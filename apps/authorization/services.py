@@ -94,18 +94,173 @@ class PermissionManagementService:
 
     @staticmethod
     def set_user_override(*, user, permission: PermissionDefinition, effect, reason="",
-                          created_by=None):
+                          created_by=None, request_meta=None, audit=True):
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        existing = UserPermissionOverride.objects.filter(user=user, permission=permission, effect=effect).first()
+        before_data = {
+            "user_id": user.pk,
+            "user": user.email,
+            "permission": permission.code,
+            "effect": existing.effect,
+            "reason": existing.reason,
+        } if existing else None
+
         obj, _ = UserPermissionOverride.objects.update_or_create(
             user=user, permission=permission, effect=effect,
             defaults={"reason": reason, "created_by": created_by},
         )
         EffectivePermissionResolver.invalidate(user.pk)
+
+        after_data = {
+            "user_id": user.pk,
+            "user": user.email,
+            "permission": permission.code,
+            "effect": effect,
+            "reason": reason,
+        }
+        
+        company = None
+        if hasattr(user, "profile") and user.profile:
+            company = user.profile.company
+
+        if audit:
+            AuditService.log(
+                action=AuditAction.PERMISSION_CHANGE,
+                instance=obj,
+                actor=created_by,
+                company=company,
+                module="authorization",
+                before=before_data,
+                after=after_data,
+                reason=reason,
+                request_meta=request_meta,
+                entity_display=f"{user.get_full_name() or user.email}",
+            )
         return obj
 
     @staticmethod
-    def assign_role(*, user, role, assigned_by=None):
+    def assign_role(*, user, role, assigned_by=None, request_meta=None, audit=True):
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        existing = UserRole.objects.filter(user=user, role=role).first()
+        before_data = {
+            "user_id": user.pk,
+            "user": user.email,
+            "role": role.name,
+            "is_active": existing.is_active,
+        } if existing else None
+
         obj, _ = UserRole.objects.update_or_create(
             user=user, role=role, defaults={"is_active": True, "assigned_by": assigned_by}
         )
         EffectivePermissionResolver.invalidate(user.pk)
+
+        after_data = {
+            "user_id": user.pk,
+            "user": user.email,
+            "role": role.name,
+            "is_active": True,
+        }
+
+        company = None
+        if hasattr(user, "profile") and user.profile:
+            company = user.profile.company
+
+        if audit:
+            AuditService.log(
+                action=AuditAction.PERMISSION_CHANGE,
+                instance=obj,
+                actor=assigned_by,
+                company=company,
+                module="authorization",
+                before=before_data,
+                after=after_data,
+                request_meta=request_meta,
+                entity_display=f"{user.get_full_name() or user.email}",
+            )
         return obj
+
+    @staticmethod
+    def update_user_overrides(*, user, permission_codes, created_by=None, request_meta=None, audit=True):
+        from apps.authorization.models import PermissionDefinition, RolePermission, UserPermissionOverride, Effect
+        from apps.authorization.services import PermissionService
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        # 1. Snapshot existing overrides
+        existing_overrides_dict = {
+            ov.permission.code: ov.effect 
+            for ov in UserPermissionOverride.objects.filter(user=user).select_related("permission")
+        }
+
+        default_role = None
+        if hasattr(user, "profile") and user.profile:
+            default_role = user.profile.default_role
+
+        role_perms = set()
+        if default_role is not None:
+            role_perms = set(
+                RolePermission.objects.filter(
+                    role=default_role, allow=True, permission__is_active=True
+                ).values_list("permission__code", flat=True)
+            )
+
+        all_perms = PermissionDefinition.objects.filter(is_active=True)
+        submitted_set = set(permission_codes)
+        for perm in all_perms:
+            code = perm.code
+            is_checked = code in submitted_set
+            is_in_role = code in role_perms
+
+            # Determine target effect
+            if is_checked and not is_in_role:
+                target_effect = Effect.ALLOW
+            elif not is_checked and is_in_role:
+                target_effect = Effect.DENY
+            else:
+                target_effect = None
+
+            # Find any existing overrides for this permission
+            existing_overrides = list(UserPermissionOverride.objects.filter(user=user, permission=perm))
+
+            if target_effect is not None:
+                # Clean up overrides with a different effect silently
+                for old_ov in existing_overrides:
+                    if old_ov.effect != target_effect:
+                        old_ov.delete()
+                # Create or update the target override silently (audit=False)
+                PermissionManagementService.set_user_override(
+                    user=user, permission=perm, effect=target_effect,
+                    reason="Customized at user matrix update" if audit else "Customized at user creation",
+                    created_by=created_by, request_meta=request_meta, audit=False
+                )
+            else:
+                # Target is None: delete any existing overrides silently
+                for old_ov in existing_overrides:
+                    old_ov.delete()
+
+        PermissionService.invalidate(user.pk)
+
+        # 2. Snapshot new overrides and log only once
+        new_overrides_dict = {
+            ov.permission.code: ov.effect 
+            for ov in UserPermissionOverride.objects.filter(user=user).select_related("permission")
+        }
+
+        if audit and existing_overrides_dict != new_overrides_dict:
+            company = user.profile.company if hasattr(user, "profile") and user.profile else None
+            AuditService.log(
+                action=AuditAction.PERMISSION_CHANGE,
+                entity_type="UserPermissionOverride",
+                entity_id=str(user.pk),
+                actor=created_by,
+                company=company,
+                module="authorization",
+                before=existing_overrides_dict,
+                after=new_overrides_dict,
+                request_meta=request_meta,
+                entity_display=user.email,
+            )

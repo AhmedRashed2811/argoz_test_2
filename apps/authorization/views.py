@@ -47,22 +47,27 @@ def permission_catalog(request):
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def user_permission_matrix(request, user_id):
-    """Show effective result + apply a direct ALLOW/DENY override (docs §4.4)."""
+    """Show effective result + apply direct ALLOW/DENY overrides (docs §4.4)."""
     target = get_object_or_404(User, id=user_id, profile__company=request.company)
-    form = UserOverrideForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        d = form.cleaned_data
-        PermissionManagementService.set_user_override(
-            user=target, permission=d["permission"], effect=d["effect"],
-            reason=d["reason"], created_by=request.user,
+    
+    if request.method == "POST":
+        permission_codes = request.POST.getlist("permissions")
+        PermissionManagementService.update_user_overrides(
+            user=target,
+            permission_codes=permission_codes,
+            created_by=request.user,
+            request_meta=request.request_meta,
         )
-        messages.success(request, "Override applied.")
+        messages.success(request, "Permission overrides updated successfully.")
         return redirect("authorization:user_matrix", user_id=target.id)
-    return render(request, "authorization/user_matrix.html", {
-        "target": target,
-        "effective": sorted(EffectivePermissionResolver.get_codes(target)),
-        "form": form,
-    })
+        
+    from apps.accounts.services import UserService
+    from apps.authorization.services import EffectivePermissionResolver
+    
+    context = UserService.get_user_creation_context(company=request.company)
+    context["target"] = target
+    context["user_active_permissions"] = EffectivePermissionResolver.get_codes(target)
+    return render(request, "authorization/user_matrix.html", context)
 
 
 @login_required

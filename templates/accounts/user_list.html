@@ -1,19 +1,478 @@
 {% extends "base.html" %}
 {% load crm_permissions %}
+
 {% block title %}Users · Argoz CRM{% endblock %}
+
 {% block content %}
-  <h1>Users</h1>
-  {% if request.user|can:'admin.users.create' %}
-    <a href="{% url 'accounts:user_create' %}">+ New user</a>
-  {% endif %}
-  <table border="1">
-    <thead><tr><th>Email</th><th>Name</th><th>Active</th></tr></thead>
-    <tbody>
-      {% for u in users %}
-        <tr><td>{{ u.email }}</td><td>{{ u.get_full_name }}</td><td>{{ u.is_active }}</td></tr>
-      {% empty %}
-        <tr><td colspan="3">No users.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #0c0d12;
+    --card-bg: rgba(20, 21, 31, 0.6);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.2rem;
+    margin: 0;
+    background: linear-gradient(to right, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-header p {
+    color: var(--text-secondary);
+    margin: 0.25rem 0 0 0;
+    font-size: 0.95rem;
+  }
+
+  .btn-create {
+    background: var(--accent-gradient);
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-create:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+    filter: brightness(1.1);
+  }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+
+  /* Table styling */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  table.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+  }
+
+  table.user-table th {
+    padding: 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  table.user-table td {
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+  }
+
+  table.user-table tr:hover td {
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  /* User Info layout */
+  .user-identity {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .user-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .user-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .user-email {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .user-phone {
+    font-size: 0.78rem;
+    color: #64748b;
+  }
+
+  .job-department {
+    font-size: 0.9rem;
+    color: #ffffff;
+    font-weight: 500;
+  }
+
+  .job-title {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 0.1rem;
+  }
+
+  /* Badges */
+  .role-badge {
+    background: rgba(99, 102, 241, 0.12);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  .team-badge {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: inline-block;
+    margin: 2px;
+  }
+
+  .overrides-badge {
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .overrides-badge.has-overrides {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+
+  .overrides-badge.none {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Status Pill */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .status-pill.active {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .status-pill.inactive {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .status-pill.active .status-dot {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  .status-pill.inactive .status-dot {
+    background-color: var(--danger);
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+
+  /* Action Buttons */
+  .actions-cell {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-action {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .btn-action:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .btn-action.btn-edit {
+    border-color: rgba(99, 102, 241, 0.25);
+    color: #a5b4fc;
+  }
+  .btn-action.btn-edit:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--accent);
+  }
+
+  .btn-action.btn-danger {
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+  }
+  .btn-action.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--danger);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 0;
+    color: var(--text-secondary);
+  }
+</style>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>User Directory</h1>
+      <p>Manage authentication profiles, team assignments, and dynamic system permissions.</p>
+    </div>
+    {% if request.user|can:'admin.users.create' %}
+      <a href="{% url 'accounts:user_create' %}" class="btn-create">
+        <span>+</span> Create New User
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="glass-card">
+    <div class="table-responsive">
+      <table class="user-table">
+        <thead>
+          <tr>
+            <th>User Info</th>
+            <th>Default Role</th>
+            <th>Team Membership</th>
+            <th>Custom Overrides</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td>
+                <div class="user-identity">
+                  <div class="user-avatar">
+                    {{ u.first_name|default:u.email|slice:":1"|upper }}
+                  </div>
+                  <div class="user-details">
+                    <span class="user-name">
+                      {{ u.get_full_name|default:u.email }}
+                    </span>
+                    <span class="user-email">{{ u.email }}</span>
+                    {% if u.phone %}
+                      <span class="user-phone">📞 {{ u.phone }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              
+              <td>
+                {% if u.profile.default_role %}
+                  <span class="role-badge">
+                    {{ u.profile.default_role.name }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--text-secondary); font-size: 0.85rem;">None Assigned</span>
+                {% endif %}
+              </td>
+              
+              <td>
+                {% for membership in u.team_memberships.all %}
+                  <span class="team-badge">
+                    {{ membership.team.name }}
+                  </span>
+                {% empty %}
+                  <span style="color: #64748b; font-size: 0.85rem;">No Active Teams</span>
+                {% endfor %}
+              </td>
+              
+              <td>
+                {% with override_count=u.permission_overrides.count %}
+                  {% if override_count > 0 %}
+                    <span class="overrides-badge has-overrides">
+                      ⚡ {{ override_count }} custom
+                    </span>
+                  {% else %}
+                    <span class="overrides-badge none">
+                      0 overrides
+                    </span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+              
+              <td>
+                {% if u.is_active %}
+                  <span class="status-pill active">
+                    <span class="status-dot"></span> Active
+                  </span>
+                {% else %}
+                  <span class="status-pill inactive">
+                    <span class="status-dot"></span> Inactive
+                  </span>
+                {% endif %}
+              </td>
+              
+              <td>
+                <div class="actions-cell">
+                  {% if request.user|can:'admin.users.update' %}
+                    <a href="{% url 'accounts:user_edit' u.id %}" class="btn-action btn-edit">
+                      Edit
+                    </a>
+                  {% endif %}
+                  
+                  <a href="{% url 'authorization:user_matrix' u.id %}" class="btn-action">
+                    Matrix
+                  </a>
+                  
+                  <a href="{% url 'authorization:permission_preview' u.id %}" class="btn-action">
+                    Preview
+                  </a>
+                  
+                  {% if u.is_active %}
+                    {% if request.user|can:'admin.users.delete' and u != request.user %}
+                      <a href="{% url 'accounts:user_delete' u.id %}" class="btn-action btn-danger" 
+                         onclick="return confirm('Are you sure you want to deactivate user {{ u.email }}?');">
+                        Deactivate
+                      </a>
+                    {% endif %}
+                  {% else %}
+                    {% if request.user|can:'admin.users.update' %}
+                      <a href="{% url 'accounts:user_activate' u.id %}" class="btn-action" 
+                         style="border-color: rgba(16, 185, 129, 0.25); color: #34d399;"
+                         onclick="return confirm('Are you sure you want to activate user {{ u.email }}?');">
+                        Activate
+                      </a>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <h3>No Users Found</h3>
+                  <p>There are no registered users in this company tenant.</p>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

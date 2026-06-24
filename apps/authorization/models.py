@@ -105,6 +105,10 @@ class UserRole(BaseModel):
     )
     is_active = models.BooleanField(default=True)
 
+    def __str__(self) -> str:
+        state = "Active" if self.is_active else "Inactive"
+        return f"UserRole: {self.user.email} -> {self.role.name} ({state})"
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["user", "role"], name="uniq_user_role")
@@ -125,6 +129,10 @@ class RolePermission(BaseModel):
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True
     )
+
+    def __str__(self) -> str:
+        state = "Allow" if self.allow else "Deny"
+        return f"RolePermission: {self.role.name} -> {self.permission.code} ({state})"
 
     class Meta:
         constraints = [
@@ -153,6 +161,9 @@ class UserPermissionOverride(BaseModel):
         blank=True,
         related_name="override_grants",
     )
+
+    def __str__(self) -> str:
+        return f"Override: {self.user.email} -> {self.permission.code} ({self.effect})"
 
     class Meta:
         constraints = [

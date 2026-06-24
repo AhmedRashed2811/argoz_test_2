@@ -30,3 +30,32 @@ class UserCreateForm(forms.Form):
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("A user with this email already exists.")
         return email
+
+
+class UserEditForm(forms.Form):
+    email = forms.EmailField()
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    phone = forms.CharField(max_length=32, required=False)
+    job_title = forms.CharField(max_length=120, required=False)
+    default_role = forms.ModelChoiceField(
+        queryset=RoleGroup.objects.none(), required=False
+    )
+    password = forms.CharField(widget=forms.PasswordInput, required=False, help_text="Leave blank to keep current password")
+
+    def __init__(self, *args, company=None, user_instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user_instance = user_instance
+        if company is not None:
+            self.fields["default_role"].queryset = RoleGroup.objects.filter(
+                company=company, is_active=True
+            )
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+        qs = User.objects.filter(email=email)
+        if self.user_instance is not None:
+            qs = qs.exclude(pk=self.user_instance.pk)
+        if qs.exists():
+            raise forms.ValidationError("A user with this email already exists.")
+        return email

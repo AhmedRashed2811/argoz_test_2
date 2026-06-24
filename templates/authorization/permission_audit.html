@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load crm_permissions %}
 
-{% block title %}Audit Trail · Argoz CRM{% endblock %}
+{% block title %}Permission Audit · Argoz CRM{% endblock %}
 
 {% block content %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,6 +56,11 @@
     margin-bottom: 2rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
   }
 
   .page-header h1 {
@@ -70,6 +75,20 @@
     color: var(--text-secondary);
     margin: 0.25rem 0 0 0;
     font-size: 0.95rem;
+  }
+
+  .back-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+  }
+
+  .back-link:hover {
+    color: #ffffff;
   }
 
   .glass-card {
@@ -106,7 +125,6 @@
     letter-spacing: 0.05em;
   }
 
-  .filter-group select,
   .filter-group input {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -115,12 +133,11 @@
     color: #ffffff;
     font-family: inherit;
     font-size: 0.9rem;
-    min-width: 200px;
+    min-width: 250px;
     box-sizing: border-box;
     transition: all 0.25s;
   }
 
-  .filter-group select:focus,
   .filter-group input:focus {
     outline: none;
     border-color: var(--accent);
@@ -228,12 +245,6 @@
     border: 1px solid rgba(239, 68, 68, 0.2);
   }
 
-  .action-badge.permission_change {
-    background: rgba(139, 92, 246, 0.12);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.2);
-  }
-
   .action-badge.default {
     background: rgba(156, 163, 175, 0.12);
     color: #d1d5db;
@@ -282,7 +293,7 @@
     font-weight: 500;
   }
 
-  /* Metadata Tooltip-like Box */
+  /* Metadata Box */
   .metadata-box {
     display: flex;
     flex-direction: column;
@@ -357,31 +368,24 @@
 
 <div class="container">
   <div class="page-header">
-    <h1>System Audit Trail</h1>
-    <p>Read-only, append-only logs documenting modifications, configurations, and user actions.</p>
+    <div>
+      <h1>Permission Audit Log</h1>
+      <p>Audit records detailing roles, user overrides, and system access baseline changes.</p>
+    </div>
+    <a href="{% url 'authorization:role_list' %}" class="back-link">
+      ← Roles & Permissions
+    </a>
   </div>
 
   <!-- Filters Panel -->
   <form method="get" class="glass-card">
     <div class="filter-bar">
       <div class="filter-group">
-        <label for="id_action">Action Type</label>
-        <select name="action" id="id_action">
-          <option value="">-- All Actions --</option>
-          <option value="CREATE" {% if request.GET.action == "CREATE" %}selected{% endif %}>CREATE</option>
-          <option value="UPDATE" {% if request.GET.action == "UPDATE" %}selected{% endif %}>UPDATE</option>
-          <option value="DELETE" {% if request.GET.action == "DELETE" %}selected{% endif %}>DELETE</option>
-          <option value="PERMISSION_CHANGE" {% if request.GET.action == "PERMISSION_CHANGE" %}selected{% endif %}>PERMISSION_CHANGE</option>
-          <option value="POLICY_CHANGE" {% if request.GET.action == "POLICY_CHANGE" %}selected{% endif %}>POLICY_CHANGE</option>
-        </select>
+        <label for="id_user_id">Filter by target user ID</label>
+        <input type="text" name="user_id" id="id_user_id" placeholder="e.g. 2" value="{{ request.GET.user_id|default:'' }}">
       </div>
 
-      <div class="filter-group">
-        <label for="id_entity_type">Entity Type</label>
-        <input type="text" name="entity_type" id="id_entity_type" placeholder="e.g. User, Lead" value="{{ request.GET.entity_type|default:'' }}">
-      </div>
-
-      <button type="submit" class="btn-submit">Apply Filters</button>
+      <button type="submit" class="btn-submit">Filter Log</button>
       <a href="?" class="btn-reset">Reset</a>
     </div>
   </form>
@@ -394,10 +398,10 @@
           <tr>
             <th style="width: 180px;">Timestamp</th>
             <th style="width: 130px;">Action</th>
-            <th style="width: 220px;">Target Entity</th>
-            <th style="width: 180px;">Actor</th>
-            <th>Details / Value Changes</th>
-            <th style="width: 260px;">Request Meta</th>
+            <th style="width: 250px;">Target Config/Entity</th>
+            <th style="width: 180px;">Authorized Actor</th>
+            <th>Details & Reasons</th>
+            <th style="width: 260px;">Request Context</th>
           </tr>
         </thead>
         <tbody>
@@ -409,7 +413,7 @@
               </td>
               
               <td>
-                <span class="action-badge {% if log.action == 'CREATE' %}create{% elif log.action == 'UPDATE' %}update{% elif log.action == 'DELETE' %}delete{% elif log.action == 'PERMISSION_CHANGE' %}permission_change{% else %}default{% endif %}">
+                <span class="action-badge {% if log.action == 'CREATE' %}create{% elif log.action == 'UPDATE' %}update{% elif log.action == 'DELETE' %}delete{% else %}default{% endif %}">
                   {{ log.action }}
                 </span>
               </td>
@@ -538,14 +542,6 @@
                       <span>Method/Path</span>
                       <span class="metadata-val">{{ log.request_meta.method|default:"-" }} {{ log.request_meta.path|default:"-" }}</span>
                     </div>
-                    {% if log.request_meta.user_agent %}
-                      <div class="metadata-item" style="flex-direction: column; gap: 0.1rem; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 4px; margin-top: 4px;">
-                        <span>User Agent</span>
-                        <span style="color: #64748b; font-size: 0.68rem; word-break: break-all; line-height: 1.25;">
-                          {{ log.request_meta.user_agent }}
-                        </span>
-                      </div>
-                    {% endif %}
                   </div>
                 {% else %}
                   <span style="color: #64748b; font-size: 0.85rem;">-</span>
@@ -555,7 +551,7 @@
           {% empty %}
             <tr>
               <td colspan="6" style="text-align: center; padding: 3rem 0; color: var(--text-secondary);">
-                No matching audit log entries found.
+                No matching permission audit entries found.
               </td>
             </tr>
           {% endfor %}
@@ -563,7 +559,7 @@
       </table>
     </div>
 
-    <!-- Pagination controls -->
+    <!-- Pagination -->
     {% if page.has_other_pages %}
       <div class="pagination-container">
         <span class="pagination-info">
@@ -571,12 +567,12 @@
         </span>
         <div class="pagination-actions">
           {% if page.has_previous %}
-            <a href="?page={{ page.previous_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}" class="btn-page">
+            <a href="?page={{ page.previous_page_number }}{% if request.GET.user_id %}&user_id={{ request.GET.user_id }}{% endif %}" class="btn-page">
               &larr; Previous
             </a>
           {% endif %}
           {% if page.has_next %}
-            <a href="?page={{ page.next_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.entity_type %}&entity_type={{ request.GET.entity_type }}{% endif %}" class="btn-page">
+            <a href="?page={{ page.next_page_number }}{% if request.GET.user_id %}&user_id={{ request.GET.user_id }}{% endif %}" class="btn-page">
               Next &rarr;
             </a>
           {% endif %}
