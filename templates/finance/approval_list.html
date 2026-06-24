@@ -1,20 +1,194 @@
 {% extends "base.html" %}
-{% block title %}Finance Approvals · Argoz CRM{% endblock %}
+{% load static crm_permissions %}
+{% block title %}Finance Approval · Argoz CRM{% endblock %}
+
+{% block extra_css %}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'finance/finance.css' %}">
+{% endblock %}
+
 {% block content %}
-  <h1>Campaigns pending review</h1>
-  <table border="1">
-    <thead><tr><th>Campaign</th><th>Budget</th><th>Status</th><th></th></tr></thead>
-    <tbody>
-      {% for c in campaigns %}
-        <tr>
-          <td>{{ c.name }}</td>
-          <td>{{ c.total_budget }}</td>
-          <td>{{ c.approval_status }}</td>
-          <td><a href="{% url 'finance:campaign_decide' c.id %}">Decide</a></td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="4">Nothing pending.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="toast-container" id="toastContainer"></div>
+
+<main class="page-body">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Finance Approval</h1>
+        <p>Review and approve campaign budgets — Finance queue</p>
+      </div>
+    </div>
+    <!-- <a href="campaigns.html" class="btn-back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Campaigns
+    </a> -->
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiPending">—</div><div class="kpi-label">Total Pending</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiBudgetPending">—</div><div class="kpi-label">Budget Pending (EGP)</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiApprovedToday">—</div><div class="kpi-label">Approved Today</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon red">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiRejectedToday">—</div><div class="kpi-label">Rejected Today</div></div>
+    </div>
+  </div>
+
+  <!-- Search / Filter -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search campaigns…">
+    </div>
+    <span class="search-results-hint" id="searchHint"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-scroll-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">
+              <div class="th-inner">Campaign Name
+                <button class="th-icon-btn" id="sortNameBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterNameBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Types
+                <button class="th-icon-btn" id="filterTypeBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Budget
+                <button class="th-icon-btn" id="sortBudgetBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterBudgetBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Date Submitted
+                <button class="th-icon-btn" id="sortDateBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterDateBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Approval Status
+                <button class="th-icon-btn" id="filterApprovalBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pagination-bar" id="paginationBar">
+    <span class="pg-info" id="pgInfo"></span>
+    <div class="pg-controls">
+      <button class="pg-btn" id="pgFirst" onclick="goPage(1)">«</button>
+      <button class="pg-btn" id="pgPrev"  onclick="goPage(currentPage-1)">‹</button>
+      <div class="pg-numbers" id="pgNumbers"></div>
+      <button class="pg-btn" id="pgNext"  onclick="goPage(currentPage+1)">›</button>
+      <button class="pg-btn" id="pgLast"  onclick="goPage(totalPages)">»</button>
+    </div>
+  </div>
+</main>
+
+<!-- ═══ FILTER DROPDOWNS ═══ -->
+<div class="filter-dropdown" id="filterNameDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Name</p><input type="text" class="filter-search" id="filterNameSearch" placeholder="Search…"></div>
+  <div class="filter-list" id="filterNameList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterNameSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterNameClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterTypeDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Type</p></div>
+  <div class="filter-list" id="filterTypeList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterTypeSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterTypeClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterBudgetDropdown" onclick="event.stopPropagation()" style="width:220px">
+  <div class="filter-dd-head"><p>Filter by Budget Range</p></div>
+  <div style="padding:10px 14px 4px">
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Min Budget</label><input type="number" id="budgetMin" class="budget-dd-input" placeholder="e.g. 0" min="0" oninput="currentPage=1;renderTable()"></div>
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Max Budget</label><input type="number" id="budgetMax" class="budget-dd-input" placeholder="e.g. 50,000" min="0" oninput="currentPage=1;renderTable()"></div>
+  </div>
+  <div class="filter-actions"><button class="filter-btn clear-all" id="filterBudgetClear" style="flex:1">Clear</button></div>
+</div>
+<div class="filter-dropdown" id="filterDateDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Date Submitted</p></div>
+  <div class="filter-list" id="filterDateList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterDateSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterDateClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterApprovalDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Approval</p></div>
+  <div class="filter-list" id="filterApprovalList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterApprovalSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterApprovalClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══ REVIEW PANEL ═══ -->
+<div class="review-overlay" id="reviewOverlay">
+  <div class="review-panel">
+    <div class="review-panel-header">
+      <div>
+        <div class="review-panel-title" id="reviewTitle">Campaign Review</div>
+        <div class="review-panel-sub" id="reviewSub">Finance budget review</div>
+      </div>
+      <button class="review-close" onclick="closeReview()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="review-body" id="reviewBody"></div>
+    <div class="review-footer" id="reviewFooter"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.FINANCE_CFG = {
+    listUrl:    "{% url 'finance:approval_api_list' %}",
+    decideTmpl: "{% url 'finance:approval_api_decide' '00000000-0000-0000-0000-000000000000' %}",
+    csrf: "{{ csrf_token }}",
+    canApprove: {% if request.user|can:'finance.campaign.approve' %}true{% else %}false{% endif %}
+  };
+</script>
+<script src="{% static 'finance/finance.js' %}"></script>
 {% endblock %}

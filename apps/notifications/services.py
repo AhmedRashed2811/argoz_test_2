@@ -43,8 +43,12 @@ class NotificationService:
         return notif
 
     @staticmethod
-    def create_for_users(*, company, recipients, code, **kwargs):
+    def create_for_users(*, company, recipients, code, exclude_user=None, **kwargs):
+        # The actor behind an event should not be notified about their own action
+        # (e.g. a manager who creates a campaign — docs §12). Pass exclude_user.
         seen = set()
+        if exclude_user is not None and getattr(exclude_user, "pk", None) is not None:
+            seen.add(exclude_user.pk)
         for user in recipients:
             if user is None or user.pk in seen:
                 continue

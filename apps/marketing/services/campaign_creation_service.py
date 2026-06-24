@@ -39,7 +39,7 @@ class CampaignCreationService:
             after={"name": name, "types": list(selected_types or [])},
         )
         NotificationService.create_for_users(
-            company=company, recipients=_marketing_managers(company),
+            company=company, recipients=_campaign_created_recipients(company), exclude_user=actor,
             code=NotificationCode.CAMPAIGN_CREATED, title=f"Campaign created: {name}",
             related_type="Campaign", related_id=campaign.pk,
         )
@@ -72,10 +72,14 @@ class CampaignCreationService:
             raise ValidationError("All selected campaign types must be completed (§17).")
 
 
-def _marketing_managers(company):
+def _campaign_created_recipients(company):
     from apps.accounts.models import User
-    from apps.authorization.services import EffectivePermissionResolver
-
-    users = User.objects.filter(is_active=True, profile__company=company).distinct()
-    return [u for u in users
-            if EffectivePermissionResolver.has(u, "marketing.campaign.view_all")]
+    from django.db.models import Q
+    role_codes = ["FINANCE_MANAGERS", "MARKETING_MEMBERS", "MARKETING_MANAGERS"]
+    return list(User.objects.filter(
+        is_active=True,
+        profile__company=company
+    ).filter(
+        Q(profile__default_role__code__in=role_codes) |
+        Q(roles__role__code__in=role_codes, roles__is_active=True)
+    ).distinct())

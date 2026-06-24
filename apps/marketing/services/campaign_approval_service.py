@@ -38,7 +38,7 @@ class CampaignApprovalService:
         )
         NotificationService.create_for_users(
             company=campaign.company, recipients=_finance_managers(campaign.company),
-            code=NotificationCode.CAMPAIGN_SUBMITTED_FINANCE,
+            exclude_user=actor, code=NotificationCode.CAMPAIGN_SUBMITTED_FINANCE,
             title=f"Campaign submitted: {campaign.name}",
             related_type="Campaign", related_id=campaign.pk,
         )
@@ -72,9 +72,14 @@ class CampaignApprovalService:
             before={"approval_status": from_status},
             after={"approval_status": status}, reason=reason,
         )
+        if status == ApprovalStatus.APPROVED:
+            recipients = _campaign_approved_recipients(campaign.company)
+        else:
+            recipients = _marketing_team(campaign.company)
+
         NotificationService.create_for_users(
-            company=campaign.company, recipients=_marketing_team(campaign.company),
-            code=_NOTIF.get(status, NotificationCode.CAMPAIGN_APPROVED),
+            company=campaign.company, recipients=recipients,
+            exclude_user=actor, code=_NOTIF.get(status, NotificationCode.CAMPAIGN_APPROVED),
             title=f"Campaign {status}: {campaign.name}",
             related_type="Campaign", related_id=campaign.pk,
         )
@@ -95,3 +100,16 @@ def _finance_managers(company):
 
 def _marketing_team(company):
     return _perm_users(company, "marketing.campaigns.access")
+
+
+def _campaign_approved_recipients(company):
+    from apps.accounts.models import User
+    from django.db.models import Q
+    role_codes = ["FINANCE_MANAGERS", "DIRECTORS", "MARKETING_MEMBERS"]
+    return list(User.objects.filter(
+        is_active=True,
+        profile__company=company
+    ).filter(
+        Q(profile__default_role__code__in=role_codes) |
+        Q(roles__role__code__in=role_codes, roles__is_active=True)
+    ).distinct())
