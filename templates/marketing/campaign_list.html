@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load crm_permissions %}
+{% block title %}Campaigns · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Campaigns</h1>
+  {% if request.user|can:'marketing.campaign.create' %}
+    <a href="{% url 'marketing:campaign_create' %}">+ New campaign</a>
+  {% endif %}
+  <table border="1">
+    <thead><tr><th>Name</th><th>Dates</th><th>Status</th><th>Approval</th><th>Budget</th><th>Leads</th></tr></thead>
+    <tbody>
+      {% for c in campaigns %}
+        <tr>
+          <td><a href="{% url 'marketing:campaign_detail' c.id %}">{{ c.name }}</a></td>
+          <td>{{ c.start_date }} → {{ c.end_date }}</td>
+          <td>{{ c.lifecycle_status }}</td>
+          <td>{{ c.approval_status }}</td>
+          <td>{{ c.total_budget }}</td>
+          <td>{{ c.lead_count }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">No campaigns.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

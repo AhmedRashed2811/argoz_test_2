@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load crm_permissions %}
+{% block title %}{{ lead.name }} · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>{{ lead.name }} — {{ lead.phone }}</h1>
+  <p>Stage: <strong>{{ lead.current_stage.code }}</strong> ·
+     Status: {{ lead.active_status }} ·
+     Salesman: {{ lead.assigned_salesman.email|default:"unassigned" }} ·
+     SLA: {{ lead.sla_deadline|default:"—" }}</p>
+
+  <h3>History</h3>
+  <ul>
+    {% for h in lead.stage_history.all|slice:":10" %}
+      <li>{{ h.changed_at }} — {{ h.from_stage.code }} → {{ h.to_stage.code }} ({{ h.reason }})</li>
+    {% endfor %}
+  </ul>
+
+  {% if request.user|can:'leads.distribution.manual_all' %}
+    <details><summary>Assign</summary>
+      <form method="post" action="{% url 'leads:assign' lead.id %}">{% csrf_token %}{{ assign_form.as_p }}<button>Assign</button></form>
+    </details>
+  {% endif %}
+  {% if request.user|can:'leads.stage.change_own' %}
+    <details><summary>Change stage</summary>
+      <form method="post" action="{% url 'leads:stage_change' lead.id %}">{% csrf_token %}{{ stage_form.as_p }}<button>Update</button></form>
+    </details>
+  {% endif %}
+  {% if request.user|can:'leads.followup.create_own' %}
+    <details><summary>Schedule follow-up</summary>
+      <form method="post" action="{% url 'leads:followup_create' lead.id %}">{% csrf_token %}{{ followup_form.as_p }}<button>Schedule</button></form>
+    </details>
+  {% endif %}
+  {% if request.user|can:'leads.meeting.create_own' %}
+    <details><summary>Schedule meeting</summary>
+      <form method="post" action="{% url 'leads:meeting_create' lead.id %}">{% csrf_token %}{{ meeting_form.as_p }}<button>Schedule</button></form>
+    </details>
+  {% endif %}
+{% endblock %}

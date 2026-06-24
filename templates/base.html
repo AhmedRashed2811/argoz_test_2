@@ -1,0 +1,17 @@
+{% load crm_permissions %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Argoz CRM{% endblock %}</title>
+</head>
+<body>
+  {# Nav is built from PageDefinition filtered by the effective permission set (docs §14). #}
+  {% include "includes/nav.html" %}
+  {% include "includes/messages.html" %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

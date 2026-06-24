@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Webhooks · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Webhook Integrations</h1>
+  <a href="{% url 'integrations:webhook_create' %}">+ New endpoint</a>
+  <p>Paste the endpoint URL into your Make/Zapier scenario; send the secret in the
+     <code>X-Webhook-Token</code> header.</p>
+  <table border="1">
+    <thead><tr><th>Name</th><th>Provider</th><th>URL</th><th>Token</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.ep.name }}</td>
+          <td>{{ row.ep.provider.code }}</td>
+          <td><code>{{ row.url }}</code></td>
+          <td><code>{{ row.ep.secret_token }}</code></td>
+          <td>{{ row.ep.status }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No endpoints.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

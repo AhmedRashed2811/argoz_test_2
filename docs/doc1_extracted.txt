@@ -1,0 +1,1423 @@
+
+Argoz CRM SYSTEM
+Technical Software Design Document
+Django MVT Backend Development Blueprint - Lead Management, Distribution, Marketing, Permissions, Audit, Background Jobs, and Integration Architecture
+Item
+Value
+Version
+1.0 - Technical Blueprint Draft
+Prepared for
+Backend Django development of the Real Estate CRM
+Implementation Mode
+Single company implementation now; SaaS-ready company scoping preserved for future subscription management
+Frontend Rule
+Django MVT server-rendered templates only; no frontend REST API layer
+Chart/Image Rule
+No charts and no images included in this document, by request
+Source Business Documents
+Lead Management & Distribution Functional Specification, and Marketing Management Module Functional Specification
+
+Document Intent: This document intentionally converts the two business specifications into a development-ready technical design. It preserves all current business rules while adding implementation structure, entities, custom permission design, background services, audit strategy, webhooks, and a clean Django folder/file architecture.
+
+
+Table of Contents
+1. Executive Development Brief
+2. Architectural Principles and Technology Stack
+3. Application Modules and Boundaries
+4. Custom Authentication and Authorization Engine
+5. Default Groups and Permission Matrix
+6. Audit Engine
+7. Policy Engine and Configurable Business Rules
+8. Lead Management and Distribution Technical Design
+9. Follow-ups, Meetings, Lead Stages, SLA and Reminders
+10. Marketing Management Technical Design
+11. Entity / Model Catalog with Fields and Types
+12. Background Services, Celery, Redis, WebSockets, Emails and Notifications
+13. Meta Ads, Make/Zapier and Dynamic Webhook Architecture
+14. Django MVT UI and Template Guidelines
+15. Folder and File Structure
+16. Service Layer, OOP Patterns and Extension Contracts
+17. Data Integrity, Concurrency and Validation Rules
+18. Deployment Runtime and Environment Strategy
+19. Implementation Roadmap
+20. Final Development Checklist
+
+1. Executive Development Brief
+The CRM must be built as a clean, flexible Django MVT application for one company first. The codebase must still be prepared for a future SaaS management application that controls CRM subscriptions, company isolation, integrations, and subscription-level settings. The current implementation should not overcomplicate the UI with SaaS screens, but the database and service boundaries must keep company scoping ready.
+1.1 Non-Negotiable Development Rules
+Rule
+Technical Decision
+Django MVT only
+Frontend pages are rendered by Django templates. Use views, forms, templates, template tags, static JS/CSS, and standard Django URL reversing.
+No frontend REST API
+Do not build DRF endpoints for the template frontend. AJAX views may return JSON or HTML partials only for server-rendered UX behavior. External integrations may use webhook endpoints.
+Custom authorization
+Django auth may be used for login/session/password handling, but business permissions must be custom, DB-driven, page/action-aware, and editable from the UI.
+No hardcoded authorization
+Views, services, menus, buttons, and actions must check permission codes stored in the database, not Python role-name if/else logic.
+Service layer first
+Views must be thin: validate request, call service, return response. Business logic, distribution, campaign budget aggregation, SLA expiry, and permissions stay in services.
+Audit everything
+Every meaningful CRUD, permission change, policy change, assignment, stage change, approval, import, export, webhook event, background job result, and sensitive access must be audit logged.
+OOP and DRY
+Distribution techniques, policies, notification channels, approval logic, and integrations must be implemented through extensible classes/registries where possible.
+Configurable policies
+SLA times, distribution methods, reminder behavior, walk-in reception policy, source rules, campaign budget rules, and approval rules must be stored as configurable policies.
+Relative URLs
+All templates must use Django relative URL reversing, for example: {% url 'leads:detail' lead.id %}.
+
+1.2 Business Scope Preserved in This Technical Design
+Lead creation for Self-Generated, Campaign, Broker, Walk-in, Call Center, Exhibition, Referral, and Existing Client sources.
+Direct vs Broker/Indirect lead classification, with configurable SLA assignment and breach handling.
+Manual distribution, automatic Round Robin, automatic By Turn, language pre-check, team/salesman scope modes, retry attempts, and team escalation.
+Lead stages: Fresh, Interested, Not Interested, Follow-up, Meeting, Not Reached, and Frozen, each with configurable SLA and reminder behavior.
+Universal rule after SLA rotation: reset the visible lead stage to Fresh, reset Fresh SLA, preserve full history.
+Marketing campaign master setup with multi-select campaign types: Events, TV Ads, Street Ads, Social Media, and Exhibition.
+Campaign budgets, child budgets, Other Costs, finance approval, campaign lifecycle status, lead attribution, ROI, and KPI reporting.
+Self-service future Meta Ads linkage using tenant-specific dynamic webhook URLs with Make/Zapier as middleware.
+2. Architectural Principles and Technology Stack
+2.1 High-Level Architecture
+Layer
+Responsibility
+Implementation Guidance
+Template/UI Layer
+HTML templates, server-rendered pages, forms, modals, tables, and AJAX interactions.
+Use template inheritance, namespaced URLs, permission-aware menus/buttons, Select2/vanilla JS/Bootstrap where useful, SweetAlert/toasts for user feedback.
+View Layer
+Receives HTTP request, checks authentication, calls form validation, checks required permission, calls service, returns redirect/render/JsonResponse.
+No business logic, no direct complex ORM writes, no direct campaign child creation, no direct distribution decision logic.
+Form Layer
+Input validation, field-level cleaning, user-friendly error messages.
+Use ModelForm/Form classes but keep cross-entity business rules in services/policies.
+Service Layer
+Main business engine for leads, SLA, distribution, campaign creation, budget aggregation, approval, audit, notifications, webhooks.
+Services must be transaction-aware and idempotent where background jobs or webhooks are involved.
+Selector/Query Layer
+Reusable read queries for dashboards, tables, permission-filtered lists, and reports.
+Avoid duplicating queryset logic in views. Apply user scope filters through selectors.
+Domain Strategy Layer
+OOP interfaces for distribution techniques, policy options, notification delivery, integration mapping.
+Use registry by code so future techniques can be added without rewriting workflows.
+Persistence Layer
+Django ORM models and migrations.
+Small focused models. Use constraints for data integrity. No heavy logic in model save except minimal invariant helpers.
+Async Layer
+Celery workers, Celery Beat schedules, Redis broker/cache/channel layer.
+Handles SLA monitoring, reminders, emails, notifications, webhook retries, campaign metric recalculation, and audit retention jobs.
+
+2.2 Recommended Technology Stack
+Concern
+Recommended Technology / Pattern
+Backend framework
+Django 5.x, Python 3.12+, Django MVT
+Database
+MariaDB named “argoz” for transactional CRM data, JSONField policies, indexes, and row-level concurrency locks
+DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.environ.get('MYSQL_DATABASE', 'argoz'),
+            'USER': os.environ.get('MYSQL_USER', 'root'),
+            'PASSWORD': os.environ.get('MYSQL_PASSWORD', ''),
+            'HOST': os.environ.get('MYSQL_HOST', '127.0.0.1'),
+            'PORT': os.environ.get('MYSQL_PORT', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            },
+        }
+
+Background jobs
+Celery workers and Celery Beat
+Message broker / cache
+Redis for Celery broker/cache and Django Channels layer
+Realtime
+Django Channels + Redis channel layer for WebSocket notifications
+Web server
+Gunicorn for WSGI pages; Daphne/Uvicorn/ASGI process for WebSockets if deployed separately
+Static/media
+Django staticfiles; media storage local during development, S3/MinIO-compatible storage later
+Frontend behavior
+Django templates, Bootstrap, Select2, AJAX/fetch, SweetAlert/toast notifications, Chart.js only if dashboards are later requested; this document itself contains no charts
+Email
+Email outbox model + Celery send task using SMTP/provider configured by environment
+Integrations
+Make/Zapier webhook bridge now; native Meta integration can be evaluated later if the company accepts Meta App Review effort
+
+2.3 One-Company Now, SaaS-Ready Later
+Create a Company model and attach company_id to major business tables even though the first release has exactly one active company.
+A default company resolver can return the single company during the one-company release. Later, the resolver can use subdomain, tenant slug, subscription context, or logged-in user membership.
+All services should accept company or derive it from request context. This prevents a future migration from requiring a full rewrite.
+Do not expose subscription billing UI now. Keep placeholders for subscription_status and plan_code if useful, but manage them later through the planned management application.
+3. Application Modules and Boundaries
+Module / App
+Core Responsibility
+Must Not Do
+companies
+Company, branches, subscription placeholders, tenant/current-company resolver.
+Must not contain business CRM rules.
+accounts
+Django login users, user profile, teams, languages, availability, broker-linked users.
+Must not decide business permissions by role names.
+authorization
+Custom roles, permissions, page definitions, effective permission resolver, template tags, decorators/mixins.
+Must not depend on Django default Group permissions for CRM business actions.
+audit
+Global audit log, field diffs, snapshots, request context, export logs, job logs.
+Must not rely only on Django admin history.
+policies
+Policy definitions, options, company values, parameters, policy resolver.
+Must not hardcode company policy in services.
+leads
+Lead entity, source workflow, stage lifecycle, assignment history, follow-ups, meetings, notes.
+Must not directly implement strategy-specific distribution inside views.
+distribution
+Manual assignment services, automatic strategy registry, Round Robin, By Turn, retry/team escalation, locking.
+Must not create leads or change stages without lead services.
+marketing
+Campaign master, campaign types, child records, assets, budgets, approval, attribution, ROI.
+Must not let views create heavy child objects directly.
+finance
+Finance approval services for campaigns, approval history, budget review screens.
+Must not own campaign creation logic.
+notifications
+Notification types, notification records, delivery status, WebSocket fanout, email triggers.
+Must not embed business rules that belong to leads/marketing.
+integrations
+Webhook endpoints, Make/Zapier mapping, deduplication, failed retry, provider config.
+Must not bypass lead services when creating leads from external payloads.
+reports
+Permission-filtered dashboard/report selectors, exports, management summaries.
+Must not mutate core business data.
+
+4. Custom Authentication and Authorization Engine
+Critical Requirement: This is the most critical part of the system. Authentication can use Django login/session/password infrastructure. Authorization must be a custom CRM permission engine that non-technical admins can manage from the UI.
+
+4.1 Authentication vs Authorization
+Area
+Decision
+Authentication
+Use Django User, sessions, password hashing, password reset, login/logout, account activation, and optional 2FA later.
+Authorization
+Use custom RoleGroup, PermissionDefinition, PageDefinition, RolePermissionDefault, UserPermissionOverride, and EffectivePermissionResolver.
+Why not Django default permissions?
+Django default add/change/delete/view permissions are too model-centric and not user-friendly enough for the required page/action/custom business permissions.
+Django staff/superuser
+Use only for internal technical admin access. CRM business access must not depend on is_superuser except for a restricted technical emergency account.
+
+4.2 Permission Model Concept
+A permission represents a business action or page/action ability, not only a database model action.
+A page permission controls whether a user can open a page, menu, tab, or section.
+An action permission controls what the user can do inside that page: create, edit, assign, approve, export, archive, upload asset, change stage, etc.
+Every permission has a stable code such as leads.lead.view, leads.lead.assign_manual, marketing.campaign.budget.manage, finance.campaign.approve, or admin.users.create.
+Roles are only default permission bundles. A user can receive a role, then lose some default permissions through explicit Deny overrides, and receive additional permissions from other roles through explicit Allow overrides.
+Deny overrides win over Role defaults. Explicit Allow can add permissions from any module. This is what allows a Sales Manager to also have selected Marketing permissions without becoming a Marketing Manager.
+4.3 Effective Permission Resolution Algorithm
+Load all active roles assigned to the user.
+Union all active default permissions allowed by these roles.
+Load all direct user overrides: ALLOW and DENY.
+Add all direct ALLOW permissions to the permission set.
+Remove all direct DENY permissions from the permission set; Deny wins so admins can unselect default role permissions.
+Apply optional contextual scope checks: own, team, branch, all-company, broker-owned, or campaign-owned.
+Cache the result for the request and invalidate when roles, permissions, policy, or user overrides change.
+4.4 Permission-Aware UI Screens
+UI Screen
+Purpose
+Required UX Behavior
+Group / Role Management
+Create and edit custom roles such as Sales, Sales Operation, Marketing Manager.
+Show modules as accordion sections. Admin can add/remove default permissions using friendly names, not technical codes only.
+Permission Catalog
+Create new permission definitions from the UI.
+Permission has module, page, action, friendly name, code, description, risk level, and active/inactive flag.
+Page Permission Management
+Define CRM pages, menus, tabs, and page access permissions.
+Admin can decide who sees dashboard cards, pages, buttons, and table actions.
+User Creation Wizard
+Create user, choose default role(s), then show all default permissions preselected.
+Admin can unselect default permissions or add permissions from other roles/modules before saving.
+User Permission Matrix
+Fine-tune permissions for a single user.
+Display role defaults, direct allows, direct denies, final effective result, and the reason each permission exists.
+Permission Preview
+Simulate what the user can see/do.
+Show menus, pages, buttons, and actions enabled for this user before account activation.
+Permission Audit
+Trace permission and role changes.
+Show who changed permissions, when, old value, new value, reason, and affected user.
+
+4.5 View and Template Enforcement
+# View-level authorization example
+@login_required
+@crm_permission_required('leads.lead.assign_manual')
+def assign_lead_view(request, lead_id):
+    form = ManualAssignmentForm(request.POST or None, company=request.company)
+    if request.method == 'POST' and form.is_valid():
+        LeadAssignmentService.assign_manually(
+            lead_id=lead_id,
+            actor=request.user,
+            company=request.company,
+            target=form.cleaned_data,
+            request_meta=RequestMeta.from_request(request),
+        )
+        messages.success(request, 'Lead assigned successfully.')
+        return redirect('leads:detail', lead_id=lead_id)
+    return render(request, 'leads/assign_modal.html', {'form': form})
+
+# Template relative URL and action permission example
+<a href="{% url 'leads:detail' lead.id %}">Open Lead</a>
+{% if request.user|can:'leads.lead.assign_manual' %}
+  <button data-url="{% url 'leads:assign' lead.id %}">Assign</button>
+{% endif %}
+
+5. Default Groups and Permission Matrix
+5.1 Permission Code Taxonomy
+Code Pattern
+Meaning
+Examples
+<module>.<page>.access
+Can open a specific page or page section.
+leads.dashboard.access, marketing.campaigns.access, admin.users.access
+<module>.<entity>.view_own
+Can view records assigned to the user.
+leads.lead.view_own
+<module>.<entity>.view_team
+Can view records for the user team.
+leads.lead.view_team
+<module>.<entity>.view_all
+Can view all company records.
+leads.lead.view_all, marketing.campaign.view_all
+<module>.<entity>.<action>
+Can execute a business action.
+lead.assign_manual, campaign.submit_finance, campaign.approve
+<module>.<config>.manage
+Can manage configuration.
+policies.company.manage, distribution.rotation.manage
+<module>.<report>.export
+Can export data.
+reports.leads.export, audit.logs.export
+
+5.2 Default CRM Groups
+Group
+Default Scope
+Default Custom Permissions / Notes
+System Admins
+All company configuration and administration pages.
+admin.users.*, authorization.roles.*, authorization.permissions.*, policies.*, audit.view_all, audit.export, companies.settings.manage, teams.manage, languages.manage, integrations.webhooks.manage, notifications.templates.manage, reports.view_all. Finance approval can be added or removed as a direct permission depending on governance.
+Sales
+Own lead workspace.
+leads.dashboard.access, leads.lead.create_self_generated, leads.lead.view_own, leads.lead.update_own, leads.stage.change_own, leads.followup.create_own, leads.followup.update_own, leads.meeting.create_own, leads.note.add_own, notifications.view_own, campaigns.reference.view. No manual all-company distribution by default.
+Sales Head
+Team sales management.
+All Sales defaults + leads.lead.view_team, leads.lead.assign_team_member, leads.distribution.team_manual, leads.distribution.team_auto, leads.stage.change_team, leads.followup.manage_team, leads.meeting.manage_team, reports.team.view, team.members.view. Can assign self-generated leads to self or team member and run automatic distribution within own team only.
+Sales Operation
+Operational lead control and distribution.
+leads.lead.full_crud, leads.lead.view_all, leads.lead.create_any_source, leads.lead.update_any, leads.lead.archive, leads.lead.reactivate, leads.distribution.manual_all, leads.distribution.auto_trigger, leads.import, leads.export_limited, leads.source.manage, broker.lead.assign_salesman, campaigns.reference.view, marketing.attribution.link, reports.leads.view.
+Directors
+Management visibility and decision monitoring.
+dashboards.executive.access, leads.lead.view_all, marketing.campaign.view_all, finance.approval.view, reports.all.view, reports.export_summary, audit.summary.view, sla.breaches.view, distribution.performance.view. Edit/approve actions are not default unless explicitly granted.
+Call Center
+Phone lead capture and initial qualification.
+leads.callcenter.access, leads.lead.create_callcenter, leads.lead.create_referral, leads.lead.view_created, leads.lead.update_created_before_assignment, leads.source.how_did_you_know.capture, leads.duplicate.check, notifications.view_own. Assignment only if manual distribution permission is added.
+Finance Managers
+Campaign budget approval and review.
+finance.dashboard.access, marketing.campaign.view_all, marketing.budget.view, finance.campaign.review, finance.campaign.approve, finance.campaign.semi_approve, finance.campaign.reject, finance.approval.reason.add, finance.approval.history.view, reports.marketing_roi.view, audit.budget.view.
+Receptionists
+Walk-in lead intake and visitor queue.
+reception.walkin.access, leads.lead.create_walkin, leads.source.how_did_you_know.capture, reception.queue.manage, reception.salesman_availability.view, leads.walkin.assign_by_policy, notifications.view_own. No campaign budget or finance approval by default.
+Brokers
+Broker portal and own broker leads.
+broker.portal.access, broker.lead.create_own, broker.lead.view_own, broker.lead.status_limited_view, broker.profile.update_own, notifications.view_own. Internal lead notes, sales assignments, and all-company data are hidden by default.
+Marketing Members
+Campaign creation and execution details.
+marketing.campaigns.access, marketing.campaign.create, marketing.campaign.update_draft, marketing.campaign.select_types, marketing.event.manage, marketing.tv_ad.manage, marketing.street_ad.manage, marketing.social_ad.manage, marketing.exhibition.manage, marketing.assets.upload, marketing.budget.enter, marketing.other_cost.add, marketing.campaign.submit_finance, marketing.roi.view_own_campaigns.
+Marketing Managers
+Marketing planning, control, and reporting.
+All Marketing Member defaults + marketing.campaign.view_all, marketing.campaign.edit_all, marketing.campaign.archive, marketing.campaign.duplicate, marketing.campaign.completeness.review, marketing.campaign_type_definitions.manage, marketing.platform_definitions.manage, marketing.street_type_definitions.manage, marketing.roi.view_all, marketing.performance.manage. Finance approval still requires Finance permission.
+
+5.3 Example of Mixed Permissions
+Example: A Sales Head can keep all Sales Head defaults, lose export permission through a direct Deny, and receive selected Marketing permissions such as marketing.campaign.view_all and marketing.roi.view_all through direct Allows. The user remains a Sales Head by default role, but the effective permission set becomes customized to the real business need.
+
+6. Audit Engine
+6.1 Audit Scope
+Audit Category
+Examples
+Data CRUD
+Lead create/update/delete/archive/reactivate, campaign create/update/archive, budget lines, users, roles, policies, broker records.
+Field-level changes
+Before value, after value, changed field, old display value, new display value, actor, timestamp.
+Assignments
+Manual assignment, automatic assignment, SLA redistribution, retry attempt, team escalation, broker ownership change, salesman assignment change.
+Workflow events
+Stage change, SLA reset, follow-up scheduled, meeting scheduled, reminder created/sent, inactive/reactivated.
+Finance
+Approval status, reason, budget snapshot at approval time, semi-approved conditions, rejection reason.
+Permissions and policies
+Role default changes, user override changes, permission creation, policy option/value changes.
+Integrations
+Webhook received, payload mapping, duplicate ignored, failed processing, retry success/failure.
+Security/access
+Login/logout, failed login, sensitive page access, export/download, bulk operations.
+Background jobs
+Celery task started/completed/failed, processed count, error summary, correlation ID.
+
+6.2 Audit Implementation Strategy
+Use middleware to attach RequestMeta to a thread-local/context variable: user, company, IP, user-agent, request path, request method, request_id, and correlation_id.
+Use model-level diff helpers for simple CRUD field changes. Use explicit service-level audit events for semantic actions such as assign, approve, rotate, reactivate, submit for finance, or webhook import.
+Use transaction.on_commit to create notifications and async side effects only after the database transaction succeeds.
+For sensitive fields such as phone/email, store raw before/after values only if the company accepts that audit policy; otherwise store masked values plus secure hashes.
+Keep audit append-only. Never update audit rows except to attach archival metadata if needed.
+Audit Model
+Fields / Types
+Rules
+AuditLog
+id UUID, company FK, actor FK nullable, action CharField, module CharField, entity_type CharField, entity_id CharField, entity_display CharField, before_json JSONField, after_json JSONField, changed_fields JSONField, request_meta JSONField, reason TextField, source CharField, created_at DateTimeField
+Main immutable audit record. Used for all modules.
+AuditEventField
+audit FK, field_name CharField, old_value TextField, new_value TextField, old_display TextField, new_display TextField
+Optional normalized field diff table for easier filtering.
+DataExportLog
+id UUID, company FK, actor FK, report_code CharField, filters JSONField, row_count IntegerField, file_name CharField, created_at DateTimeField
+Every export is recorded.
+JobExecutionLog
+id UUID, task_name CharField, task_id CharField, status CharField, started_at, finished_at, processed_count, error TextField, metadata JSONField
+Records background job result and supports operations troubleshooting.
+
+7. Policy Engine and Configurable Business Rules
+Policies are configurable business rules selected by the company. The first implementation has one company, but policies must still be data-driven so the business team can modify behavior without a developer changing Python code.
+7.1 Policy Data Model
+Entity
+Core Fields
+Purpose
+PolicyDefinition
+code CharField unique, name, module, description, value_type, is_active
+Defines a policy such as lead.default_distribution_method or marketing.budget_calculation_rule.
+PolicyOptionDefinition
+policy FK, code, label, description, strategy_code nullable, metadata JSONField
+Defines available choices such as ROUND_ROBIN, BY_TURN, MANUAL, OPEN_FLOOR, TEAM_TURN.
+CompanyPolicyValue
+company FK, policy FK, selected_option FK nullable, value_json JSONField, effective_from DateTimeField, updated_by FK
+Stores the selected policy value for the current company.
+PolicyParameter
+company_policy FK, key, value_type, value_json
+Stores parameters such as SLA hours, retry count n, warning minutes, selected teams, or rotation order.
+
+7.2 Required Policy Catalog
+Policy Code
+Type / Options
+Business Meaning
+lead.origin.direct_sla
+Duration
+Lead response SLA for Direct leads.
+lead.origin.broker_sla
+Duration
+Lead response SLA for Broker/Indirect leads.
+lead.stage_sla.<stage_code>
+Duration per stage
+SLA for Fresh, Interested, Follow-up, Meeting, Not Reached, Frozen. Not Interested has no SLA.
+lead.sla_expiry_method
+ROUND_ROBIN / RETRY_TEAM_ESCALATION / MANUAL
+Defines how active leads are handled after SLA expiry. Broker leads are manually reassigned for team-to-team escalation unless policy later changes.
+lead.retry_attempts_per_team
+Integer n + time window
+Number of retries inside a team before escalation to next team.
+lead.default_auto_distribution_method
+ROUND_ROBIN / BY_TURN
+Selects the automatic assignment algorithm.
+lead.distribution_scope_mode
+TEAM_THEN_SALESMAN / TEAM_HEAD_DECIDES / ALL_SALESMEN
+Defines candidate scope after language pre-check.
+lead.language_default
+Language code
+Default Arabic unless changed.
+lead.self_generated_salesman_policy
+KEEP_WITH_OWNER / REDISTRIBUTE_AFTER_SLA
+For salesman-created self-generated leads.
+lead.walkin_reception_policy
+OPEN_FLOOR / TEAM_TURN / FULL_ROTATION
+Controls walk-in assignment behavior.
+lead.existing_client_policy
+PRESERVE_PRIOR_RELATIONSHIP / REDISTRIBUTE
+Controls whether prior salesman relationship is preserved.
+lead.not_reached_reminder_mode
+AUTOMATIC / MANUAL
+Special reminder rule for Not Reached stage.
+lead.fresh_reminder_schedule
+Duration/list
+Company schedule for Fresh lead reminders.
+marketing.campaign_type_repeatability
+Boolean/limit per type
+Whether Events, TV Ads, Street Ads, Social Media, Exhibition can have multiple records.
+marketing.type_date_policy
+STRICT_WITHIN_CAMPAIGN / WARN_ONLY
+How type-level dates are validated against campaign dates.
+marketing.budget_calculation_rule
+INCLUDE_MAIN_AND_CHILD / CUSTOM
+Defines which budgets feed total budget.
+marketing.finance_reason_required
+By approval status
+Semi Approved and Not Approved must require reason. Approved can have optional reason.
+integration.webhook_mapping_policy
+Mapping config
+Maps Make/Zapier payload fields to CRM lead fields.
+notification.delivery_policy
+In-app/WebSocket/Email options
+Controls which notification events also send email.
+
+8. Lead Management and Distribution Technical Design
+8.1 Lead Creation Rules
+Every lead requires name and phone number. Email is optional.
+Phone number is validated on the frontend according to selected country code and revalidated on the backend.
+The system asks whether the lead is Direct or Broker/Indirect. This affects SLA and reassignment behavior.
+Every lead is Active by default unless created directly into an inactive terminal state by a controlled service action.
+Duplicate detection must run before creating a new lead. If the existing lead is Active and within SLA, a “Call Me Again” / re-engagement case must be escalated to users authorized for manual distribution instead of automatic Round Robin.
+8.2 Lead Source Rules
+Lead Source
+Business Rule
+Technical Enforcement
+Self-Generated - Sales Head
+May assign to himself, to a salesman within his team, or run automatic distribution within his own team only.
+Sales Head permissions + team scope.
+Self-Generated - Salesman
+Automatically assigned to himself. Policy decides whether it stays permanently with him or is redistributed after no-contact SLA.
+Sales own-lead permissions.
+Campaign
+User selects campaign, then specific Event/Social channel/other campaign child. Distribution follows company policy: manual if authorized or automatic.
+Campaign must exist and be active/selectable.
+Broker
+If broker logs in, lead is assigned to broker ownership first. Policy decides whether it is also assigned to company salesman. If another user enters it, the broker is selected and salesman assignment is optional per policy.
+Broker ownership must be separate from salesman assignment.
+Walk-in
+Receptionist asks how visitor knew the company. Reception policy controls assignment: Open Floor, Team Turn, or Full Rotation.
+Website must exist as an option in how-did-you-know lists.
+Call Center
+Call center user asks how caller knew the company. Distribution is manual or automatic based on policy.
+Call center create permission.
+Exhibition
+User selects exhibition. Distribution is manual only and a salesman must be selected; lead cannot remain unassigned.
+Exhibition/reference must be selected.
+Referral
+Referrer name captured as free text. Distribution manual or automatic according to policy.
+Referral fields required.
+Existing Client
+Search by phone. Policy either preserves prior salesman relationship if active or redistributes manually/automatically.
+Prior relationship check must be service-based.
+
+8.3 Distribution Strategy Architecture
+Technique
+Business Logic
+Implementation Contract
+Manual Distribution
+Authorized user assigns directly to a team or to a salesman. If assigned to team, Sales Head can decide who receives the lead.
+ManualAssignmentService.assign_to_team() and assign_to_salesman(). Must create assignment history, audit event, SLA instance, and notification.
+Round Robin
+Load-balanced selection: first choose candidate with fewest active leads; tie-break by earliest last received lead date/time.
+RoundRobinStrategy implements AssignmentStrategyInterface. Uses locking and candidate snapshot.
+By Turn
+Sequential fixed rotation across eligible pool. Skips inactive/unavailable recipients and advances pointer after successful assignment.
+ByTurnStrategy implements same interface and uses RotationPointer model.
+Retry Attempts + Team Escalation
+Lead cycles through salesmen in current team for n attempts. After n attempts, escalates to next team and repeats.
+RetryTeamEscalationService uses policy parameters, LeadRetryAttempt, TeamRotationPointer, and LeadAssignmentService.
+
+8.4 Language Pre-Check and Scope Modes
+Scope Mode
+Rule
+Language Pre-Check
+Before automatic distribution, the system asks/selects lead language. Eligible pool is filtered to salesmen who support that language. Default language is Arabic unless policy says otherwise.
+Mode 1 - Team, then Salesman
+Automatic method selects a team, then selects a salesman inside that team.
+Mode 2 - Team, then Sales Head Decides
+Automatic method selects a team. Sales Head receives task/notification to manually choose salesman inside the team.
+Mode 3 - All Salesmen
+Automatic method selects across all eligible salesmen company-wide, ignoring team boundaries.
+
+8.5 Broker Ownership Must Be Separate from Salesman Assignment
+Important Design Fix: Broker ownership answers: which broker brought this lead? Salesman assignment answers: which company salesman is currently responsible for contacting this lead? These must never be merged into the same field.
+
+Field / Model
+Meaning
+Lead.broker_owner FK(Broker)
+The broker/intermediary credited as the source owner of the lead.
+Lead.assigned_salesman FK(User)
+The current internal salesman responsible for the lead.
+BrokerLeadOwnershipHistory
+History of broker ownership changes.
+LeadAssignmentHistory
+History of internal team/salesman assignment changes.
+
+9. Follow-ups, Meetings, Lead Stages, SLA and Reminders
+9.1 Stage Rules
+Stage
+Meaning
+Distribution on SLA Expiry
+Reminder
+Fresh
+Initial stage for every newly assigned or rotated lead.
+Automatic per configured SLA expiry method.
+Yes, per company schedule.
+Interested
+Lead expressed interest.
+Per company policy. If rotated, visible stage becomes Fresh but history remains.
+Yes, per company schedule.
+Not Interested
+Lead declined.
+None. Lead becomes Inactive.
+No reminders.
+Follow-up
+Scheduled follow-up with the lead.
+Manual assignment per policy.
+Yes, before scheduled follow-up.
+Meeting
+Scheduled meeting with the lead.
+Manual assignment per policy.
+Yes, before meeting time.
+Not Reached
+Sales attempted contact but lead did not answer.
+Automatic per configured SLA expiry method.
+Yes, automatic or manual per policy.
+Frozen
+Lead temporarily unavailable until a known future date.
+Automatic per configured SLA expiry method.
+Yes, automatically when freeze ends.
+
+9.2 Universal Rotation Rule
+Whenever a lead is rotated to a new salesman due to SLA expiry, the visible stage resets to Fresh.
+The SLA clock restarts using the Fresh stage SLA configured by company policy.
+All old stage history, notes, calls, meetings, attempts, and assignments are preserved.
+The new salesman starts with a clear Fresh queue item and full SLA time, while management still sees the full audit trail.
+9.3 Follow-up and Meeting Service Enforcement
+Service-Only Rule: Views must never directly create FollowUp or Meeting models. They must call FollowUpService and MeetingService so reminders, SLA adjustments, notifications, and audit logs are created consistently.
+
+Service
+Responsibilities
+FollowUpService.schedule()
+Validate lead ownership/scope, create follow-up, set lead stage to Follow-up, create reminder, audit old/new values, notify assigned salesman.
+FollowUpService.complete()
+Mark follow-up as completed, capture outcome, optionally move stage, audit and notify.
+MeetingService.schedule()
+Validate date/time and assignment, create meeting, set lead stage to Meeting, create reminder, notify salesman and optional receptionist/sales head.
+ReminderService.create_for_stage()
+Create reminders according to stage and company policy.
+
+10. Marketing Management Technical Design
+10.1 Campaign Master
+Campaign fields: name, description, start date, end date, configurable target, selected campaign types, status, finance approval, calculated total budget, and lead count.
+End date must not be earlier than start date.
+Campaign target can be Project, Unit, Exhibition, Event, or an “Other” target defined by company configuration.
+Campaign lifecycle status is date-based: Coming, Active, Ended. Finance approval is separate: Pending, Approved, Semi Approved, Not Approved.
+At least one campaign type must be selected before campaign completion/submission.
+10.2 Campaign Type Requirements
+Type
+Main Fields
+Child Rules
+Events
+Event name, venue/place, event date, main budget, notes, logo, event images, target attendees.
+Celebrities, Giveaways, Catering. Budget = main event budget + all sub-costs.
+TV Ads
+TV ad name, start/end dates, main budget, notes.
+Channels with separate budgets/assets; slots with appearance time and number of appearances. Slot budget is optional only if policy defines slot-level costing.
+Street Ads
+Street ad name, start/end dates, main budget, notes, images.
+Ad types: Billboard, Banner, Bus Shelter, LED Screen, Transit/Bus Wrap, Wall Mural, Lamp Post, Bridge Banner, Others. Each has quantity, budget, and locations where applicable.
+Exhibition
+Exhibition name, start/end dates, budget, place.
+Supports exhibition lead source and campaign ROI.
+Social Media
+Social ad name, platforms, platform budget, target KPI, creatives, optional linked event.
+Platforms include Meta, WhatsApp, TikTok, LinkedIn, X, Google Ads/Website, and configurable future platforms.
+
+10.3 Campaign Creation Service Rule
+Service-Only Rule: Campaign creation may receive a large nested form containing selected types and child records. Heavy child-record logic must live inside CampaignCreationService and related child services, not in the view.
+
+Service
+Main Responsibility
+CampaignCreationService.create_campaign()
+Validate master fields, create campaign, create selected type records, create children, create assets, calculate budget, store audit.
+CampaignBudgetService.recalculate()
+Aggregate type budgets, sub-budgets, channel/platform/location budgets, and Other Costs. Store snapshot.
+CampaignApprovalService.set_status()
+Finance approval with reason rules, approval history, audit, and notification.
+CampaignAttributionService.link_lead()
+Connect leads to campaign and specific campaign child records where available.
+CampaignROIService.calculate()
+Compute cost per lead, cost per attendee, platform performance, and target KPI achievement.
+
+10.4 Budget and Finance Approval Rules
+Rule
+Technical Enforcement
+Budget values numeric and non-negative
+Use DecimalField(max_digits=14, decimal_places=2), MinValueValidator(0), DB CheckConstraint where practical, and service validation.
+Other Costs are repeatable
+OtherCost model with value and reason, included in total budget and visible to finance.
+Campaign total budget formula
+Sum selected campaign type main budgets + repeatable sub-sections + channel/platform/location budgets + Other Costs.
+Finance status separate from lifecycle status
+approval_status is persisted; lifecycle status can be property/selector based on today.
+Reason mandatory for Semi Approved and Not Approved
+CampaignApprovalService enforces reason; form shows required state dynamically.
+Budget changes audited
+Budget line changes, recalculated totals, and approval snapshots are audit logged.
+
+10.5 Campaign Lead Attribution and ROI
+A lead generated from a campaign stores campaign_id.
+Where possible, the lead also stores the child source: event, TV ad, street ad, social ad/platform, or exhibition.
+For social ads linked to events, store both social_ad_id and event_id so attendees/leads can be traced to platform spend.
+Attendance can be captured through registration, reception entry, QR, landing page, manual entry, or webhook payload mapping.
+ROI must avoid mixing unrelated costs unless the report explicitly selects total campaign budget mode.
+11. Entity / Model Catalog with Fields and Types
+Entity Catalog: This catalog is intentionally implementation-oriented. It is not a final migration file, but it gives the backend developer the class-level structure, field types, and relationships needed to start coding cleanly.
+
+Entity / Class
+Core Fields and Django Types
+Main Rule / Relationship
+Company
+id UUIDField; name CharField; slug SlugField; is_active BooleanField; subscription_status CharField; plan_code CharField; timezone CharField; created_at/updated_at DateTimeField
+Single active company now; future SaaS tenant root.
+Branch
+id UUIDField; company FK; name CharField; city CharField; address TextField; is_active BooleanField
+Optional branch/office scope for future.
+User
+id UUIDField or default BigAuto; email EmailField unique; username CharField optional; first_name/last_name; phone CharField; is_active; is_staff; date_joined
+Django auth identity for login only.
+UserProfile
+user OneToOne; company FK; job_title CharField; default_role FK(RoleGroup); department CharField; availability_status CharField; timezone CharField; avatar ImageField optional
+CRM profile and availability.
+RoleGroup
+id UUIDField; company FK; code CharField; name CharField; description TextField; is_system_default BooleanField; is_active BooleanField
+Custom business role/group.
+PageDefinition
+id UUIDField; code CharField; module CharField; name CharField; url_name CharField; parent FK self; icon CharField; menu_order IntegerField; is_menu_item BooleanField; is_active BooleanField
+Controls page/menu permissions.
+PermissionDefinition
+id UUIDField; code CharField unique; module CharField; page FK nullable; action CharField; name CharField; description TextField; risk_level CharField; is_active BooleanField
+Custom CRM permission.
+UserRole
+id UUIDField; user FK; role FK; assigned_by FK; assigned_at DateTimeField; is_active BooleanField
+Users can have one or more roles.
+RolePermission
+id UUIDField; role FK; permission FK; allow BooleanField; created_by FK; updated_at
+Default permission bundle per role.
+UserPermissionOverride
+id UUIDField; user FK; permission FK; effect CharField(ALLOW/DENY); reason TextField; expires_at DateTimeField nullable; created_by FK
+Direct customization; Deny wins over role default.
+Team
+id UUIDField; company FK; name CharField; sales_head FK(User); region CharField; order_index IntegerField; is_active BooleanField
+Sales team root.
+TeamMember
+id UUIDField; team FK; user FK; position CharField; is_available BooleanField; active_from DateField; active_to DateField nullable; max_active_leads IntegerField nullable
+Salesmen and heads membership.
+Language
+id UUIDField; code CharField; name CharField; is_active BooleanField
+Arabic default plus future languages.
+UserLanguage
+id UUIDField; user FK; language FK; proficiency CharField; is_primary BooleanField
+Filters eligible salesmen during automatic distribution.
+Broker
+id UUIDField; company FK; linked_user FK(User) nullable; name CharField; phone CharField; email EmailField; company_name CharField; status CharField; notes TextField
+External broker/intermediary.
+BrokerLeadOwnershipHistory
+id UUIDField; lead FK; broker FK; action CharField; old_broker FK nullable; new_broker FK; actor FK; created_at; reason TextField
+Separates broker ownership from internal assignment.
+PolicyDefinition
+id UUIDField; code CharField unique; module CharField; name CharField; value_type CharField; description TextField; is_active BooleanField
+Configurable policy definition.
+PolicyOptionDefinition
+id UUIDField; policy FK; code CharField; label CharField; strategy_code CharField nullable; metadata JSONField
+Allowed policy option.
+CompanyPolicyValue
+id UUIDField; company FK; policy FK; selected_option FK nullable; value_json JSONField; effective_from; updated_by FK
+Selected company policy.
+StrategyDefinition
+id UUIDField; code CharField unique; name CharField; class_path CharField; module CharField; is_active BooleanField; metadata JSONField
+Maps DB codes to OOP strategy classes.
+LeadSourceDefinition
+id UUIDField; code CharField; name CharField; requires_campaign BooleanField; requires_broker BooleanField; requires_referrer BooleanField; requires_salesman BooleanField; is_active BooleanField
+Sources: self-generated, campaign, broker, walk-in, call center, exhibition, referral, existing client.
+LeadStageDefinition
+id UUIDField; code CharField; name CharField; is_active_stage BooleanField; is_terminal BooleanField; allows_reminder BooleanField; resets_on_rotation BooleanField
+Fresh, Interested, Not Interested, Follow-up, Meeting, Not Reached, Frozen.
+Lead
+id UUIDField; company FK; name CharField; phone CharField; country_code CharField; email EmailField nullable; source FK; origin CharField(DIRECT/BROKER); language FK; broker_owner FK nullable; campaign FK nullable; campaign_child_type CharField; campaign_child_id UUID; assigned_team FK nullable; assigned_salesman FK nullable; current_stage FK; active_status CharField; sla_deadline DateTimeField; last_activity_at DateTimeField; created_by FK; metadata JSONField
+Main lead record. Use service methods for changes.
+LeadAssignmentHistory
+id UUIDField; lead FK; from_team FK nullable; to_team FK nullable; from_salesman FK nullable; to_salesman FK nullable; assignment_method CharField; strategy_code CharField; reason CharField; actor FK nullable; assigned_at DateTimeField; snapshot JSONField
+Assignment audit/history.
+LeadStageHistory
+id UUIDField; lead FK; from_stage FK; to_stage FK; actor FK; changed_at DateTimeField; reason TextField; sla_before DateTime; sla_after DateTime; metadata JSONField
+Stage transition history.
+SLAInstance
+id UUIDField; lead FK; stage FK; assigned_salesman FK; start_at DateTime; deadline_at DateTime; status CharField; breached_at DateTime nullable; policy_snapshot JSONField
+Current and historical SLA windows.
+SLABreachEvent
+id UUIDField; sla_instance FK; lead FK; breach_type CharField; handled_by_task_id CharField; action_taken CharField; created_at; metadata JSONField
+Records each SLA breach handling action.
+DistributionRun
+id UUIDField; company FK; lead FK; method_code CharField; scope_mode CharField; language FK; status CharField; selected_team FK; selected_salesman FK; actor FK nullable; started_at; finished_at; error TextField
+One execution of distribution engine.
+DistributionCandidateSnapshot
+id UUIDField; run FK; candidate_type CharField; candidate_id UUID; active_lead_count IntegerField; last_received_at DateTime; is_eligible BooleanField; rejection_reason TextField
+Explains why a candidate was selected/skipped.
+RotationPointer
+id UUIDField; company FK; pointer_code CharField; scope CharField; current_index IntegerField; metadata JSONField; updated_at
+Used by By Turn and walk-in rotation.
+LeadRetryAttempt
+id UUIDField; lead FK; team FK; salesman FK; attempt_number IntegerField; started_at; deadline_at; status CharField; result CharField; policy_snapshot JSONField
+Retry attempts before team escalation.
+FollowUp
+id UUIDField; lead FK; assigned_salesman FK; scheduled_at DateTime; status CharField; outcome CharField; notes TextField; created_by FK; completed_at DateTime nullable
+Created by FollowUpService only.
+Meeting
+id UUIDField; lead FK; assigned_salesman FK; scheduled_start DateTime; scheduled_end DateTime; location CharField; status CharField; outcome CharField; created_by FK
+Created by MeetingService only.
+Reminder
+id UUIDField; company FK; user FK; lead FK nullable; related_type CharField; related_id UUID; reminder_type CharField; due_at DateTime; status CharField; sent_at DateTime nullable; channel CharField
+Reminders for SLA, follow-ups, meetings, frozen returns.
+LeadNote
+id UUIDField; lead FK; body TextField; visibility CharField; created_by FK; created_at; is_deleted BooleanField
+Internal notes; broker visibility limited.
+LeadActivity
+id UUIDField; lead FK; activity_type CharField; body TextField; actor FK; created_at; metadata JSONField
+Calls, messages, emails, attempts, updates.
+Client
+id UUIDField; company FK; name CharField; phone CharField; email EmailField; original_salesman FK nullable; created_from_lead FK nullable; status CharField
+Existing client relationship handling.
+WalkInQueueEntry
+id UUIDField; lead FK; arrival_at DateTime; status CharField; selected_policy_code CharField; assigned_salesman FK nullable; receptionist FK
+Walk-in reception queue.
+Project
+id UUIDField; company FK; name CharField; location CharField; developer CharField; status CharField; metadata JSONField
+Campaign target and lead context.
+Unit
+id UUIDField; project FK; unit_code CharField; unit_type CharField; area DecimalField; price DecimalField; status CharField
+Campaign target and sales context.
+Campaign
+id UUIDField; company FK; name CharField; description TextField; start_date DateField; end_date DateField; target_type CharField; target_id UUID; approval_status CharField; approval_reason TextField; total_budget DecimalField; created_by FK; archived_at DateTime nullable
+Marketing campaign master.
+CampaignSelectedType
+id UUIDField; campaign FK; type_code CharField; is_completed BooleanField; completed_at DateTime nullable
+Selected campaign type flags.
+CampaignAsset
+id UUIDField; campaign FK; related_type CharField; related_id UUID; file FileField; asset_type CharField(IMAGE/VIDEO/LOGO); uploaded_by FK; uploaded_at
+Assets linked to exact child record when possible.
+EventRecord
+id UUIDField; campaign FK; name CharField; venue CharField; event_date DateField; budget DecimalField; description TextField; logo FK(CampaignAsset) nullable; target_attendees IntegerField
+Event campaign child.
+EventCelebrity / EventGiveaway / EventCatering
+id UUIDField; event FK; name CharField; budget DecimalField; notes TextField
+Repeatable event sub-costs.
+TVAdRecord
+id UUIDField; campaign FK; name CharField; start_date DateField; end_date DateField; budget DecimalField; description TextField
+TV ad campaign child.
+TVChannel
+id UUIDField; tv_ad FK; channel_name CharField; budget DecimalField; notes TextField
+Channel-specific TV budget and assets.
+TVSlot
+id UUIDField; tv_ad FK; appearance_time TimeField; number_of_appearances PositiveIntegerField; notes TextField
+Airing slots.
+StreetAdRecord
+id UUIDField; campaign FK; name CharField; start_date DateField; end_date DateField; budget DecimalField; description TextField
+Outdoor advertising parent.
+StreetAdTypeDefinition
+id UUIDField; code CharField; name CharField; requires_exact_location BooleanField; is_active BooleanField
+Billboard, Banner, Bus Shelter, LED Screen, Transit/Bus Wrap, Wall Mural, Lamp Post, Bridge Banner, Others.
+StreetAdTypeLine
+id UUIDField; street_ad FK; ad_type FK; total_number PositiveIntegerField; budget DecimalField; description TextField
+Selected outdoor type and quantity.
+StreetAdLocation
+id UUIDField; type_line FK; location_text CharField; latitude DecimalField nullable; longitude DecimalField nullable; budget DecimalField; notes TextField
+Location-level budget and analysis.
+ExhibitionRecord
+id UUIDField; campaign FK; name CharField; start_date DateField; end_date DateField; budget DecimalField; place CharField
+Exhibition child and lead source reference.
+SocialPlatformDefinition
+id UUIDField; code CharField; name CharField; is_active BooleanField; supports_webhook BooleanField
+Meta, WhatsApp, TikTok, LinkedIn, X, Google Ads/Website, future platforms.
+SocialMediaAdRecord
+id UUIDField; campaign FK; name CharField; target_kpi CharField; linked_event FK(EventRecord) nullable; description TextField
+Social media ad child.
+SocialMediaPlatformLine
+id UUIDField; social_ad FK; platform FK; budget DecimalField; target_kpi_value DecimalField nullable; creatives JSONField; external_campaign_id CharField nullable
+Platform-specific budget and KPI.
+OtherCost
+id UUIDField; campaign FK; value DecimalField; reason TextField; created_by FK; created_at
+Additional campaign costs, included in total.
+CampaignApprovalHistory
+id UUIDField; campaign FK; from_status CharField; to_status CharField; reason TextField; budget_snapshot JSONField; actor FK; created_at
+Finance approval audit.
+CampaignLeadAttribution
+id UUIDField; campaign FK; lead FK; source_type CharField; source_id UUID; platform FK nullable; event FK nullable; created_at
+Connects leads to campaign child records.
+EventAttendee
+id UUIDField; event FK; lead FK nullable; name CharField; phone CharField; source_type CharField; social_ad FK nullable; checked_in_at DateTime nullable
+Event attendance and ROI.
+CampaignBudgetSnapshot
+id UUIDField; campaign FK; total_budget DecimalField; breakdown_json JSONField; calculated_by FK nullable; calculated_at DateTime
+Budget traceability and reporting.
+NotificationType
+id UUIDField; code CharField unique; name CharField; default_channels JSONField; is_active BooleanField
+Notification catalog.
+Notification
+id UUIDField; company FK; recipient FK; notification_type FK; title CharField; body TextField; priority CharField; related_type CharField; related_id UUID; is_read BooleanField; created_at
+In-app notification.
+NotificationDelivery
+id UUIDField; notification FK; channel CharField; status CharField; sent_at DateTime; error TextField
+Email/WebSocket delivery state.
+EmailTemplate
+id UUIDField; company FK; code CharField; subject_template CharField; body_template TextField; is_active BooleanField
+Configurable email content.
+EmailOutbox
+id UUIDField; company FK; to_email EmailField; subject CharField; body TextField; status CharField; attempts IntegerField; last_error TextField; send_after DateTime
+Async email sending.
+IntegrationProvider
+id UUIDField; code CharField; name CharField; is_active BooleanField
+Meta via Make/Zapier, Zapier, Make, future native providers.
+WebhookEndpoint
+id UUIDField; company FK; provider FK; name CharField; endpoint_uuid UUIDField; secret_token CharField; status CharField; mapping FK; created_by FK; last_used_at DateTime
+Tenant-specific dynamic webhook.
+WebhookMapping
+id UUIDField; endpoint FK; source_field CharField; target_field CharField; transform_rule JSONField; required BooleanField
+Maps external payload to CRM lead fields.
+WebhookEvent
+id UUIDField; endpoint FK; external_event_id CharField; payload JSONField; status CharField; received_at DateTime; processed_at DateTime; error TextField; dedupe_hash CharField
+Incoming webhook processing and idempotency.
+WebhookRetry
+id UUIDField; webhook_event FK; attempt_number IntegerField; status CharField; scheduled_at DateTime; processed_at DateTime; error TextField
+Failed webhook retry job.
+AuditLog
+id UUIDField; company FK; actor FK nullable; action CharField; entity_type CharField; entity_id CharField; before_json JSONField; after_json JSONField; changed_fields JSONField; request_meta JSONField; created_at
+Global audit trail.
+
+12. Background Services, Celery, Redis, WebSockets, Emails and Notifications
+12.1 Background Job Strategy
+Job / Task
+Cadence / Trigger
+Responsibilities
+check_lead_sla_expiry
+Celery Beat every 1-5 minutes
+Find expired active SLA instances, lock rows, apply configured expiry method, rotate/reassign/escalate, reset stage to Fresh when needed, audit and notify.
+send_due_reminders
+Celery Beat every minute or configurable
+Send follow-up, meeting, Fresh, Not Reached, Frozen return, and SLA warning reminders.
+send_email_outbox
+Frequent Celery task
+Send pending emails, update attempts/status, record delivery audit.
+fanout_notification
+Triggered after notification creation
+Push WebSocket notification to recipient and optional groups.
+process_webhook_event
+Triggered by webhook receive
+Deduplicate payload, validate mapping, create or update lead through LeadCreationService, audit and notify.
+retry_failed_webhooks
+Celery Beat every 5-15 minutes
+Retry failed webhook events with backoff and maximum attempt policy.
+recalculate_campaign_metrics
+On campaign/lead changes and periodic reconciliation
+Refresh lead counts, CPL, attendee counts, ROI snapshots.
+refresh_campaign_lifecycle_status
+Daily or selector-computed
+Update cached campaign statuses if using stored status; otherwise selectors compute Coming/Active/Ended.
+archive_old_audit_logs
+Monthly / policy-based
+Export/archive old audit data if retention policy requires. Do not delete without business approval.
+
+12.2 SLA Job Concurrency
+The SLA job must process batches and use database transactions.
+Use select_for_update(skip_locked=True) on MariaDB so multiple workers do not rotate the same lead.
+If skip_locked is unavailable in a non- MariaDB development environment, fall back to smaller single-worker scheduling or an application lock.
+Every SLA handling action must write SLABreachEvent, LeadAssignmentHistory, LeadStageHistory if applicable, Notification, and AuditLog.
+Tasks must be idempotent. Re-running the same task should not create duplicate assignments or duplicate webhook leads.
+12.3 Notification Types
+Notification Type
+Default Recipients
+Trigger
+LEAD_ASSIGNED
+Assigned salesman, Sales Head
+New lead assigned to user/team.
+LEAD_REASSIGNED_SLA
+New salesman, old salesman, Sales Head, Sales Operation
+Lead redistributed due to SLA expiry.
+SLA_WARNING
+Assigned salesman
+SLA is near deadline.
+SLA_BREACHED
+Sales Head, Sales Operation, Directors optional
+Lead breached SLA and needs action or has been rotated.
+MANUAL_DISTRIBUTION_REQUIRED
+Sales Operation, authorized manual distributors
+Call Me Again, Broker escalation, or policy requires manual reassignment.
+FOLLOWUP_DUE
+Assigned salesman
+Follow-up time is near/due.
+MEETING_DUE
+Assigned salesman, Receptionist optional
+Meeting time is near/due.
+FROZEN_LEAD_RETURN
+Assigned salesman
+Frozen lead should be re-engaged.
+STAGE_CHANGED
+Assigned salesman, Sales Head optional
+Lead moved to another stage.
+LEAD_REACTIVATED
+Assigned salesman, Sales Operation
+Inactive lead became active again.
+WALKIN_WAITING
+Receptionist, Sales Head / available salesmen
+Walk-in visitor needs assignment or attendance.
+BROKER_LEAD_CREATED
+Sales Operation, broker owner optional
+Broker submitted or is linked to a lead.
+CAMPAIGN_CREATED
+Marketing Manager
+New campaign created.
+CAMPAIGN_SUBMITTED_FINANCE
+Finance Managers
+Campaign submitted for finance review.
+CAMPAIGN_APPROVED
+Marketing team, Marketing Manager
+Finance approved campaign.
+CAMPAIGN_SEMI_APPROVED
+Marketing team, Marketing Manager
+Finance partially approved with reason.
+CAMPAIGN_REJECTED
+Marketing team, Marketing Manager
+Finance rejected campaign with reason.
+BUDGET_CHANGED
+Marketing Manager, Finance Managers
+Campaign budget changed after earlier state.
+USER_PERMISSION_CHANGED
+Affected user, System Admins
+Permissions changed.
+WEBHOOK_FAILED
+System Admins, Integration owner
+Webhook failed and may need mapping/action.
+IMPORT_COMPLETED
+Actor, Sales Operation
+Bulk import completed.
+SYSTEM_JOB_FAILED
+System Admins
+Background job failed.
+
+13. Meta Ads, Make/Zapier and Dynamic Webhook Architecture
+13.1 Strategy
+For the first release, use Make or Zapier as the middleware bridge for Meta lead ads. The CRM should not depend on a single global webhook. Instead, the system must create a tenant/company-specific webhook endpoint that can be copied into a Make/Zapier scenario. This keeps the setup self-service-ready for future SaaS clients while still working for the one-company implementation.
+13.2 Dynamic Webhook Flow
+Authorized admin or marketing manager opens Integration Setup.
+User chooses provider: Make, Zapier, or future native integration.
+CRM creates WebhookEndpoint with unique endpoint_uuid and secret token for the current company.
+CRM displays the endpoint URL and setup instructions for Make/Zapier.
+User configures Make/Zapier to receive Meta Lead Ads and send payload to CRM endpoint.
+CRM receives payload, verifies token/secret, stores WebhookEvent, deduplicates event_id/hash, maps fields through WebhookMapping, then calls LeadCreationService.
+LeadCreationService applies source rules, campaign attribution, language, policy-driven distribution, audit, and notifications.
+Security / Reliability Feature
+Implementation
+Tenant-specific URL
+/integrations/webhooks/<company_slug>/<endpoint_uuid>/ or UUID-only hidden endpoint linked to company.
+Secret token
+Require header or query token generated by CRM and stored hashed if possible.
+Deduplication
+Use provider event id when available; otherwise create dedupe_hash from normalized payload.
+Mapping validation
+Required fields: name and phone. Optional fields: email, campaign, platform, ad id, form id, language, source.
+Idempotency
+WebhookEvent status prevents duplicate processing. Lead duplicate service prevents duplicate CRM lead creation.
+Retry
+Failed event stored with error and retried by retry_failed_webhooks task.
+Audit
+Every received, processed, ignored, failed, and retried event creates audit/job logs.
+
+14. Django MVT UI and Template Guidelines
+Use base.html with navigation rendered from PageDefinition and filtered by EffectivePermissionResolver.
+Every link must use Django URL reversing: {% url 'namespace:name' args %}. Do not hardcode internal paths in templates.
+Use AJAX/fetch for modal forms, inline permission toggles, campaign child sections, budget recalculation previews, and notifications. AJAX endpoints are still Django views, not DRF APIs.
+Use SweetAlert/confirm dialogs for destructive or high-risk actions: delete/archive, permission changes, finance rejection, SLA override, campaign approval.
+Use server-side pagination/filtering for large lead/campaign/audit tables through standard Django views/selectors.
+Hide buttons and table actions in templates when user lacks permission, but always enforce permission again in the view/service.
+Use forms with dynamic sections for campaign type selection. The selected types determine which formsets appear.
+Use user-friendly language in admin screens: display permission names/descriptions first and codes as secondary technical labels.
+Page
+URL Name Example
+Permission
+Main Dashboard
+dashboard:index
+dashboard.main.access
+Lead List
+leads:list
+leads.lead.view_own/team/all according to scope
+Lead Detail
+leads:detail
+leads.lead.view_*
+Manual Distribution
+leads:assign
+leads.distribution.manual_all or team_manual
+Follow-up Form
+leads:followup_create
+leads.followup.create_own/team
+Campaign List
+marketing:campaign_list
+marketing.campaign.view_*
+Campaign Create/Edit
+marketing:campaign_create / campaign_update
+marketing.campaign.create/update
+Campaign Budget
+marketing:campaign_budget
+marketing.budget.view/manage
+Finance Approval
+finance:campaign_approval
+finance.campaign.review/approve
+Users
+accounts:user_list
+admin.users.access
+Roles & Permissions
+authorization:role_list
+authorization.roles.manage
+Policies
+policies:list
+policies.company.manage
+Audit Logs
+audit:list
+audit.view_all
+Webhook Setup
+integrations:webhook_list
+integrations.webhooks.manage
+
+15. Folder and File Structure
+argoz_crm/
+  manage.py
+  requirements/
+    base.txt
+    development.txt
+    production.txt
+  config/
+    __init__.py
+    settings/
+      base.py
+      development.py
+      production.py
+    urls.py
+    asgi.py
+    wsgi.py
+    celery.py
+  apps/
+    companies/
+      models.py
+      services.py
+      selectors.py
+      admin.py
+      urls.py
+      views.py
+      forms.py
+      migrations/
+    accounts/
+      models.py              # UserProfile, Team, TeamMember, Language, Broker link helpers
+      forms.py               # User creation wizard forms
+      services.py            # UserService, TeamService, AvailabilityService
+      selectors.py
+      views.py
+      urls.py
+      template_tags/
+    authorization/
+      models.py              # RoleGroup, PageDefinition, PermissionDefinition, RolePermission, UserOverride
+      services.py            # PermissionManagementService, EffectivePermissionResolver
+      decorators.py          # crm_permission_required
+      mixins.py
+      template_tags/crm_permissions.py
+      urls.py
+      views.py
+    audit/
+      models.py              # AuditLog, AuditEventField, DataExportLog, JobExecutionLog
+      middleware.py           # RequestMeta middleware
+      services.py             # AuditService, DiffService
+      signals.py
+      selectors.py
+      views.py
+    policies/
+      models.py              # PolicyDefinition, PolicyOptionDefinition, CompanyPolicyValue
+      registry.py
+      services.py             # PolicyResolver, PolicyManagementService
+      selectors.py
+      urls.py
+      views.py
+    leads/
+      models.py              # Lead, LeadStage, SLAInstance, FollowUp, Meeting, histories
+      forms.py
+      services/
+        lead_creation_service.py
+        lead_stage_service.py
+        followup_service.py
+        meeting_service.py
+        sla_service.py
+        duplicate_service.py
+        reactivation_service.py
+      selectors.py
+      urls.py
+      views.py
+      tasks.py
+      signals.py
+    distribution/
+      models.py              # DistributionRun, CandidateSnapshot, RotationPointer, RetryAttempt
+      interfaces.py           # AssignmentStrategyInterface
+      registry.py             # StrategyRegistry by code
+      strategies/
+        round_robin.py
+        by_turn.py
+      services.py             # ManualAssignmentService, DistributionEngine, RetryEscalationService
+      locks.py
+    marketing/
+      models.py              # Campaign and all campaign child entities
+      forms.py
+      services/
+        campaign_creation_service.py
+        campaign_budget_service.py
+        campaign_approval_service.py
+        campaign_attribution_service.py
+        campaign_roi_service.py
+      selectors.py
+      urls.py
+      views.py
+      tasks.py
+    finance/
+      services.py
+      selectors.py
+      urls.py
+      views.py
+    notifications/
+      models.py              # NotificationType, Notification, Delivery, EmailTemplate, EmailOutbox
+      services.py
+      consumers.py            # WebSocket consumer
+      routing.py
+      tasks.py
+      template_tags/
+    integrations/
+      models.py              # Provider, WebhookEndpoint, WebhookMapping, WebhookEvent, Retry
+      services.py             # WebhookReceiverService, MappingService, WebhookLeadImportService
+      urls.py
+      views.py
+      tasks.py
+    reports/
+      selectors.py
+      services.py
+      views.py
+      urls.py
+  templates/
+    base.html
+    includes/
+      nav.html
+      messages.html
+      permission_badge.html
+    accounts/
+    authorization/
+    leads/
+    marketing/
+    finance/
+    integrations/
+    reports/
+  static/
+    css/
+      app.css
+    js/
+      ajax_forms.js
+      permission_matrix.js
+      campaign_formsets.js
+      notifications_ws.js
+      sweetalert_helpers.js
+  media/
+  docs/
+
+15.1 File Responsibility Rules
+File Type
+Responsibility
+models.py
+Fields, relationships, constraints, indexes, small helper properties only.
+services.py / services/*.py
+Business logic, transactions, workflow decisions, audit, notifications.
+selectors.py
+Reusable read queries and permission-scoped querysets.
+views.py
+Request handling only: permission check, form validation, service call, render/redirect/JSON partial.
+forms.py
+Input cleaning and user-friendly validation.
+tasks.py
+Celery task entry points that call services.
+signals.py
+Lightweight hooks only; avoid heavy business decisions inside signals.
+utils.py
+Small pure utility functions only; avoid turning utils.py into a business logic dump.
+registry.py
+Maps DB codes to strategy/policy classes.
+template_tags
+Permission checks, UI formatting, menu filtering helpers.
+
+16. Service Layer, OOP Patterns and Extension Contracts
+16.1 Distribution Strategy Interface
+class AssignmentStrategyInterface:
+    code: str
+
+    def select_candidate(self, *, company, lead, eligible_pool, context):
+        '''Return AssignmentDecision(team=None, salesman=None, reason='', snapshot={}).'''
+        raise NotImplementedError
+
+class RoundRobinStrategy(AssignmentStrategyInterface):
+    code = 'ROUND_ROBIN'
+    # Select fewest active leads; tie-break earliest last_received_at.
+
+class ByTurnStrategy(AssignmentStrategyInterface):
+    code = 'BY_TURN'
+    # Select next configured rotation pointer; skip inactive/unavailable candidates.
+
+class StrategyRegistry:
+    def get(self, code: str) -> AssignmentStrategyInterface:
+        # Lookup class by code from StrategyDefinition or static safe registry.
+        ...
+
+16.2 Service Transaction Pattern
+@transaction.atomic
+def assign_lead_to_salesman(*, lead_id, salesman_id, actor, company, reason, request_meta):
+    lead = Lead.objects.select_for_update().get(id=lead_id, company=company)
+    old_snapshot = LeadSnapshot.from_instance(lead)
+
+    # Validate actor permission and business policy.
+    PermissionService.require(actor, 'leads.distribution.manual_all', company=company)
+    AssignmentPolicyValidator.validate_salesman_is_eligible(lead, salesman_id, company)
+
+    # Apply mutation.
+    lead.assigned_salesman_id = salesman_id
+    lead.current_stage = LeadStageDefinition.objects.get(code='FRESH')
+    lead.sla_deadline = SLAService.calculate_deadline(company, stage_code='FRESH')
+    lead.save(update_fields=['assigned_salesman', 'current_stage', 'sla_deadline', 'updated_at'])
+
+    LeadAssignmentHistory.objects.create(...)
+    LeadStageHistory.objects.create(...)
+    AuditService.log_change(actor=actor, before=old_snapshot, after=lead, request_meta=request_meta)
+
+    transaction.on_commit(lambda: NotificationService.lead_assigned(lead.id, salesman_id))
+
+16.3 Pattern Usage
+Pattern
+Where to Use
+Service Layer
+Lead creation, distribution, SLA handling, follow-up/meeting, campaign creation, budget calculation, approval, webhook import.
+Strategy Pattern
+Round Robin, By Turn, future distribution methods, notification delivery channels, campaign budget rules.
+Registry Pattern
+Map database policy/strategy codes to Python classes.
+Factory Pattern
+Create correct campaign child handler based on selected campaign type.
+Observer / Signals
+Lightweight audit hooks and cache invalidation after model changes.
+Outbox Pattern
+Email and webhook processing reliability.
+Unit of Work / Transaction Boundary
+Wrap multi-model business changes in transaction.atomic.
+
+17. Data Integrity, Concurrency and Validation Rules
+Area
+Required Protection
+Campaign dates
+Check end_date >= start_date in forms/services and DB CheckConstraint if possible.
+Campaign type completion
+Campaign cannot be submitted to finance until at least one type is selected and required child data for selected types is complete.
+Budget values
+DecimalField + MinValueValidator(0) + DB CheckConstraint for non-negative values. All writes go through CampaignBudgetService where possible.
+Finance approval
+Semi Approved and Not Approved require reason. Approval writes only through CampaignApprovalService.
+Lead assignment concurrency
+Use select_for_update on lead/SLA rows. Distribution candidate selection must lock relevant rows or record snapshot and revalidate before saving.
+SLA jobs
+Use select_for_update(skip_locked=True) on expired SLA instances. Idempotency key prevents duplicate rotation.
+By Turn pointer
+Lock RotationPointer row before reading/updating current_index.
+Webhook events
+Unique constraint on endpoint + external_event_id where available, or dedupe_hash.
+Permission changes
+Invalidate effective permission cache and write audit entry.
+Broker ownership
+Broker ownership and salesman assignment use separate fields and separate history tables.
+Deletes
+Prefer archive/soft-delete for business records to preserve audit and reporting.
+
+18. Deployment Runtime and Environment Strategy
+Runtime Piece
+Purpose / Notes
+Django web process
+Serves MVT pages and AJAX partials.
+ASGI/WebSocket process
+Serves realtime notification sockets using Django Channels.
+Celery worker
+Executes SLA, reminders, email, webhook processing, campaign metrics, and retry jobs.
+Celery Beat
+Schedules periodic tasks such as SLA monitoring and retries.
+Redis
+Celery broker/cache and Channels layer.
+MariaDB
+Primary transactional database. Use indexes on lead status, SLA deadline, assigned users, campaign, approval status, and webhook dedupe fields.
+Media storage
+Campaign assets and uploads. Store outside code repo. Use cloud/object storage in production.
+Environment variables
+SECRET_KEY, DATABASE_URL, REDIS_URL, EMAIL settings, ALLOWED_HOSTS, CSRF settings, webhook base URL.
+
+18.1 Suggested Indexes
+Model
+Indexes
+Lead
+company + active_status + assigned_salesman; company + phone; company + source; company + current_stage; company + sla_deadline.
+SLAInstance
+company through lead + status + deadline_at; lead + status.
+LeadAssignmentHistory
+lead + assigned_at; to_salesman + assigned_at.
+Campaign
+company + start_date/end_date; company + approval_status; company + archived_at.
+CampaignLeadAttribution
+campaign + lead; campaign + source_type/source_id.
+Notification
+recipient + is_read + created_at.
+WebhookEvent
+endpoint + external_event_id unique nullable; endpoint + dedupe_hash unique; status + received_at.
+AuditLog
+company + entity_type + entity_id; actor + created_at; action + created_at.
+
+19. Implementation Roadmap
+Phase
+Deliverables
+Phase 1 - Foundation
+Create project structure, settings, Company, accounts, profiles, teams, languages, custom authorization engine, page definitions, audit middleware, base templates.
+Phase 2 - Policies
+Build policy definitions, company policy values, policy resolver, admin UI for policy editing. Seed initial lead/marketing policies.
+Phase 3 - Lead Core
+Lead model, source definitions, lead creation forms/services, duplicate handling, broker ownership separation, assignment history.
+Phase 4 - Distribution + SLA
+Manual assignment, Round Robin, By Turn, scope modes, language filtering, retry/team escalation, SLA jobs, locking and notifications.
+Phase 5 - Stages / Follow-ups / Meetings
+Stage transitions, follow-up service, meeting service, reminders, Frozen/Not Reached behavior, universal Fresh reset on rotation.
+Phase 6 - Marketing
+Campaign master, selected types, Events, TV Ads, Street Ads, Exhibition, Social Media, assets, budgets, Other Costs.
+Phase 7 - Finance Approval + ROI
+Approval workflow, approval history, budget snapshots, lead attribution, event attendees, ROI and KPI selectors.
+Phase 8 - Integrations
+Dynamic webhook setup, Make/Zapier instructions page, mapping, event processing, failed retry job.
+Phase 9 - Reports and Hardening
+Dashboards, exports, audit review pages, permission preview, operations tools, deployment readiness.
+
+20. Final Development Checklist
+Django MVT pages render through templates; no frontend DRF dependency.
+Every template URL uses {% url 'namespace:name' %}.
+Every page and button is controlled by custom page/action permissions.
+User creation wizard supports role defaults, unselecting defaults, and adding cross-role permissions.
+Effective permission resolver supports role union, direct allow, direct deny, and scope filtering.
+All business writes go through services, not direct view-created models.
+Audit logs capture before/after values, actor, time, request metadata, and semantic action.
+Lead duplicate and Call Me Again cases escalate to manual distribution users.
+Broker ownership is separate from salesman assignment.
+Round Robin and By Turn are strategy classes selected by code.
+Language pre-check filters automatic distribution candidate pool.
+SLA expiry supports Round Robin redistribution and Retry Attempts + Team Escalation.
+SLA rotation resets stage to Fresh, resets Fresh SLA, and preserves history.
+Follow-ups and meetings use services and create reminders/notifications/audit consistently.
+Campaign creation uses CampaignCreationService for nested child records.
+Campaign type completion and budget validation are enforced before finance submission.
+Budgets use DecimalField, non-negative validation, and snapshot history.
+Finance approvals have independent approval status and mandatory reasons where required.
+Celery Beat monitors SLA, reminders, webhook retries, email outbox, and campaign metrics.
+WebSocket notifications use Django Channels and Redis.
+Make/Zapier webhook endpoints are company-specific, deduplicated, mapped, audited, and retryable.
+Folder structure remains clean: models, services, selectors, views, forms, tasks, signals, registries.
+Closing Note: This blueprint is designed to be reused as a master prompt/reference for future AI-assisted implementation. It contains the current business rules, technical architecture, permissions, models, services, background jobs, and file structure needed to start the project cleanly.

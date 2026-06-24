@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Dashboard</h1>
+  <p>Active leads: <strong>{{ counts.active|default:0 }}</strong> ·
+     Inactive: {{ counts.inactive|default:0 }}</p>
+  <h3>My recent leads</h3>
+  <ul>
+    {% for lead in my_leads %}
+      <li><a href="{% url 'leads:detail' lead.id %}">{{ lead.name }}</a> — {{ lead.current_stage.code }}</li>
+    {% empty %}
+      <li>No leads assigned.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

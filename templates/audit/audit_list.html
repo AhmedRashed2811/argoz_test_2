@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Audit Log · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Audit Log</h1>
+  <table border="1">
+    <thead><tr><th>When</th><th>Action</th><th>Entity</th><th>Actor</th><th>Changed</th></tr></thead>
+    <tbody>
+      {% for log in page %}
+        <tr>
+          <td>{{ log.created_at }}</td>
+          <td>{{ log.action }}</td>
+          <td>{{ log.entity_type }}#{{ log.entity_id }}</td>
+          <td>{{ log.actor.email|default:"system" }}</td>
+          <td>{{ log.changed_fields|default:"" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No audit entries.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if page.has_other_pages %}
+    <p>
+      {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">Prev</a>{% endif %}
+      Page {{ page.number }} of {{ page.paginator.num_pages }}
+      {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Next</a>{% endif %}
+    </p>
+  {% endif %}
+{% endblock %}

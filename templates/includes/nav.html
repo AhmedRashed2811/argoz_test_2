@@ -1,0 +1,16 @@
+{# Permission-aware menu (docs §14). nav_items comes from the nav_menu context
+   processor: top-level PageDefinitions the user may access. #}
+<nav>
+  {% if user.is_authenticated %}
+    <strong>Argoz CRM</strong>
+    <ul>
+      {% for item in nav_items %}
+        <li><a href="{% if item.url_name %}{% url item.url_name %}{% else %}#{% endif %}">{{ item.name }}</a></li>
+      {% endfor %}
+    </ul>
+    <span>{{ user.get_full_name|default:user.email }}</span>
+    <a href="{% url 'accounts:logout' %}">Logout</a>
+  {% else %}
+    <a href="{% url 'accounts:login' %}">Login</a>
+  {% endif %}
+</nav>

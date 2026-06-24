@@ -1,0 +1,81 @@
+"""Campaign creation (docs §10.1, §10.3). Receives a nested payload of selected
+types + children; heavy child-record creation lives here, not in views. Validates
+dates and type completeness, recalculates budget, audits, notifies."""
+from __future__ import annotations
+
+from django.db import transaction
+
+from apps.audit.services import AuditService
+from apps.core.constants import AuditAction
+from apps.core.exceptions import ValidationError
+from apps.notifications.constants import NotificationCode
+from apps.notifications.services import NotificationService
+
+from ..models import Campaign, CampaignSelectedType
+from .campaign_budget_service import CampaignBudgetService
+
+
+class CampaignCreationService:
+    @staticmethod
+    @transaction.atomic
+    def create_campaign(*, company, name, start_date, end_date, actor=None,
+                        selected_types=None, request_meta=None, **fields) -> Campaign:
+        if end_date < start_date:
+            raise ValidationError("Campaign end_date cannot precede start_date (§10.1).")
+        campaign = Campaign.objects.create(
+            company=company, name=name, start_date=start_date, end_date=end_date,
+            created_by=actor, **fields,
+        )
+        for type_code in (selected_types or []):
+            CampaignSelectedType.objects.create(campaign=campaign, type_code=type_code)
+
+        # Children are appended through their own services after creation; we
+        # recalc the budget so a freshly-created campaign has a snapshot.
+        CampaignBudgetService.recalculate(campaign=campaign, actor=actor)
+
+        AuditService.log(
+            action=AuditAction.CREATE, instance=campaign, actor=actor, company=company,
+            module="marketing", request_meta=request_meta,
+            after={"name": name, "types": list(selected_types or [])},
+        )
+        NotificationService.create_for_users(
+            company=company, recipients=_marketing_managers(company),
+            code=NotificationCode.CAMPAIGN_CREATED, title=f"Campaign created: {name}",
+            related_type="Campaign", related_id=campaign.pk,
+        )
+        return campaign
+
+    @staticmethod
+    @transaction.atomic
+    def update_campaign(*, campaign: Campaign, actor=None, request_meta=None,
+                        **fields) -> Campaign:
+        allowed = {"name", "description", "start_date", "end_date", "target_type", "target_id"}
+        update_fields = [k for k in fields if k in allowed]
+        for k in update_fields:
+            setattr(campaign, k, fields[k])
+        if update_fields:
+            campaign.save(update_fields=update_fields + ["updated_at"])
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=campaign, actor=actor, company=campaign.company,
+            module="marketing", request_meta=request_meta,
+            after={k: str(fields[k]) for k in update_fields},
+        )
+        return campaign
+
+    @staticmethod
+    def assert_submittable(campaign: Campaign) -> None:
+        """At least one type selected before finance submission (docs §10.1, §17)."""
+        if not campaign.selected_types.exists():
+            raise ValidationError("Select at least one campaign type before submission.")
+        incomplete = campaign.selected_types.filter(is_completed=False).exists()
+        if incomplete:
+            raise ValidationError("All selected campaign types must be completed (§17).")
+
+
+def _marketing_managers(company):
+    from apps.accounts.models import User
+    from apps.authorization.services import EffectivePermissionResolver
+
+    users = User.objects.filter(is_active=True, profile__company=company).distinct()
+    return [u for u in users
+            if EffectivePermissionResolver.has(u, "marketing.campaign.view_all")]

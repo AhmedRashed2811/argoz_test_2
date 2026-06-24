@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Roles · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Roles & Permissions</h1>
+  <a href="{% url 'authorization:role_create' %}">+ New role</a> ·
+  <a href="{% url 'authorization:permission_catalog' %}">Permission catalog</a>
+  <table border="1">
+    <thead><tr><th>Name</th><th>Code</th><th>System</th><th>Active</th></tr></thead>
+    <tbody>
+      {% for r in roles %}
+        <tr><td>{{ r.name }}</td><td>{{ r.code }}</td><td>{{ r.is_system_default }}</td><td>{{ r.is_active }}</td></tr>
+      {% empty %}
+        <tr><td colspan="4">No roles.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

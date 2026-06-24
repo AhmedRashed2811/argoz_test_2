@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load crm_permissions %}
+{% block title %}Leads · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Leads</h1>
+  {% if request.user|can:'leads.lead.create_self_generated' %}
+    <a href="{% url 'leads:create' %}">+ New lead</a>
+  {% endif %}
+  <table border="1">
+    <thead><tr><th>Name</th><th>Phone</th><th>Stage</th><th>Salesman</th><th>Status</th><th>SLA</th></tr></thead>
+    <tbody>
+      {% for lead in leads %}
+        <tr>
+          <td><a href="{% url 'leads:detail' lead.id %}">{{ lead.name }}</a></td>
+          <td>{{ lead.phone }}</td>
+          <td>{{ lead.current_stage.code }}</td>
+          <td>{{ lead.assigned_salesman.email|default:"—" }}</td>
+          <td>{{ lead.active_status }}</td>
+          <td>{{ lead.sla_deadline|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">No leads.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

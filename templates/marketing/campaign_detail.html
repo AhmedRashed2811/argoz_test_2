@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load crm_permissions %}
+{% block title %}{{ campaign.name }} · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>{{ campaign.name }}</h1>
+  <p>{{ campaign.start_date }} → {{ campaign.end_date }} ·
+     Lifecycle: {{ campaign.lifecycle_status }} ·
+     Approval: <strong>{{ campaign.approval_status }}</strong></p>
+  <p>Total budget: <strong>{{ campaign.total_budget }}</strong> EGP</p>
+
+  <h3>ROI</h3>
+  <ul>
+    <li>Leads: {{ roi.lead_count }} · Cost/Lead: {{ roi.cost_per_lead|default:"—" }}</li>
+    <li>Attendees: {{ roi.attendee_count }} · Cost/Attendee: {{ roi.cost_per_attendee|default:"—" }}</li>
+  </ul>
+
+  <h3>Selected types</h3>
+  <ul>{% for t in campaign.selected_types.all %}<li>{{ t.type_code }} {% if t.is_completed %}✓{% endif %}</li>{% endfor %}</ul>
+
+  {% if request.user|can:'marketing.budget.manage' %}
+    <h3>Add other cost & recalc budget</h3>
+    <form method="post" action="{% url 'marketing:campaign_budget' campaign.id %}">
+      {% csrf_token %}{{ other_cost_form.as_p }}<button>Add & recalculate</button>
+    </form>
+  {% endif %}
+  {% if request.user|can:'marketing.campaign.submit_finance' %}
+    <form method="post" action="{% url 'marketing:campaign_submit_finance' campaign.id %}">
+      {% csrf_token %}<button>Submit to finance</button>
+    </form>
+  {% endif %}
+{% endblock %}

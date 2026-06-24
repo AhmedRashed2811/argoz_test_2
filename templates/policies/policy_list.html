@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Policies · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Company Policies</h1>
+  <table border="1">
+    <thead><tr><th>Policy</th><th>Module</th><th>Current value</th><th></th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.policy.name }}<br><code>{{ row.policy.code }}</code></td>
+          <td>{{ row.policy.module }}</td>
+          <td>{{ row.current|default:"—" }}</td>
+          <td><a href="{% url 'policies:edit' row.policy.id %}">Edit</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4">No policies.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -1,0 +1,511 @@
+
+Argoz CRM SYSTEM
+Marketing Management Module
+Functional Specification Document
+Version
+1.0
+Status
+Draft for Stakeholder Review
+Date
+June 22, 2026
+Module
+Marketing campaigns, campaign types, budget, approval, and ROI tracking
+Prepared for internal use — describes the business rules governing marketing campaign creation, marketing type configuration, finance approval, budget aggregation, and campaign performance tracking.
+
+1. Introduction
+1.1 Purpose
+This document defines the functional business rules for the Real Estate CRM Marketing Management module. The module enables marketing teams to create campaigns, associate campaigns with real estate targets such as projects or units, select one or more campaign types, record detailed execution information, calculate the full campaign budget, route the campaign through finance approval, and monitor leads and ROI results after execution.
+1.2 Scope
+This specification covers campaign master setup, campaign type selection, Events, TV Ads, Street Ads, Social Media Ads, Exhibitions, total budget calculation, additional costs, finance approval statuses, campaign table columns, campaign lifecycle statuses, and marketing performance tracking. The document focuses on the marketing module and its functional relationship with lead attribution, but it does not define accounting, payment processing, media buying integrations, or advanced analytics implementation details.
+1.3 Definitions & Key Terms
+Term
+Definition
+Campaign
+Marketing initiative created to promote a project, unit, event, exhibition, launch phase, or other business objective.
+Campaign Target
+The object being marketed, such as a project, unit, exhibition, event, or company-defined objective.
+Campaign Type
+Marketing channel/activity selected inside a campaign: Events, TV Ads, Street Ads, Social Media, or Exhibition.
+Event
+Physical or hosted activity with venue, event date, assets, target attendees, and repeatable sub-costs.
+TV Ad
+Television advertising record with date range, channels, channel budgets, assets, and airing slots.
+Street Ad
+Outdoor advertising record covering billboard, banner, bus shelter, LED screen, transit wrap, mural, lamp post, bridge banner, or others.
+Social Media Ad
+Paid digital ad running on one or more platforms with platform budget, target KPI, and creatives.
+Exhibition
+Marketing presence at an exhibition with name, place, date range, and budget.
+Budget & Other Costs
+Planned EGP spending across campaign types, sub-sections, channels, platforms, locations, and extra cost lines.
+Approval Status
+Finance decision: Pending, Approved, Semi Approved, or Not Approved, with reason/note.
+ROI
+Performance view comparing campaign cost against leads, attendees, and KPI achievement.
+
+2. Campaign Master Setup
+2.1 Campaign Creation Objective
+Marketing users create campaigns to organize all marketing activity around a defined business target. A campaign may be created to market a specific project, a specific unit, an exhibition presence, an event, a launch phase, or any other marketing objective defined by the company.
+2.2 Campaign Master Fields
+Field
+Requirement
+Functional Rule
+Campaign Name
+Required
+The display name used in lists, reports, approval screens, and lead attribution.
+Description
+Optional / per policy
+Free-text description explaining the campaign purpose, scope, target audience, or notes.
+Start Date
+Required
+The planned campaign start date. Used to calculate the Coming / Active / Ended campaign status.
+End Date
+Required
+The planned campaign end date. Must not be earlier than the start date.
+Campaign Target
+Required / configurable
+The object being promoted, such as Project, Unit, Exhibition, Event, or Other company-defined target.
+2.3 Campaign Type Selection
+After entering the campaign master fields, the user selects one or more campaign types. The selected types determine which detailed forms appear inside the campaign. The same campaign can include multiple types at the same time.
+Supported campaign types: Events, TV Ads, Street Ads, Social Media, and Exhibition.
+At least one campaign type must be selected before the campaign can be completed.
+Each selected type opens its own detailed section and can contain one or more records where applicable.
+All type-level and sub-section budgets are included in the final Total Budget section.
+Key Rule: The campaign type selection is multi-select. For example, one campaign can include an event, a social media ad linked to that event, street ads supporting the same launch, and a TV ad running during the same campaign period.
+2.4 General Validation Rules
+Rule
+Description
+Date validation
+Campaign end date must be equal to or after the campaign start date. Type-level date ranges should be validated against the campaign period or flagged according to company policy.
+Budget validation
+Budget values must be numeric, non-negative, and stored in EGP.
+Multi-record validation
+Events, TV Ads, Street Ads, and Social Media Ads may have more than one record under the same campaign.
+Asset validation
+Images and videos should be stored as campaign assets and linked to the specific type, channel, platform, or event record they belong to.
+Audit validation
+Budget changes, approval decisions, and approval reasons should be retained for traceability.
+3. Campaign Type Functional Requirements
+3.1 Events
+When the Events campaign type is selected, the campaign displays an Events section. The user can add one or more events under the same campaign. Each event stores its own details, branding assets, target attendance, and repeatable cost sections.
+Event Field
+Requirement
+Description
+Event Name
+Required
+Name of the event inside the campaign.
+Venue / Place
+Required
+Physical location or venue where the event will be held.
+Event Date
+Required
+Date of the event.
+Budget (EGP)
+Required
+Main event budget before repeatable sub-costs are added.
+Description / Notes
+Optional
+Operational notes, agenda details, or internal instructions.
+Logo Image
+Optional
+Logo or event branding image.
+Event Images
+Optional / repeatable
+Supporting images for event design, location, branding, or execution evidence.
+Target Attendees
+Required / recommended
+Expected number of attendees used for planning and ROI comparison.
+3.1.1 Event Repeatable Sub-Sections
+Sub-Section
+Fields
+Rule
+Celebrities
+Name, Budget (EGP)
+The user can add one or more celebrities. Each celebrity has a separate planned budget.
+Giveaways
+Name, Budget (EGP)
+The user can add one or more giveaway items. Each giveaway item has a separate budget.
+Catering
+Name, Budget (EGP)
+The user can add one or more catering items or vendors. Each line has a separate budget.
+Budget Rule: Event budget contributes to campaign total as: event main budget + celebrity budgets + giveaway budgets + catering budgets. The campaign can include more than one event.
+3.2 TV Ads
+When the TV Ads campaign type is selected, the campaign displays a TV Ads section. The user can add one or more TV ad records under the same campaign. Each TV ad can contain multiple channels and multiple airing slots.
+TV Ad Field
+Requirement
+Description
+TV Ad Name
+Required
+Name of the TV ad activity.
+TV Ad Start Date
+Required
+The first date when the ad is planned to run.
+TV Ad End Date
+Required
+The last date when the ad is planned to run.
+Budget (EGP)
+Required
+Main planned TV ad budget.
+Description / Notes
+Optional
+Notes about messaging, target segment, media plan, or internal instructions.
+3.2.1 TV Channels Section
+Channel Field
+Requirement
+Description
+Channel / Network Name
+Required
+The name of the channel or network where the ad will appear.
+Channel Budget (EGP)
+Required
+Separate budget allocated to this specific channel.
+Images / Video
+Optional / repeatable
+Creative assets related to this channel. Assets are linked to the channel, not only to the parent TV ad.
+3.2.2 TV Slots Section
+Slot Field
+Requirement
+Description
+Appearance Time
+Required
+The time at which the ad appears, such as a scheduled airing time.
+Number of Appearances
+Required
+How many times the ad appears at or around that slot/time.
+Functional Rule: Each channel has its own separate budget. TV ad total contributes to campaign total as: TV ad main budget + all channel budgets. Slot information controls scheduling visibility but does not automatically add budget unless company policy defines slot-level costing.
+3.3 Street Ads
+When the Street Ads campaign type is selected, the campaign displays a Street Ads section. The user can add more than one street ad record under the same campaign. Each street ad record can include one or more ad types, and each type can contain quantity, budget, and location details.
+Street Ad Field
+Requirement
+Description
+Street Ad Name
+Required
+Name of the outdoor advertising activity.
+Street Ad Start Date
+Required
+The planned start date of the street ad.
+Street Ad End Date
+Required
+The planned end date of the street ad.
+Budget (EGP)
+Required
+Main street ad budget.
+Description / Notes
+Optional
+Notes about outdoor media plan, supplier, permits, or campaign objective.
+Images for this Ad
+Optional / repeatable
+Creative visuals related to the street ad.
+3.3.1 Street Ad Types
+Ad Type
+Selectable
+Configuration Rule
+Billboard
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Banner
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Bus Shelter
+Yes
+Total Number of Street Ads and Budget. Exact location is not mandatory by default.
+LED Screen
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Transit / Bus Wrap
+Yes
+Total Number of Street Ads and Budget. Route/area may be used instead of exact location.
+Wall Mural
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Lamp Post
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Bridge Banner
+Yes
+Total Number of Street Ads, Budget, Location(s)
+Others
+Yes
+Total Number of Street Ads, Budget, Location(s) or free-text description based on the selected format.
+3.3.2 Street Ad Location Rules
+For each selected street ad type, the user enters the total number of street ads and the budget for that type.
+The user can add more than one location for the same street ad type.
+Each location can have its own budget to support location-level cost analysis.
+Bus Shelter and Transit / Bus Wrap do not require the same exact location entry rule as fixed outdoor placements; they may use area, route, vendor allocation, or company-defined tracking.
+Budget Rule: Street ad budget contributes to campaign total as: street ad main budget + selected type budgets + location budgets, according to the company’s selected budget calculation rule.
+3.4 Exhibition
+When the Exhibition campaign type is selected, the campaign displays an Exhibition section. Exhibition records represent the company’s participation or presence at an exhibition and store the basic information required for planning, approval, and reporting.
+Exhibition Field
+Requirement
+Description
+Exhibition Name
+Required
+Name of the exhibition or participation.
+Start Date
+Required
+The first day of the exhibition.
+End Date
+Required
+The last day of the exhibition.
+Budget (EGP)
+Required
+Planned exhibition budget.
+Place
+Required
+Exhibition venue or location.
+3.5 Social Media Ads
+When the Social Media campaign type is selected, the campaign displays a Social Media Ads section. The user can add more than one social media ad under the same campaign. Each social ad can run on one or more platforms, and each platform has its own budget.
+Social Media Field
+Requirement
+Description
+Social Ad Name
+Required
+Name of the social media marketing ad.
+Platforms
+Required / multi-select
+Meta, What’s App TikTok, LinkedIn, X, and Google Ads (Website). More than one platform can be selected.
+Platform Budget (EGP)
+Required per platform
+Separate budget for every selected platform.
+Target KPI
+Required / recommended
+The target performance metric, such as leads, reach, impressions, clicks, attendees, CPL, or other company-defined KPI.
+Creative Images / Videos
+Optional / repeatable
+Ad images or videos attached to the social ad or platform.
+Linked Event
+Optional
+The social media ad can be linked to a campaign event to track how many attendees came from that specific ad.
+3.5.1 Event Attribution for Social Ads
+A social media ad may be created specifically to promote an event. In that case, the ad should be linked to the event record so the system can count attendees and/or leads generated from that ad. This improves ROI analysis by connecting platform spend to actual event attendance and sales pipeline impact.
+The linked event should be selected from events under the same campaign.
+Attendance and lead attribution should be recorded through lead source, event registration, QR code, landing page, manual reception entry, or any company-approved tracking method.
+ROI reports should compare social platform budget against generated attendees, leads, and target KPI achievement.
+4. Total Budget and Other Costs
+4.1 Total Budget Section
+After the user selects campaign types and fills the required details, the system displays a Total Budget section at the end of the campaign form. This section summarizes all planned budget values across the campaign and all selected campaign types.
+Budget Source
+Included in Total Budget
+Campaign Type Budgets
+Main budget recorded for each selected type record.
+Event Sub-Budgets
+Celebrities, giveaways, and catering budgets.
+TV Channel Budgets
+Separate budget for each selected TV channel/network.
+Street Ad Type and Location Budgets
+Budgets per outdoor ad type and per location where applicable.
+Social Platform Budgets
+Separate budget for every selected social media platform.
+Exhibition Budget
+Exhibition planned budget.
+Other Costs
+Additional costs added through the Other Costs button.
+4.2 Other Costs Button
+The Total Budget section includes a button called Other Costs. When clicked, the system displays an additional repeatable section where users can record extra campaign costs that are not part of a specific campaign type.
+Other Cost Field
+Requirement
+Description
+Value (EGP)
+Required
+Numeric value of the additional cost.
+Reason
+Required
+Reason or description explaining why this cost was added.
+Global Budget Rule: The user can add more than one Other Cost line. Each line is included in the calculated campaign total and remains visible for finance review.
+4.3 Recommended Budget Calculation Formula
+Campaign Total Budget = Sum of all selected campaign type budgets + sum of all repeatable sub-section budgets + sum of all channel/platform/location budgets + sum of all Other Costs.
+5. Finance Approval, Campaign Status, and Campaign List
+5.1 Finance Approval Global Rule
+Every campaign has an Approval column controlled by finance approval. Approval status is independent from the date-based campaign lifecycle status. Each approval option includes a reason or note to keep the decision auditable.
+Approval Status
+Meaning
+Reason Rule
+Pending
+Default / in review
+Campaign has been created but finance has not made a final decision yet. Reason/note can describe what is still under review.
+Approved
+Finance approved
+Finance approved the campaign budget and planned spending. Reason/note stores approval comments or conditions if needed.
+Semi Approved
+Partially approved
+Finance approved part of the campaign, or approved with limitations. Reason is mandatory to explain what is approved and what is not.
+Not Approved
+Rejected
+Finance did not approve the campaign. Reason is mandatory to explain the rejection reason.
+5.2 Campaign Lifecycle Status
+Campaign status is calculated from the campaign start and end dates and displayed in the campaign table.
+Status
+Rule
+Coming
+Current date is before the campaign start date.
+Active
+Current date is on or after the start date and on or before the end date.
+Ended
+Current date is after the campaign end date.
+Important Distinction: Approval status and campaign lifecycle status are separate. A campaign can be Coming and Pending, Active and Approved, Active and Semi Approved, or Ended and Not Approved depending on dates and finance decision.
+5.3 Campaign List Table
+After creating a campaign, the campaign appears in the main campaign table. The table provides a management view for marketing, finance, sales, and executive stakeholders.
+Table Column
+Description
+Campaign Name
+The campaign display name.
+Type
+The selected campaign type or combined list of selected types.
+Start and End Date
+Campaign date range.
+Budget
+Calculated total budget including campaign type budgets and Other Costs.
+Leads
+Number of leads attributed to the campaign or its child records.
+Status
+Date-based status: Coming, Active, or Ended.
+Approved
+Finance approval value: Approved, Not Approved, Pending, or Semi Approved, with reason.
+Actions
+User actions such as view, edit, manage budget, duplicate, view leads, view report, or archive based on permissions.
+6. Lead Attribution and ROI Tracking
+6.1 Campaign-to-Lead Relationship
+The Marketing module should connect to the Lead Management module so every lead generated from a campaign can be traced back to the campaign and, where possible, to the specific campaign type or child record that generated it. This allows the campaign list to show lead counts and enables campaign performance reporting.
+A lead generated from a campaign should store the Campaign reference.
+Where available, the lead should also store the Campaign Type reference, such as Event, TV Ad, Street Ad, Social Media Ad, or Exhibition.
+For social ads linked to events, the lead or attendee record should store both the Social Ad and the Event references.
+The lead count in the campaign table should be calculated from attributed leads based on the selected campaign and reporting rules.
+6.2 ROI and KPI Reporting
+Metric
+Functional Meaning
+Total Budget
+Final planned budget including all types and other costs.
+Leads
+Number of leads attributed to the campaign.
+Cost per Lead
+Total budget divided by attributed leads, where lead count is greater than zero.
+Target KPI
+The target value set on social media ads or campaign reporting screens.
+Attendees
+For events, the number of attendees captured through registration, reception, QR, or manual tracking.
+Cost per Attendee
+Event-related or social-event budget divided by attributed attendees, where attendee count is greater than zero.
+Platform Performance
+Budget and KPI view per selected social platform.
+Reporting Rule: ROI calculations should be transparent and based on stored campaign budgets and attributed leads/attendees. The system should avoid mixing unrelated campaign costs unless the report explicitly uses total campaign budget.
+7. Summary Reference Tables
+7.1 Campaign Type Availability and Repeatability
+Campaign Type
+Can Be Selected with Other Types
+Can Add Multiple Records
+Main Details
+Events
+Yes
+One or more, per policy
+Event details, celebrities, giveaways, catering, assets, target attendees.
+TV Ads
+Yes
+One or more, per policy
+TV ad details, channels with budgets/assets, airing slots.
+Street Ads
+Yes
+One or more, per policy
+Outdoor ad types, quantities, budgets, locations, creatives.
+Social Media
+Yes
+One or more, per policy
+Platforms, platform budgets, target KPI, creatives, optional event link.
+Exhibition
+Yes
+One or more, per policy
+Name, start/end date, budget, place.
+7.2 Required Budget Inputs by Type
+Area
+Budget Inputs
+Events
+Event budget + celebrity budgets + giveaway budgets + catering budgets.
+TV Ads
+TV ad budget + channel-specific budgets.
+Street Ads
+Street ad budget + ad type budgets + location budgets where applicable.
+Social Media
+Platform-specific budgets for each selected platform.
+Exhibition
+Exhibition budget.
+Other Costs
+Value and reason for each additional cost line.
+7.3 Recommended Roles and Permissions
+Role
+Typical Permissions
+Marketing User
+Create campaigns, select campaign types, add details, upload assets, enter planned budgets, and submit for finance review.
+Marketing Manager
+Review campaign completeness, edit campaign plans, manage campaign performance, and access campaign reports.
+Finance User
+Review campaign budget, set approval status, and add approval reason.
+
+8. Executive Workflow Charts
+The following workflow charts are added to support faster executive review and easier reading. They summarize the same business rules documented in the specification and do not replace the detailed functional requirements above.
+8.0 Workflow Chart Index
+Figure
+Workflow
+Purpose
+Figure 1
+Executive Marketing Campaign Journey
+End-to-end campaign journey from creation to ROI reporting.
+Figure 2
+Campaign Type Selection Architecture
+Multi-select type structure and budget aggregation.
+Figure 3
+Event Campaign Workflow
+Event details, sub-costs, assets, and attendee/lead attribution.
+Figure 4
+TV Advertising Workflow
+TV ad channels, channel budgets, creative assets, and slots.
+Figure 5
+Street Advertising Workflow
+Outdoor ad types, quantities, locations, exceptions, and budgets.
+Figure 6
+Social Media and Event ROI Workflow
+Platform budgets, KPIs, creatives, event link, and ROI output.
+Figure 7
+Budget and Finance Approval Workflow
+Budget totals, other costs, approval statuses, and reasons.
+Figure 8
+Campaign List, Actions, and Reporting Workflow
+Campaign table display, actions, leads, and reporting path.
+
+8.1 Executive Marketing Campaign Journey
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 1 — End-to-end marketing campaign workflow from creation through type selection, budget calculation, finance approval, list display, lead tracking, and ROI reporting.
+
+8.2 Campaign Type Selection Architecture
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 2 — Multi-select campaign type architecture showing that one campaign can include Events, TV Ads, Street Ads, Social Media, and Exhibition records.
+
+8.3 Event Campaign Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 3 — Event details, event sub-costs, branding assets, target attendees, and optional social media ROI linkage.
+
+8.4 TV Advertising Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 4 — TV ad planning workflow including channels, channel-specific budgets, creative assets, and ad slots.
+
+8.5 Street Advertising Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 5 — Outdoor advertising workflow including selected ad types, quantities, locations, exceptions, budgets, and creative images.
+
+8.6 Social Media and Event ROI Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 6 — Social media workflow including platforms, platform budgets, KPIs, creatives, and event attendee attribution.
+
+8.7 Budget and Finance Approval Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 7 — Budget aggregation, Other Costs, and global finance approval statuses with reasons.
+
+8.8 Campaign List, Actions, and Reporting Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 8 — Campaign table display, management actions, lead count, status, approval, and reporting path.

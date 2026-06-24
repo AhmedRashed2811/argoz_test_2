@@ -1,0 +1,308 @@
+
+Argoz CRM SYSTEM
+Lead Management & Distribution Module
+Functional Specification Document
+Version 1.0
+Status: Draft for Stakeholder Review
+June 18, 2026
+Prepared for internal use — describes the business rules governing lead status, lead distribution, and lead creation.
+
+1. Introduction
+1.1 Purpose
+This document defines the functional business rules governing three connected areas of the Real Estate CRM system: the lead status lifecycle and Service Level Agreement (SLA) framework, the distribution of leads to sales teams and salesmen (manual and automatic), and the lead creation workflow across all supported lead sources. It is intended as a shared reference for business stakeholders, product, development, and QA teams.
+1.2 Scope
+This document covers: lead status determination and the Active/Inactive lifecycle; SLA assignment and breach handling; manual and automatic distribution logic — including Round Robin (load-balanced) and By Turn (sequential) methods, their shared scope modes, and the selection algorithm; SLA retry and team escalation rules; and the end-to-end lead creation workflow for each of the eight supported lead sources. Modules outside lead status, distribution, and creation (such as reporting, property listings, or contract management) are outside the scope of this document.
+1.3 Definitions & Key Terms
+Term
+Definition
+Lead
+A prospective client record captured in the CRM, identified by name and phone number, and linked to a source.
+Sales Head
+The manager of a sales team, authorized to assign leads to himself or to members of his team.
+Salesman
+An individual sales representative who is assigned leads and works them to conversion.
+Team
+A group of salesmen managed under a single Sales Head.
+Manual Distribution
+Assignment of a lead to a specific team or salesman, performed directly by an authorized user.
+Automatic Distribution (Round Robin / By Turn)
+System-driven assignment of a lead using either the Round Robin algorithm (load-balanced, fewest active leads) or the By Turn method (sequential fixed rotation), with no manual selection of the receiving salesman.
+SLA (Service Level Agreement)
+The maximum time allowed for a salesman to act on a newly assigned lead, configured by company policy and based on the lead's origin and the current stage of the lead.
+Direct Lead
+A lead that reaches the company directly, without passing through a broker.
+Broker (Indirect) Lead
+A lead referred to the company through a registered broker or intermediary.
+Active Lead
+A lead that has not been marked with an inactive outcome and remains in the working pipeline.
+Inactive Lead
+
+A lead marked as Not Interested, No Answer, Travelled, or Deceased.
+Lead Stage
+Current Lead’s Stage (Interested, Not Interested, Follow Up…)
+2. Lead Status & SLA Framework
+2.1 Lead Origin Classification
+At the moment a lead is created, the system asks whether the lead came Direct or through a Broker (indirect). This classification is recorded against the lead and drives two downstream behaviours: which SLA applies to the lead, and which rules govern reassignment if that SLA is exceeded.
+2.2 SLA Assignment
+Once the lead's origin (Direct or Broker) is set, the system assigns it a Service Level Agreement — the maximum time within which the lead must be acted upon — based on the company's configured policy. SLA durations are configurable per origin type and are not hard-coded; they reflect whatever thresholds the company defines.
+2.3 Active and Inactive Status
+Every lead is Active by default upon creation and remains Active while it is being worked by a salesman. A lead is moved to Inactive status only when the following outcomes is recorded against it:
+Not Interested
+
+Once a lead becomes Inactive, it is removed from the active distribution pool — it is no longer counted toward a salesman's active lead count and is no longer eligible for further action until it is reactivated.
+2.4 SLA Breach Handling
+If a lead remains Active beyond its assigned SLA without being resolved, an action must be taken. The available action depends on the lead's origin classification, per the table below.
+Lead Origin
+Action on SLA Breach
+Direct
+Per company policy, the system follows one of two paths:
+• Manual Reassignment by an authorized user
+• Automatic Redistribution 
+Broker (Indirect)
+Always Manual Reassignment. 
+2.5 SLA Expiry — Automatic Distribution Methods
+When a lead’s SLA expires without a successful contact outcome, the company policy determines which of two redistribution methods is applied. Both methods are configurable per company policy and govern how the lead is handled before and during escalation to another team.
+Method 1 — Round Robin Redistribution
+Upon SLA expiry, the system immediately redistributes the lead using the standard Round Robin mechanism described in Section 3.2 — selecting the next eligible salesman or team based on workload and last-received-lead timestamp. This method applies the same Round Robin logic already documented for initial distribution and SLA breach handling.
+
+
+Method 2 — Retry Attempts and Team Escalation
+Rather than redistributing immediately, the system applies a configurable retry mechanism within the current team before escalating to another team. Each team is configured with a maximum number of retry attempts (n). The lead cycles sequentially through the salesmen of that team — each salesman receiving one attempt — until all n attempts across the team are exhausted. Only then is the lead escalated to the next team, where the same retry cycle restarts. This process proceeds in the following steps:
+Step 1 — First Attempt with the Assigned Salesman
+Upon SLA expiry, the originally assigned salesman (Salesman X) counts as the first attempt. If the SLA for that attempt expires without a successful contact, the lead moves to the next salesman in the same team.
+Step 2 — Sequential Retry within the Same Team
+The lead passes sequentially from one salesman to the next within the same team. Each salesman is given one attempt within a configured time window. This continues until either a successful contact is made or all n configured attempts for the team are exhausted — regardless of whether all team members have been tried.
+Step 3 — Escalation to the Next Team
+Once all n retry attempts for the current team are exhausted without a successful contact, the lead is escalated to the next team. The same sequential retry cycle described in Steps 1 and 2 then restarts for the receiving team, using that team’s own configured n value. This escalation continues across teams in sequence until a successful contact is made.
+Note: All retry attempt counts (n) and time windows per attempt are configurable per company policy and are not hard-coded. A lead that is successfully contacted at any step is removed from the retry queue and continues its normal lifecycle. Leads originating from a Broker (Indirect) source follow the same retry logic but their team-to-team escalation is always resolved via Manual Reassignment only, consistent with Section 2.4.
+2.6 Reactivation of Inactive Leads
+If an Inactive lead later contacts the company again, or otherwise signals renewed interest, the lead is reactivated and redistributed using the same distribution rules described in Section 3 — Manual or Automatic, depending on the policy configured for that lead's source and origin.
+2.7 Handling “Call Me Again” Requests Within SLA (Active User within SLA)
+If an Active lead (still within its SLA) requests a follow-up call or came from a different source and the system subsequently attempts to re-create or re-engage that lead, this case is always escalated to the users authorized to perform manual distribution. Those authorized users manually assign the lead to a specific sales team or salesman or ignore that request. This scenario bypasses Round Robin entirely and is always resolved manually.
+
+
+
+
+
+
+
+2.8 Follow-ups, Meetings, and Lead Stages Module
+The CRM includes a dedicated Follow-ups, Meetings, and Lead Stages module that tracks the qualitative progression of each lead through the sales cycle. Every lead is assigned a stage at any given point, and each stage carries its own configurable SLA time. The same SLA expiry methods defined in Section 2.5 (Round Robin Redistribution or Retry Attempts and Team Escalation) apply to all stages, per company policy.
+2.8.1 Lead Stages
+The following stages are supported. Each stage has its own SLA duration configured by company policy:
+Fresh — The initial stage of every newly assigned or rotated lead. SLA begins immediately upon assignment.
+Interested — The lead has expressed interest. Distribution upon SLA expiry follows company policy (automatic or manual).
+Not Interested — The lead has declined. The lead is moved to Inactive status automatically. No SLA applies and no further automatic distribution is triggered. Follow-up reminders are not generated for leads in this stage.
+Follow-up — A follow-up has been scheduled with the lead. Assignment in this stage is manual, per company policy. A reminder is generated to alert the salesman before the follow-up is due.
+Meeting — A meeting has been scheduled with the lead. Assignment in this stage is manual, per company policy. A reminder is generated to alert the salesman before the meeting time.
+Not Reached (No Answer) — The salesman attempted contact but the lead did not answer. SLA expiry in this stage triggers automatic redistribution per the configured SLA expiry method. A reminder to attempt contact again is generated; the reminder may be set to trigger automatically (based on company policy) or manually by the salesman.
+Frozen — The lead is temporarily unavailable for a known period (for example, travelling abroad and expected to return after one month). SLA expiry in this stage triggers automatic redistribution per the configured SLA expiry method. A reminder is generated automatically when the freeze period is expected to end, prompting the salesman to re-engage the lead.
+2.8.2 Reminder Rules
+The system generates reminders to prompt salesmen to take action before a scheduled event or SLA window expires. The following rules govern reminders across all stages:
+Reminders are generated for all stages except Not Interested, which moves the lead to Inactive status and requires no further action.
+For the Not Reached (No Answer) stage specifically, reminders may be either automatic (triggered by the system based on a company-configured interval) or manual (set by the salesman). The mode is governed by company policy.
+For Fresh leads reminders are generated according to company-configured schedules.
+For all other active stages (Interested, Follow-up, Meeting, Frozen), reminders are set manually by the salesman schedules to alert the salesman of upcoming follow-up calls, meetings, or re-engagement windows.
+
+
+
+
+2.8.3 Stage Distribution Summary
+The following table summarizes distribution handling and reminder behaviour per stage. All SLA durations and expiry methods are configurable by company policy.
+Stage
+Distribution on SLA Expiry
+Reminder
+Notes
+Fresh
+Automatic (per configured SLA expiry method)
+Yes — per company schedule
+Stage assigned to new salesman after any lead rotation
+Interested
+Per company policy
+Yes — per company schedule
+When rotated the stage becomes Fresh but the history is preserved to monitor
+Not Interested
+None — lead becomes Inactive
+No reminders
+Lead is deactivated; no further action required
+Follow-up
+Manual assignment
+Yes — before scheduled follow-up
+Sales must choose a date time
+Meeting
+Manual assignment
+Yes — before scheduled meeting
+Sales must choose a date time
+Not Reached
+Automatic (per configured SLA expiry method)
+Yes — automatic or manual per policy
+Reminder mode is the only stage-level exception to automatic reminders
+Frozen
+Automatic (per configured SLA expiry method)
+Yes — automatic when freeze period ends
+Lead is temporarily on hold; reminder triggers re-engagement
+
+2.8.4 General Rule
+Whenever a lead is rotated to a new salesman as a result of an SLA expiry — regardless of which SLA expiry method (Round Robin or Retry and Team Escalation) triggered the rotation — the following rule applies automatically:
+Stage resets to Fresh. The lead’s stage is set back to Fresh for the new salesman, regardless of what stage it was in before the rotation.
+SLA resets to Fresh SLA. The SLA clock restarts using the Fresh stage SLA duration configured by company policy, giving the new salesman the full configured response window.
+History is preserved. All prior activity, stage history, contact attempts, notes, and salesman assignments are retained in the lead’s record. The new salesman can review the full history of the lead even though it appears Fresh in their queue.
+Note: This rule applies universally across all lead sources and origins. The stage and SLA reset is automatic and requires no manual action. It ensures that the new salesman always starts with a clear, time-bounded mandate to engage the lead, while the complete audit trail remains intact for reference and reporting.
+
+
+3. Lead Distribution Methods
+Wherever the workflow reaches a distribution decision point, the system must explicitly ask whether the lead should be distributed Manually or Automatically (based on the company policy) — except where one of the two options is not applicable for that lead source (see Section 4).
+3.1 Manual Distribution
+Manual distribution is the default distribution method in the system. When Manual is selected, the authorized user assigns the lead directly to either:
+a sales Team, then the sales head will determine
+an individual Salesman.
+3.2 Automatic Distribution Methods
+3.2.1 Overview of Automatic Distribution Methods
+The system supports two configurable automatic distribution methods: Round Robin and By Turn. The company selects which method is active through system configuration. Both methods share the same language pre-check and scope modes described in the subsections below.
+Method A — Round Robin (Load-Balanced)
+Round Robin is the load-balanced automatic distribution method. Rather than following a fixed sequence, it dynamically selects the next recipient based on current workload, ensuring that leads flow to whoever has the most capacity at that moment. The selection engine always applies the following two-step logic:
+Primary rule: select the candidate (team or salesman) with the fewest currently active leads.
+Tie-break rule: if two or more candidates share the same lowest active-lead count, select whichever has the earliest date/time of their last received lead — i.e., the one who has gone the longest without receiving a new lead.
+Method B — By Turn (Sequential)
+By Turn is the sequential automatic distribution method. The system maintains a fixed rotation order across the eligible pool (team or salesman, depending on the active mode). Each incoming lead is assigned to the next recipient in the sequence, regardless of current workload. After the last recipient in the list is reached, the rotation restarts from the beginning.
+Key characteristics of By Turn distribution:
+The rotation order is configured by an authorized administrator and can be adjusted at any time.
+If a recipient is inactive or unavailable, they are skipped in the current rotation and the lead passes to the next eligible person in the sequence.
+The position pointer advances after each successful assignment, so the sequence resumes correctly for the next lead.
+3.2.2 Language Pre-Check
+Before any automatic distribution runs — whether Round Robin or By Turn — the system must first ask which language the lead speaks. This filters the eligible pool to only those salesmen who support that language, so a lead is never routed to a salesman who cannot communicate with them.
+
+
+3.2.3 Distribution Scope Modes
+Once the language filter has been applied (Default is Arabic), the active distribution method (Round Robin or By Turn) operates in one of three configurable scope modes:
+Mode
+Description
+Mode 1 — Team, then Salesman
+The system runs Round Robin to select a team, then runs Round Robin again to select a salesman within that team.
+Mode 2 — Team, then Sales Head Decides
+The system runs Round Robin to select a team; the Sales Head of that team then manually chooses which salesman within the team receives the lead.
+Mode 3 — All Salesmen
+The system runs Round Robin across all salesmen company-wide, without regard to team boundaries.
+
+
+4. Lead Creation Workflow
+4.1 Lead Information Capture
+When a new lead is created, the user must enter the following information:
+Name — required.
+Phone Number — required; validated on the front end against the format and code of the selected country.
+Email — optional.
+4.2 Lead Source Selection
+After capturing the basic information, the user selects the lead's Source. The selected source determines which distribution paths are available later in the workflow. Eight sources are supported:
+a) Self-Generated
+If the logged-in user is a Sales Head: he may assign the lead to himself, to a salesman within his team, or run automatic distribution within his own team only.
+If the logged-in user is a Salesman: the lead is automatically assigned to him. In addition, depending on company policy, the system asks whether the lead should remain permanently assigned to him, or be automatically redistributed if no contact is made with the lead within the lead-response SLA.
+
+b) Campaign
+The user selects the Campaign, then the specific Event or Social Media channel or any type associated with that campaign.
+Distribution follows company policy: Manual (only available to users authorized to make manual assignments) or Automatic (Round Robin).
+c) Broker
+If the logged-in user is the broker himself: the lead is automatically assigned to that broker. The system then asks, per company policy, whether the lead should also be automatically assigned to one of the company's salesmen, or remain with the broker only.
+If the logged-in user is someone other than the broker: the user selects the relevant broker, and the system then asks whether the lead should be assigned to a salesman or not.
+d) Walk-in
+The system asks how the visitor knew about the company (see Section 4.3).
+Distribution is Manual only. The receptionist records the lead in the system and the active walk-in reception policy — configured by the company — determines which salesman meets the visitor. Three policies are supported:
+Policy 1 — Open Floor (Any Available Salesman)
+Any available salesman from any team may meet the walk-in lead. The receptionist manually selects or flags the lead as available, and whichever salesman is free and present attends to the visitor. No rotation or team restriction applies under this policy.
+Policy 2 — Team Turn (Sequential Team Rotation, Head Assigns)
+A configured set of teams participates in a fixed rotation. When a walk-in arrives, it is the turn of the current team in the sequence. The Sales Head of that team manually selects which salesman within his team will meet the visitor. If no salesman from that team is available to meet the lead, the lead passes to the next team in the rotation, whose Sales Head then assigns a salesman. This continues until the lead is met or all teams in the rotation have been offered the opportunity. After each successful assignment the rotation pointer advances so the next walk-in goes to the following team in sequence.
+Policy 3 — Full Rotation (All Salesmen Across All Teams)
+The system maintains a single rotation across all salesmen of all teams’ company-wide. Each walk-in lead is assigned to the next salesman in the sequence, regardless of team boundaries. If the salesman whose turn it is is unavailable, the lead passes to the next eligible salesman in the rotation. The rotation pointer advances after each successful assignment and restarts from the beginning after the last salesman in the list is reached.
+Note: The active walk-in reception policy is configured by the company and applies uniformly to all walk-in leads. Regardless of which policy is active, the lead source is always recorded as Walk-in and the “how did you know us” prompt is always presented to the receptionist at time of entry.
+e) Call Center
+The system asks how the caller knew about the company.
+Distribution follows company policy: Manual — where the authorized users choose who to assign the lead to — or Automatic (Round Robin).
+f) Exhibition
+The user selects the relevant Exhibition.
+Distribution is Manual only, and a salesman must be selected — the lead cannot be left unassigned.
+g) Referral
+The referrer's name is captured in a free-text field.
+Distribution follows company policy: Manual — where the authorized users choose who to assign the lead to — or Automatic (Round Robin).
+h) Existing Client
+The user searches for the client by phone number.
+If company policy is to preserve the prior relationship: the system checks whether the salesman who originally handled this client is still active at the company. If yes, the lead is reassigned to that same salesman; if no, the lead is redistributed (Manual or Automatic, per policy).
+If company policy does not depend on the original salesman: the lead is redistributed directly (Manual or Automatic, per policy).
+4.3 General Rule — Source List Completeness
+Wherever the system prompts “how did you know us” (e.g., Walk-in, Call Center), and in every list of Campaigns, Events, and Social Media channels, the option “Website” must always be included as an available entry.
+4.4 Summarized Table for Distribution Method Availability by Lead Source
+Source
+Manual
+Automatic (RR)
+Notes
+Self-Generated (Sales Head)
+Yes
+Yes (within his own team only)
+May assign to himself, a team member, or run team-level Round Robin.
+Self-Generated (Salesman)
+—
+Auto-assigned to self
+Continued assignment vs. SLA-based redistribution depends on policy.
+Campaign
+Yes (if authorized)
+Yes
+Per company policy.
+Broker (broker logged in)
+—
+Auto-assigned to broker
+Further assignment to a salesman depends on policy.
+Broker (another user logged in)
+Optional
+Optional
+User selects broker, then decides whether to assign a salesman.
+Walk-in
+Yes (if authorized)
+Yes
+Reception policy (company-configured) determines salesman assignment: Policy 1 — any available salesman; Policy 2 — team turn rotation, Sales Head assigns; Policy 3 — full rotation across all salesmen. See Section 4.2d.
+Call Center
+Yes (if authorized)
+Yes
+Per company policy.
+Exhibition
+Yes (mandatory)
+—
+A salesman must be selected.
+Referral
+Yes (if authorized)
+Yes
+Per company policy.
+Existing Client
+Yes
+Yes
+Depends on whether the previous salesman is retained, per policy.
+
+5. Executive Workflow Charts
+The following workflow charts are added to support faster executive review and easier reading. They summarize the same business rules documented in the specification and do not replace the detailed functional requirements above.
+5.1 Executive Lead Journey Overview
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Not Interested
+Not Interested
+Not Interested
+Not Interested
+Figure 1 — Executive overview of the complete lead journey from creation, source selection, origin classification, distribution, SLA tracking, outcomes, and reactivation.
+5.2 Lead Status and SLA Lifecycle
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Not Interested
+Not Interested
+Figure 2 — Lead status lifecycle showing Active and Inactive states, SLA assignment, SLA breach handling, Call Me Again escalation, and reactivation.
+5.3 Distribution Method, Round Robin and By Turn Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 3 — Manual distribution, automatic distribution, language filtering, Round Robin and By Turn methods, shared scope modes, and the assignment algorithm.
+5.4 Lead Creation Source Workflows — Part 1
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 4 — Source-specific workflow rules for Self-Generated, Campaign, Broker, and Walk-in leads.
+5.5 Lead Creation Source Workflows — Part 2
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 5 — Source-specific workflow rules for Call Center, Exhibition, Referral, and Existing Client leads.
+5.6 Follow-ups, Meetings and Lead Stage SLA Workflow
+Visual workflow for executive reading. Refer to the preceding sections for the complete detailed rules.
+
+Figure 6 — Follow-up, meeting, reminder, and lead-stage SLA workflow showing stage-specific expiry handling and the universal Fresh reset after rotation.

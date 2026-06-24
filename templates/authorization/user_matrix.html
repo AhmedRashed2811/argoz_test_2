@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Permission Matrix · Argoz CRM{% endblock %}
+{% block content %}
+  <h1>Permissions — {{ target.email }}</h1>
+  <h3>Effective permissions ({{ effective|length }})</h3>
+  <ul>{% for code in effective %}<li><code>{{ code }}</code></li>{% empty %}<li>None</li>{% endfor %}</ul>
+  <h3>Add direct override (Deny wins over role defaults)</h3>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button>Apply</button></form>
+{% endblock %}
