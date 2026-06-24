@@ -1,7 +1,9 @@
 """Effective permission resolution (docs §4.3) + management writes. Centralized:
 every protected view/service action checks codes through here, never role names."""
 from __future__ import annotations
+from apps.authorization.models import RoleGroup
 
+from django.db import transaction
 from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
@@ -91,6 +93,14 @@ PermissionService = EffectivePermissionResolver
 class PermissionManagementService:
     """UI-driven permission changes (docs §4.4). Audits + cache invalidation are
     wired by callers/signals (§17: permission change invalidates cache)."""
+
+    @staticmethod
+    def get_permission_catalog():
+        return PermissionDefinition.objects.all().order_by("module", "code")
+
+    @staticmethod
+    def get_active_permissions():
+        return PermissionDefinition.objects.filter(is_active=True).order_by("module", "code")
 
     @staticmethod
     def set_user_override(*, user, permission: PermissionDefinition, effect, reason="",
@@ -264,3 +274,116 @@ class PermissionManagementService:
                 request_meta=request_meta,
                 entity_display=user.email,
             )
+
+
+class RoleService:
+    @staticmethod
+    def get_roles_for_company(company):
+        from django.db.models import Count, Q
+        return (
+            RoleGroup.objects.filter(company=company)
+            .annotate(member_count=Count("assignments", filter=Q(assignments__is_active=True)))
+            .order_by("name")
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def create_role(*, company, code, name, description="", is_active=True, permission_ids=None, actor=None, request_meta=None) -> RoleGroup:
+        role = RoleGroup.objects.create(
+            company=company,
+            code=code,
+            name=name,
+            description=description,
+            is_active=is_active,
+        )
+        if permission_ids:
+            for pid in permission_ids:
+                RolePermission.objects.create(role=role, permission_id=pid, allow=True)
+
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+        AuditService.log(
+            action=AuditAction.CREATE, instance=role, actor=actor, company=company,
+            module="authorization", request_meta=request_meta,
+            after={
+                "code": code,
+                "name": name,
+                "description": description,
+                "is_active": is_active,
+                "permissions": list(RolePermission.objects.filter(role=role, allow=True).values_list("permission__code", flat=True)),
+            },
+            entity_display=name,
+        )
+        return role
+
+    @staticmethod
+    @transaction.atomic
+    def update_role(*, role: RoleGroup, code, name, description="", is_active=True, permission_ids=None, actor=None, request_meta=None) -> RoleGroup:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        before_data = {
+            "code": role.code,
+            "name": role.name,
+            "description": role.description,
+            "is_active": role.is_active,
+            "permissions": list(role.permissions.filter(allow=True).values_list("permission__code", flat=True)),
+        }
+
+        role.code = code
+        role.name = name
+        role.description = description
+        role.is_active = is_active
+        role.save()
+
+        if not role.is_system_default:
+            if permission_ids is not None:
+                # Sync permissions
+                existing_pids = set(role.permissions.values_list("permission_id", flat=True))
+                target_pids = set(permission_ids)
+
+                # Delete removed ones
+                role.permissions.filter(permission_id__in=existing_pids - target_pids).delete()
+
+                # Add new ones
+                for pid in target_pids - existing_pids:
+                    RolePermission.objects.create(role=role, permission_id=pid, allow=True)
+
+        after_data = {
+            "code": role.code,
+            "name": role.name,
+            "description": role.description,
+            "is_active": role.is_active,
+            "permissions": list(role.permissions.filter(allow=True).values_list("permission__code", flat=True)),
+        }
+
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=role, actor=actor, company=role.company,
+            module="authorization", request_meta=request_meta,
+            before=before_data, after=after_data,
+            entity_display=role.name,
+        )
+        return role
+
+    @staticmethod
+    @transaction.atomic
+    def toggle_role(*, role: RoleGroup, actor=None, request_meta=None) -> bool:
+        if role.is_system_default:
+            raise ValueError("System default roles cannot be deactivated.")
+        
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        before_active = role.is_active
+        role.is_active = not role.is_active
+        role.save()
+
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=role, actor=actor, company=role.company,
+            module="authorization", request_meta=request_meta,
+            before={"is_active": before_active},
+            after={"is_active": role.is_active},
+            entity_display=role.name,
+            reason="Toggled role active state",
+        )
+        return role.is_active

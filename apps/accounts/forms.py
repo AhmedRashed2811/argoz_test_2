@@ -4,7 +4,7 @@ from django import forms
 
 from apps.authorization.models import RoleGroup
 
-from .models import User
+from .models import Team, User
 
 
 class UserCreateForm(forms.Form):
@@ -59,3 +59,15 @@ class UserEditForm(forms.Form):
         if qs.exists():
             raise forms.ValidationError("A user with this email already exists.")
         return email
+
+
+class TeamForm(forms.Form):
+    name = forms.CharField(max_length=150)
+    region = forms.CharField(max_length=120, required=False)
+    order_index = forms.IntegerField(required=False, initial=0)
+
+    def clean_name(self):
+        return self.cleaned_data["name"].strip()
+
+    def clean_order_index(self):
+        return self.cleaned_data.get("order_index") or 0

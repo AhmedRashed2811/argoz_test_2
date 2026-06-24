@@ -299,6 +299,7 @@ class Command(BaseCommand):
             ("finance", "dashboard", "Finance Approvals", "finance:campaign_approval", 3),
             ("notifications", "view_own", "Notifications", "notifications:list", 4),
             ("admin", "users", "Users", "accounts:user_list", 10),
+            ("admin", "teams", "Sales Teams", "accounts:team_list", 11),
             ("authorization", "roles", "Roles & Permissions",
              "authorization:role_list", 11),
             ("policies", "company", "Policies", "policies:list", 12),
@@ -314,48 +315,60 @@ class Command(BaseCommand):
         self.stdout.write(f"  pages: {len(pages)}")
 
     def _permissions(self):
-        from apps.authorization.models import PageDefinition, PermissionDefinition
+        from apps.authorization.models import PageDefinition, PermissionDefinition, RiskLevel
 
         # Every code referenced by view decorators / selectors (docs §5.1).
         codes = [
-            ("dashboard.main.access", "Open dashboard"),
-            ("admin.users.access", "Open users page"),
-            ("admin.users.create", "Create users"),
-            ("leads.dashboard.access", "Open leads"),
-            ("leads.lead.create_self_generated", "Create self-generated lead"),
-            ("leads.lead.create_any_source", "Create lead from any source"),
-            ("leads.lead.view_own", "View own leads"),
-            ("leads.lead.view_team", "View team leads"),
-            ("leads.lead.view_all", "View all leads"),
-            ("leads.distribution.manual_all", "Manual distribution (all)"),
-            ("leads.distribution.team_manual", "Manual distribution (team)"),
-            ("leads.stage.change_own", "Change stage (own)"),
-            ("leads.followup.create_own", "Create follow-up"),
-            ("leads.meeting.create_own", "Create meeting"),
-            ("marketing.campaigns.access", "Open campaigns"),
-            ("marketing.campaign.create", "Create campaign"),
-            ("marketing.campaign.view_all", "View all campaigns"),
-            ("marketing.budget.manage", "Manage budget"),
-            ("marketing.campaign.submit_finance", "Submit to finance"),
-            ("finance.dashboard.access", "Open finance"),
-            ("finance.campaign.review", "Review campaign"),
-            ("finance.campaign.approve", "Approve campaign"),
-            ("authorization.roles.manage", "Manage roles"),
-            ("authorization.permissions.manage", "Manage permissions"),
-            ("policies.company.manage", "Manage policies"),
-            ("audit.view_all", "View audit log"),
-            ("notifications.view_own", "View notifications"),
-            ("integrations.webhooks.manage", "Manage webhooks"),
+            ("dashboard.main.access", "Open dashboard", RiskLevel.LOW),
+            ("admin.users.access", "Open users page", RiskLevel.MEDIUM),
+            ("admin.users.create", "Create users", RiskLevel.MEDIUM),
+            ("admin.users.update", "Update users", RiskLevel.MEDIUM),
+            ("admin.users.delete", "Delete users", RiskLevel.HIGH),
+            ("admin.teams.access", "Open sales teams page", RiskLevel.LOW),
+            ("admin.teams.create", "Create sales teams", RiskLevel.MEDIUM),
+            ("admin.teams.update", "Update sales teams", RiskLevel.MEDIUM),
+            ("admin.teams.delete", "Deactivate sales teams", RiskLevel.HIGH),
+            ("leads.dashboard.access", "Open leads", RiskLevel.LOW),
+            ("leads.lead.create_self_generated", "Create self-generated lead", RiskLevel.LOW),
+            ("leads.lead.create_any_source", "Create lead from any source", RiskLevel.MEDIUM),
+            ("leads.lead.view_own", "View own leads", RiskLevel.LOW),
+            ("leads.lead.view_team", "View team leads", RiskLevel.MEDIUM),
+            ("leads.lead.view_all", "View all leads", RiskLevel.HIGH),
+            ("leads.distribution.manual_all", "Manual distribution (all)", RiskLevel.HIGH),
+            ("leads.distribution.team_manual", "Manual distribution (team)", RiskLevel.MEDIUM),
+            ("leads.stage.change_own", "Change stage (own)", RiskLevel.LOW),
+            ("leads.followup.create_own", "Create follow-up", RiskLevel.LOW),
+            ("leads.meeting.create_own", "Create meeting", RiskLevel.LOW),
+            ("marketing.campaigns.access", "Open campaigns", RiskLevel.LOW),
+            ("marketing.campaign.create", "Create campaign", RiskLevel.MEDIUM),
+            ("marketing.campaign.update", "Update campaign", RiskLevel.MEDIUM),
+            ("marketing.campaign.delete", "Delete campaign", RiskLevel.HIGH),
+            ("marketing.campaign.view_all", "View all campaigns", RiskLevel.MEDIUM),
+            ("marketing.budget.manage", "Manage budget", RiskLevel.HIGH),
+            ("marketing.campaign.submit_finance", "Submit to finance", RiskLevel.MEDIUM),
+            ("finance.dashboard.access", "Open finance", RiskLevel.MEDIUM),
+            ("finance.campaign.review", "Review campaign", RiskLevel.MEDIUM),
+            ("finance.campaign.approve", "Approve campaign", RiskLevel.HIGH),
+            ("authorization.roles.manage", "Manage roles", RiskLevel.HIGH),
+            ("authorization.permissions.manage", "Manage permissions", RiskLevel.HIGH),
+            ("policies.company.manage", "Manage policies", RiskLevel.HIGH),
+            ("audit.view_all", "View audit log", RiskLevel.HIGH),
+            ("notifications.view_own", "View notifications", RiskLevel.LOW),
+            ("integrations.webhooks.manage", "Manage webhooks", RiskLevel.HIGH),
         ]
-        for code, name in codes:
+        for code, name, risk in codes:
             module = code.split(".")[0]
-            page = PageDefinition.objects.filter(
-                code__startswith=f"{module}."
-            ).first()
+            parts = code.split(".")
+            page_code = f"{parts[0]}.{parts[1]}"
+            page = PageDefinition.objects.filter(code=page_code).first()
+            if not page:
+                page = PageDefinition.objects.filter(
+                    code__startswith=f"{module}."
+                ).first()
             PermissionDefinition.objects.update_or_create(
                 code=code,
                 defaults=dict(module=module, action=code.rsplit(".", 1)[-1],
-                              name=name, page=page),
+                              name=name, page=page, risk_level=risk),
             )
         self.stdout.write(f"  permissions: {len(codes)}")
 
@@ -384,17 +397,21 @@ class Command(BaseCommand):
                            "leads.meeting.create_own", "notifications.view_own"],
             "SALES_OPERATION": ["dashboard.main.access", "leads.dashboard.access",
                                 "leads.lead.view_all", "leads.lead.create_any_source",
-                                "leads.distribution.manual_all",
-                                "notifications.view_own"],
+                                "leads.distribution.manual_all", "notifications.view_own",
+                                "admin.teams.access", "admin.teams.create",
+                                "admin.teams.update", "admin.teams.delete"],
             "FINANCE_MANAGERS": ["finance.dashboard.access", "finance.campaign.review",
                                  "finance.campaign.approve",
                                  "marketing.campaign.view_all", "notifications.view_own"],
             "MARKETING_MEMBERS": ["marketing.campaigns.access",
-                                  "marketing.campaign.create", "marketing.budget.manage",
+                                  "marketing.campaign.create",
+                                  "marketing.campaign.update", "marketing.budget.manage",
                                   "marketing.campaign.submit_finance",
                                   "notifications.view_own"],
             "MARKETING_MANAGERS": ["marketing.campaigns.access",
                                    "marketing.campaign.create",
+                                   "marketing.campaign.update",
+                                   "marketing.campaign.delete",
                                    "marketing.campaign.view_all",
                                    "marketing.budget.manage",
                                    "marketing.campaign.submit_finance",

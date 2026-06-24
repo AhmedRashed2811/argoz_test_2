@@ -7,6 +7,12 @@ app_name = "marketing"
 
 urlpatterns = [
     path("", views.campaign_list, name="campaign_list"),
+    path("api/campaigns/", views.campaign_api_list, name="campaign_api_list"),
+    path("api/campaigns/create/", views.campaign_api_create, name="campaign_api_create"),
+    path("api/campaigns/<uuid:campaign_id>/update/", views.campaign_api_update,
+         name="campaign_api_update"),
+    path("api/campaigns/<uuid:campaign_id>/delete/", views.campaign_api_delete,
+         name="campaign_api_delete"),
     path("create/", views.campaign_create, name="campaign_create"),
     path("<uuid:campaign_id>/", views.campaign_detail, name="campaign_detail"),
     path("<uuid:campaign_id>/edit/", views.campaign_update, name="campaign_update"),

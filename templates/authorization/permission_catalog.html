@@ -1,15 +1,430 @@
 {% extends "base.html" %}
+{% load crm_permissions %}
+
 {% block title %}Permission Catalog · Argoz CRM{% endblock %}
+
 {% block content %}
-  <h1>Permission Catalog</h1>
-  <table border="1">
-    <thead><tr><th>Name</th><th>Code</th><th>Module</th><th>Risk</th></tr></thead>
-    <tbody>
-      {% for p in permissions %}
-        <tr><td>{{ p.name }}</td><td><code>{{ p.code }}</code></td><td>{{ p.module }}</td><td>{{ p.risk_level }}</td></tr>
-      {% empty %}
-        <tr><td colspan="4">No permissions defined.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #0c0d12;
+    --card-bg: rgba(20, 21, 31, 0.6);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    background-image:
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.2rem;
+    margin: 0;
+    background: linear-gradient(to right, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-header p { color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem; }
+
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; }
+
+  .back-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: #fff; }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-chip {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    backdrop-filter: blur(12px);
+  }
+
+  .stat-value { font-size: 1.5rem; font-weight: 700; color: #fff; line-height: 1; }
+  .stat-label { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.1rem; }
+
+  .stat-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-total { background: var(--accent); box-shadow: 0 0 8px rgba(99,102,241,0.5); }
+  .dot-low { background: var(--success); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+  .dot-medium { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+  .dot-high { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,0.4); }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .search-wrapper { position: relative; flex: 1; min-width: 240px; max-width: 420px; }
+
+  .search-wrapper input {
+    width: 100%;
+    padding: 10px 16px 10px 40px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    transition: all 0.2s;
+  }
+
+  .search-wrapper input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+
+  .search-wrapper input::placeholder { color: #475569; }
+
+  .search-wrapper::before {
+    content: "🔍";
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .filter-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  .filter-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: rgba(255,255,255,0.03);
+    color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .filter-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: #a5b4fc; }
+  .filter-btn.risk-low.active { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.35); color: #34d399; }
+  .filter-btn.risk-medium.active { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.35); color: #fbbf24; }
+  .filter-btn.risk-high.active { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.35); color: #f87171; }
+
+  /* Module groups */
+  .module-group {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
+
+  .module-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .module-header:hover { background: rgba(255,255,255,0.015); }
+
+  .module-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .module-name { font-size: 1.05rem; font-weight: 600; color: #fff; text-transform: capitalize; }
+
+  .module-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(99,102,241,0.12);
+    color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,0.2);
+  }
+
+  .chevron {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    transition: transform 0.25s;
+  }
+  .module-group.collapsed .chevron { transform: rotate(-90deg); }
+  .module-group.collapsed .module-body { display: none; }
+
+  .module-body { padding: 1.25rem 1.5rem; }
+
+  .perm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .perm-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    transition: all 0.2s;
+  }
+  .perm-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+
+  .perm-info { flex: 1; min-width: 0; }
+  .perm-name { font-size: 0.9rem; font-weight: 500; color: #fff; }
+  .perm-code { font-size: 0.73rem; color: var(--text-secondary); font-family: monospace; margin-top: 0.2rem; word-break: break-all; }
+
+  .risk-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .risk-LOW { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+  .risk-MEDIUM { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+  .risk-HIGH { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+
+  .no-results {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+    display: none;
+  }
+
+  .results-count {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+    padding: 8px 0;
+  }
+  .results-count span { color: #a5b4fc; font-weight: 600; }
+</style>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Permission Catalog</h1>
+      <p>All defined permission codes across every module. Referenced by role bundles and direct overrides.</p>
+    </div>
+    <div class="header-right">
+      <a href="{% url 'authorization:role_list' %}" class="back-link">← Roles & Permissions</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-chip">
+      <span class="stat-dot dot-total"></span>
+      <div>
+        <div class="stat-value" id="stat-total">{{ permissions|length }}</div>
+        <div class="stat-label">Total Permissions</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-dot dot-low"></span>
+      <div>
+        <div class="stat-value" id="stat-low">{{ permissions|length }}</div>
+        <div class="stat-label">Low Risk</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-dot dot-medium"></span>
+      <div>
+        <div class="stat-value" id="stat-medium">0</div>
+        <div class="stat-label">Medium Risk</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-dot dot-high"></span>
+      <div>
+        <div class="stat-value" id="stat-high">0</div>
+        <div class="stat-label">High Risk</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrapper">
+      <input type="text" id="perm-search" placeholder="Search by name or code…" oninput="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <button class="filter-btn active" data-risk="ALL" onclick="setRisk(this)">All</button>
+      <button class="filter-btn risk-low" data-risk="LOW" onclick="setRisk(this)">Low</button>
+      <button class="filter-btn risk-medium" data-risk="MEDIUM" onclick="setRisk(this)">Medium</button>
+      <button class="filter-btn risk-high" data-risk="HIGH" onclick="setRisk(this)">High</button>
+    </div>
+    <div class="results-count">Showing <span id="visible-count">{{ permissions|length }}</span> permission{{ permissions|length|pluralize }}</div>
+  </div>
+
+  <!-- Groups -->
+  <div id="catalog">
+    {% regroup permissions by module as by_module %}
+    {% for group in by_module %}
+      <div class="module-group" data-module="{{ group.grouper }}">
+        <div class="module-header" onclick="toggleGroup(this.parentElement)">
+          <div class="module-title">
+            <span class="module-name">{{ group.grouper }}</span>
+            <span class="module-count" data-module-count="{{ group.grouper }}">{{ group.list|length }}</span>
+          </div>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="module-body">
+          <div class="perm-grid">
+            {% for p in group.list %}
+              <div class="perm-card"
+                   data-name="{{ p.name|lower }}"
+                   data-code="{{ p.code|lower }}"
+                   data-risk="{{ p.risk_level }}"
+                   data-module="{{ p.module }}">
+                <div class="perm-info">
+                  <div class="perm-name">{{ p.name }}</div>
+                  <div class="perm-code">{{ p.code }}</div>
+                </div>
+                <span class="risk-badge risk-{{ p.risk_level }}">{{ p.risk_level }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="no-results" style="display:block;">
+        <h3>No Permissions Defined</h3>
+        <p>Run <code>python manage.py seed_crm</code> to populate the catalog.</p>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="no-results" id="no-results-msg">No permissions match your search.</div>
+</div>
+
+<script>
+  let activeRisk = 'ALL';
+
+  // Compute real risk counts from DOM on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.perm-card');
+    const counts = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+    cards.forEach(c => { counts[c.dataset.risk] = (counts[c.dataset.risk] || 0) + 1; });
+    document.getElementById('stat-total').textContent = cards.length;
+    document.getElementById('stat-low').textContent = counts.LOW || 0;
+    document.getElementById('stat-medium').textContent = counts.MEDIUM || 0;
+    document.getElementById('stat-high').textContent = counts.HIGH || 0;
+  });
+
+  function setRisk(btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeRisk = btn.dataset.risk;
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('perm-search').value.toLowerCase();
+    let visible = 0;
+
+    document.querySelectorAll('.module-group').forEach(group => {
+      let groupVisible = 0;
+      group.querySelectorAll('.perm-card').forEach(card => {
+        const matchSearch = !q || card.dataset.name.includes(q) || card.dataset.code.includes(q);
+        const matchRisk = activeRisk === 'ALL' || card.dataset.risk === activeRisk;
+        const show = matchSearch && matchRisk;
+        card.style.display = show ? '' : 'none';
+        if (show) { groupVisible++; visible++; }
+      });
+
+      // Update per-module count badge
+      const badge = group.querySelector('[data-module-count]');
+      if (badge) badge.textContent = groupVisible;
+
+      // Hide entire group if nothing matches
+      group.style.display = groupVisible > 0 ? '' : 'none';
+    });
+
+    document.getElementById('visible-count').textContent = visible;
+    document.getElementById('no-results-msg').style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  function toggleGroup(group) {
+    group.classList.toggle('collapsed');
+  }
+</script>
 {% endblock %}

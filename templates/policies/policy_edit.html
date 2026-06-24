@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% load crm_permissions %}
+
+{% block title %}Configure · {{ policy.name }} · Argoz CRM{% endblock %}
+
+{% block content %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #0c0d12;
+    --card-bg: rgba(20, 21, 31, 0.6);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    background-image:
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+    margin: 0;
+    background: linear-gradient(to right, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.2;
+  }
+
+  .policy-meta { margin-top: 0.4rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .meta-code { font-size: 0.75rem; font-family: monospace; color: var(--text-secondary); }
+
+  .type-chip {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(99,102,241,0.12);
+    color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,0.25);
+  }
+
+  .back-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s;
+    white-space: nowrap;
+    margin-top: 0.25rem;
+  }
+  .back-link:hover { color: #fff; }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.37);
+  }
+
+  .current-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(99,102,241,0.07);
+    border: 1px solid rgba(99,102,241,0.18);
+    border-radius: 10px;
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 1.75rem;
+    font-size: 0.9rem;
+  }
+  .current-banner .label { color: var(--text-secondary); }
+  .current-banner .value { color: #a5b4fc; font-weight: 600; }
+  .current-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  .unset-banner {
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.15);
+  }
+  .unset-banner .dot { background: var(--danger); }
+  .unset-banner .value { color: #f87171; }
+
+  /* ── OPTION type: radio cards ── */
+  .options-grid { display: flex; flex-direction: column; gap: 0.65rem; }
+
+  .option-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    position: relative;
+  }
+  .option-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+  .option-card.selected { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.4); }
+  .option-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+
+  .radio-circle {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.04);
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .option-card.selected .radio-circle {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .radio-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #fff; display: none;
+  }
+  .option-card.selected .radio-dot { display: block; }
+
+  .option-text { flex: 1; }
+  .option-label { font-size: 0.95rem; font-weight: 600; color: #fff; }
+  .option-desc { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; line-height: 1.4; }
+  .option-code-tag {
+    font-size: 0.7rem; font-family: monospace;
+    color: #64748b; margin-top: 0.15rem;
+  }
+
+  /* ── DURATION type ── */
+  .duration-row { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+
+  .duration-field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .duration-field label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .duration-input-wrap { position: relative; }
+
+  .duration-input-wrap input {
+    width: 120px;
+    padding: 12px 48px 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 600;
+    box-sizing: border-box;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .duration-input-wrap input:focus {
+    outline: none; border-color: var(--accent);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+  .duration-unit {
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.78rem; font-weight: 700;
+    color: var(--text-secondary); text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── INTEGER type ── */
+  .int-input {
+    width: 200px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    box-sizing: border-box;
+    transition: all 0.2s;
+  }
+  .int-input:focus {
+    outline: none; border-color: var(--accent);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+
+  /* ── BOOLEAN type ── */
+  .bool-options { display: flex; gap: 0.75rem; }
+
+  .bool-card {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    background: rgba(255,255,255,0.02);
+    border: 2px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .bool-card:hover { background: rgba(255,255,255,0.04); }
+  .bool-card input { display: none; }
+  .bool-card.selected-yes { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.08); color: #34d399; }
+  .bool-card.selected-no { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.08); color: #f87171; }
+  .bool-icon { font-size: 1.8rem; }
+
+  /* ── CODE type ── */
+  .code-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    transition: all 0.2s;
+  }
+  .code-input:focus {
+    outline: none; border-color: var(--accent);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+
+  /* ── JSON type ── */
+  .json-textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: #c4b5fd;
+    font-family: monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    box-sizing: border-box;
+    resize: vertical;
+    transition: all 0.2s;
+  }
+  .json-textarea:focus {
+    outline: none; border-color: var(--accent);
+    background: rgba(255,255,255,0.05);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  }
+  .json-hint { font-size: 0.78rem; color: #475569; margin-top: 0.4rem; }
+
+  .field-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  .btn-primary {
+    background: var(--accent-gradient);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 28px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+    margin-top: 2rem;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99,102,241,0.45);
+    filter: brightness(1.1);
+  }
+</style>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>{{ policy.name }}</h1>
+      <div class="policy-meta">
+        <span class="meta-code">{{ policy.code }}</span>
+        <span class="type-chip">{{ policy.value_type }}</span>
+      </div>
+      {% if policy.description %}
+        <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0.5rem 0 0 0;">{{ policy.description }}</p>
+      {% endif %}
+    </div>
+    <a href="{% url 'policies:list' %}" class="back-link">← Back</a>
+  </div>
+
+  <div class="glass-card">
+
+    <!-- Current value banner -->
+    {% if cpv and cpv.selected_option %}
+      <div class="current-banner">
+        <span class="dot"></span>
+        <span class="label">Current:</span>
+        <span class="value">{{ cpv.selected_option.label }}</span>
+      </div>
+    {% elif cpv and cpv.value_json is not None %}
+      <div class="current-banner">
+        <span class="dot"></span>
+        <span class="label">Current:</span>
+        <span class="value">
+          {% if policy.value_type == "DURATION" %}
+            {% with v=cpv.value_json %}
+              {% if v.hours %}{{ v.hours }}h {% endif %}{% if v.minutes %}{{ v.minutes }}m{% endif %}
+            {% endwith %}
+          {% elif policy.value_type == "BOOLEAN" %}
+            {% if cpv.value_json %}Yes{% else %}No{% endif %}
+          {% elif policy.value_type == "CODE" %}
+            {{ cpv.value_json.code|default:cpv.value_json }}
+          {% else %}
+            {{ cpv.value_json }}
+          {% endif %}
+        </span>
+      </div>
+    {% else %}
+      <div class="current-banner unset-banner">
+        <span class="dot"></span>
+        <span class="label">Status:</span>
+        <span class="value">Not configured</span>
+      </div>
+    {% endif %}
+
+    <form method="post" id="policy-form">
+      {% csrf_token %}
+
+      {# ── OPTION ── #}
+      {% if policy.value_type == "OPTION" %}
+        <div class="field-label">Select an option</div>
+        <div class="options-grid">
+          {% for opt in policy.options.all %}
+            <div class="option-card {% if cpv.selected_option.code == opt.code %}selected{% endif %}"
+                 onclick="selectOption(this, '{{ opt.code }}')">
+              <input type="radio" name="option" value="{{ opt.code }}"
+                     {% if cpv.selected_option.code == opt.code %}checked{% endif %} id="opt_{{ opt.code }}">
+              <div class="radio-circle"><div class="radio-dot"></div></div>
+              <div class="option-text">
+                <div class="option-label">{{ opt.label }}</div>
+                {% if opt.description %}
+                  <div class="option-desc">{{ opt.description }}</div>
+                {% endif %}
+                <div class="option-code-tag">{{ opt.code }}</div>
+              </div>
+            </div>
+          {% empty %}
+            <p style="color: var(--text-secondary);">No options defined for this policy.</p>
+          {% endfor %}
+        </div>
+
+      {# ── DURATION ── #}
+      {% elif policy.value_type == "DURATION" %}
+        <div class="field-label">Set duration</div>
+        <div class="duration-row">
+          <div class="duration-field">
+            <label for="id_hours">Hours</label>
+            <div class="duration-input-wrap">
+              <input type="number" name="hours" id="id_hours" min="0" max="8760"
+                     value="{{ cpv.value_json.hours|default:'0' }}">
+              <span class="duration-unit">hrs</span>
+            </div>
+          </div>
+          <div class="duration-field">
+            <label for="id_minutes">Minutes</label>
+            <div class="duration-input-wrap">
+              <input type="number" name="minutes" id="id_minutes" min="0" max="59"
+                     value="{{ cpv.value_json.minutes|default:'0' }}">
+              <span class="duration-unit">min</span>
+            </div>
+          </div>
+        </div>
+
+      {# ── INTEGER ── #}
+      {% elif policy.value_type == "INTEGER" %}
+        <div class="field-label">Enter value</div>
+        <input type="number" name="integer_value" class="int-input" min="0"
+               value="{{ cpv.value_json|default:'0' }}">
+
+      {# ── BOOLEAN ── #}
+      {% elif policy.value_type == "BOOLEAN" %}
+        <div class="field-label">Select option</div>
+        <div class="bool-options">
+          <label class="bool-card {% if cpv.value_json == True %}selected-yes{% endif %}"
+                 id="bool-yes" onclick="selectBool(true)">
+            <input type="radio" name="bool_value" value="true"
+                   {% if cpv.value_json == True %}checked{% endif %}>
+            <span class="bool-icon">✓</span>
+            <span>Enabled</span>
+          </label>
+          <label class="bool-card {% if cpv.value_json == False or cpv is None %}selected-no{% endif %}"
+                 id="bool-no" onclick="selectBool(false)">
+            <input type="radio" name="bool_value" value="false"
+                   {% if cpv.value_json == False or cpv is None %}checked{% endif %}>
+            <span class="bool-icon">✗</span>
+            <span>Disabled</span>
+          </label>
+        </div>
+
+      {# ── CODE ── #}
+      {% elif policy.value_type == "CODE" %}
+        <div class="field-label">Enter code</div>
+        <input type="text" name="code_value" class="code-input"
+               placeholder="e.g. ar"
+               value="{% if cpv and cpv.value_json %}{{ cpv.value_json.code|default:'' }}{% endif %}">
+
+      {# ── JSON ── #}
+      {% else %}
+        <div class="field-label">Raw JSON value</div>
+        <textarea name="value_json" class="json-textarea" spellcheck="false"
+                  placeholder='e.g. {"key": "value"}'>{% if cpv and cpv.value_json %}{{ cpv.value_json|safe }}{% endif %}</textarea>
+        <div class="json-hint">Must be valid JSON. Leave blank to clear the value.</div>
+      {% endif %}
+
+      <button type="submit" class="btn-primary">Save Policy</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  function selectOption(card, code) {
+    document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    card.querySelector('input[type="radio"]').checked = true;
+  }
+
+  function selectBool(val) {
+    const yes = document.getElementById('bool-yes');
+    const no = document.getElementById('bool-no');
+    yes.classList.toggle('selected-yes', val);
+    yes.classList.toggle('selected-no', false);
+    no.classList.toggle('selected-no', !val);
+    no.classList.toggle('selected-yes', false);
+    document.querySelector('input[value="true"]').checked = val;
+    document.querySelector('input[value="false"]').checked = !val;
+  }
+</script>
+{% endblock %}

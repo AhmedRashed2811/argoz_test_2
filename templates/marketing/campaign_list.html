@@ -1,26 +1,471 @@
 {% extends "base.html" %}
-{% load crm_permissions %}
+{% load static crm_permissions %}
 {% block title %}Campaigns · Argoz CRM{% endblock %}
+
+{% block extra_css %}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'marketing/css/campaigns.css' %}">
+{% endblock %}
+
 {% block content %}
-  <h1>Campaigns</h1>
-  {% if request.user|can:'marketing.campaign.create' %}
-    <a href="{% url 'marketing:campaign_create' %}">+ New campaign</a>
-  {% endif %}
-  <table border="1">
-    <thead><tr><th>Name</th><th>Dates</th><th>Status</th><th>Approval</th><th>Budget</th><th>Leads</th></tr></thead>
-    <tbody>
-      {% for c in campaigns %}
-        <tr>
-          <td><a href="{% url 'marketing:campaign_detail' c.id %}">{{ c.name }}</a></td>
-          <td>{{ c.start_date }} → {{ c.end_date }}</td>
-          <td>{{ c.lifecycle_status }}</td>
-          <td>{{ c.approval_status }}</td>
-          <td>{{ c.total_budget }}</td>
-          <td>{{ c.lead_count }}</td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="6">No campaigns.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="toast-container" id="toastContainer"></div>
+
+<main class="page-body">
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Campaigns</h1>
+        <p>Manage all marketing campaigns and track their performance</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      {% if request.user|can:'marketing.campaign.create' %}
+      <button class="btn-create" id="btnCreate">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span class="btn-label">Create a Campaign</span>
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiTotal">0</div><div class="kpi-label">Total Campaigns</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiActive">0</div><div class="kpi-label">Active Now</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon blue">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiTypes">0</div><div class="kpi-label">Channel Types</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiBudget">0</div><div class="kpi-label">Total Budget (EGP)</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon purple">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiLeads">0</div><div class="kpi-label">Total Leads</div></div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search campaigns…">
+    </div>
+    <span class="search-results-hint" id="searchHint"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-scroll-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <div class="th-inner">Name
+                <button class="th-icon-btn" id="sortNameBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterNameBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Types
+                <button class="th-icon-btn" id="filterTypeBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Start Date
+                <button class="th-icon-btn" id="sortStartBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterStartBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">End Date
+                <button class="th-icon-btn" id="sortEndBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterEndBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Budget
+                <button class="th-icon-btn" id="sortBudgetBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterBudgetBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Leads
+                <button class="th-icon-btn" id="sortLeadsBtn"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterLeadsBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Status
+                <button class="th-icon-btn" id="filterStatusBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Approval
+                <button class="th-icon-btn" id="filterApprovalBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th style="width:110px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pagination-bar" id="paginationBar">
+    <span class="pg-info" id="pgInfo"></span>
+    <div class="pg-controls">
+      <button class="pg-btn" id="pgFirst" onclick="goPage(1)">«</button>
+      <button class="pg-btn" id="pgPrev"  onclick="goPage(currentPage-1)">‹</button>
+      <div class="pg-numbers" id="pgNumbers"></div>
+      <button class="pg-btn" id="pgNext"  onclick="goPage(currentPage+1)">›</button>
+      <button class="pg-btn" id="pgLast"  onclick="goPage(totalPages)">»</button>
+    </div>
+  </div>
+</main>
+
+<!-- ===== FILTER DROPDOWNS ===== -->
+<div class="filter-dropdown" id="filterNameDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Name</p><input type="text" class="filter-search" id="filterNameSearch" placeholder="Search…"></div>
+  <div class="filter-list" id="filterNameList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterNameSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterNameClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterTypeDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Type</p></div>
+  <div class="filter-list" id="filterTypeList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterTypeSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterTypeClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterStartDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Start Date</p></div>
+  <div class="filter-list" id="filterStartList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterStartSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterStartClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterEndDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by End Date</p></div>
+  <div class="filter-list" id="filterEndList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterEndSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterEndClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterBudgetDropdown" onclick="event.stopPropagation()" style="width:220px">
+  <div class="filter-dd-head"><p>Filter by Budget Range</p></div>
+  <div style="padding:10px 14px 4px">
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Min Budget</label><input type="number" id="budgetMin" class="budget-dd-input" placeholder="e.g. 0" min="0" oninput="currentPage=1;renderTable()"></div>
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Max Budget</label><input type="number" id="budgetMax" class="budget-dd-input" placeholder="e.g. 50,000" min="0" oninput="currentPage=1;renderTable()"></div>
+  </div>
+  <div class="filter-actions"><button class="filter-btn clear-all" id="filterBudgetClear" style="flex:1">Clear</button></div>
+</div>
+<div class="filter-dropdown" id="filterLeadsDropdown" onclick="event.stopPropagation()" style="width:220px">
+  <div class="filter-dd-head"><p>Filter by Leads Range</p></div>
+  <div style="padding:10px 14px 4px">
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Min Leads</label><input type="number" id="leadsMin" class="budget-dd-input" placeholder="e.g. 0" min="0" oninput="currentPage=1;renderTable()"></div>
+    <div style="margin-bottom:10px"><label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Max Leads</label><input type="number" id="leadsMax" class="budget-dd-input" placeholder="e.g. 500" min="0" oninput="currentPage=1;renderTable()"></div>
+  </div>
+  <div class="filter-actions"><button class="filter-btn clear-all" id="filterLeadsClear" style="flex:1">Clear</button></div>
+</div>
+<div class="filter-dropdown" id="filterStatusDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Status</p></div>
+  <div class="filter-list" id="filterStatusList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterStatusSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterStatusClearAll">Clear All</button>
+  </div>
+</div>
+<div class="filter-dropdown" id="filterApprovalDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Approval</p></div>
+  <div class="filter-list" id="filterApprovalList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterApprovalSelectAll">Select All</button>
+    <button class="filter-btn clear-all"  id="filterApprovalClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ===== CREATE MODAL ===== -->
+<div class="modal-backdrop" id="createModal">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        <div>
+          <div class="modal-title">Create New Campaign</div>
+        </div>
+      </div>
+      <button class="modal-close-btn" id="createModalClose"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <!-- Basic info -->
+      <div class="form-group">
+        <label class="form-label">Campaign Name <span style="color:#c0392b">*</span></label>
+        <input type="text" class="form-input" id="c_name" placeholder="e.g. Summer Brand Awareness">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description <span class="optional">(optional)</span></label>
+        <textarea class="form-textarea" id="c_description" placeholder="Brief overview of the campaign goals and target audience…" rows="3"></textarea>
+      </div>
+      <div class="form-group" style="display:none">
+        <label class="form-label">Target Project <span class="optional">(optional)</span></label>
+        <div class="proj-select-wrap" id="c_proj_wrap">
+          <input type="text" class="proj-search-input" id="c_proj_display" placeholder="— Select a project —" readonly onclick="toggleProjDD('c_proj')" autocomplete="off">
+          <input type="hidden" id="c_proj_val">
+          <div class="proj-dropdown" id="c_proj_dd">
+            <div class="proj-dd-search"><input type="text" placeholder="Search projects…" oninput="filterProjDD(this,'c_proj')" id="c_proj_search"></div>
+            <div class="proj-dd-list" id="c_proj_list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><label class="form-label">Start Date <span style="color:#c0392b">*</span></label><input type="date" class="form-input" id="c_startDate"></div>
+        <div><label class="form-label">End Date <span style="color:#c0392b">*</span></label><input type="date" class="form-input" id="c_endDate"></div>
+      </div>
+
+      <hr class="section-divider">
+      <p class="section-heading" style="margin-bottom:6px">Campaign Types</p>
+
+      <div class="campaign-types-grid">
+        <label class="ctype-item" id="ct_events_wrap">
+          <input type="checkbox" id="ct_events" onchange="toggleCampaignType('events')">
+          <span class="ctype-icon">🎪</span>
+          <div><div class="ctype-label">Events</div><div class="ctype-desc">Live events & exhibitions</div></div>
+        </label>
+        <label class="ctype-item" id="ct_tv_wrap">
+          <input type="checkbox" id="ct_tv" onchange="toggleCampaignType('tv')">
+          <span class="ctype-icon">📺</span>
+          <div><div class="ctype-label">TV Ads</div><div class="ctype-desc">Television advertising</div></div>
+        </label>
+        <label class="ctype-item" id="ct_street_wrap">
+          <input type="checkbox" id="ct_street" onchange="toggleCampaignType('street')">
+          <span class="ctype-icon">🏙️</span>
+          <div><div class="ctype-label">Street Ads</div><div class="ctype-desc">Outdoor & OOH media</div></div>
+        </label>
+        <label class="ctype-item" id="ct_social_wrap">
+          <input type="checkbox" id="ct_social" onchange="toggleCampaignType('social')">
+          <span class="ctype-icon">📱</span>
+          <div><div class="ctype-label">Social Media</div><div class="ctype-desc">Digital platforms</div></div>
+        </label>
+        <label class="ctype-item" id="ct_exhibition_wrap">
+          <input type="checkbox" id="ct_exhibition" onchange="toggleCampaignType('exhibition')">
+          <span class="ctype-icon">🏛️</span>
+          <div><div class="ctype-label">Exhibition</div><div class="ctype-desc">Trade shows & fairs</div></div>
+        </label>
+      </div>
+
+      <!-- ── Events panel ── -->
+      <div class="ctype-details" id="details_events">
+        <div class="ctype-details-title">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Events
+        </div>
+        <div id="cr_events_list"></div>
+        <button type="button" class="btn-add-item" onclick="addCrEvent()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Another Event
+        </button>
+      </div>
+
+      <!-- ── TV Ads panel ── -->
+      <div class="ctype-details" id="details_tv">
+        <div class="ctype-details-title">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          TV Ads
+        </div>
+        <div id="cr_tv_list"></div>
+        <button type="button" class="btn-add-item" onclick="addCrTvAd()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Another TV Ad
+        </button>
+      </div>
+
+      <!-- ── Street Ads panel ── -->
+      <div class="ctype-details" id="details_street">
+        <div class="ctype-details-title">
+          <svg viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          Street Ads
+        </div>
+        <div id="cr_street_list"></div>
+        <button type="button" class="btn-add-item" onclick="addCrStreetAd()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Another Street Ad
+        </button>
+      </div>
+
+      <!-- ── Social Media panel ── -->
+      <div class="ctype-details" id="details_social">
+        <div class="ctype-details-title">
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Social Media Ads
+        </div>
+        <div id="cr_social_list"></div>
+        <button type="button" class="btn-add-item" onclick="addCrSocialAd()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Another Social Media Ad
+        </button>
+      </div>
+
+      <!-- ── Exhibition panel ── -->
+      <div class="ctype-details" id="details_exhibition">
+        <div class="ctype-details-title">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Exhibitions
+        </div>
+        <div id="cr_exhibition_list"></div>
+        <button type="button" class="btn-add-item" onclick="addCrExhibition()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Another Exhibition
+        </button>
+      </div>
+
+      <!-- ── Total Budget Section ── -->
+      <div id="totalBudgetBar" style="display:none" class="budget-total-section">
+        <hr class="section-divider">
+        <p class="section-heading">💰 Total Campaign Budget</p>
+        <div class="budget-total-bar">
+          <div>
+            <div class="budget-total-label">Grand Total</div>
+            <div style="font-size:.74rem;color:var(--clr-text-sub);margin-top:2px">Sum of all campaign types + other costs</div>
+          </div>
+          <div class="budget-total-value" id="totalBudgetVal"> 0</div>
+        </div>
+        <!-- Budget breakdown -->
+        <div class="budget-breakdown" id="budgetBreakdown"></div>
+
+        <!-- Other costs -->
+        <div class="other-costs-section">
+          <button type="button" class="other-costs-toggle" id="otherCostsToggleBtn" onclick="toggleOtherCosts()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Other Costs
+          </button>
+          <div class="other-costs-panel" id="otherCostsPanel">
+            <div id="otherCostsList"></div>
+            <button type="button" class="btn-add-sub" onclick="addOtherCost()" style="margin-top:4px">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add New Cost Item
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="createCancel">Cancel</button>
+      <button class="btn-save" id="createSave">💾 Save Campaign</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EDIT MODAL ===== -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+        <div><div class="modal-title">Edit Campaign</div><div class="modal-sub" id="editModalSub">Update campaign details</div></div>
+      </div>
+      <button class="modal-close-btn" id="editModalClose"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="editModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="editCancel">Cancel</button>
+      <button class="btn-save" id="editSave">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== VIEW MODAL ===== -->
+<div class="modal-backdrop" id="viewModal">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <div><div class="modal-title" id="viewTitle">Campaign Details</div><div class="modal-sub" id="viewSub"></div></div>
+      </div>
+      <button class="modal-close-btn" id="viewModalClose"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="viewModalBody"></div>
+    <div class="modal-footer"><button class="btn-cancel" id="viewClose">Close</button></div>
+  </div>
+</div>
+
+<!-- ===== APPROVAL MODAL ===== -->
+<div class="modal-backdrop" id="approvalModal">
+  <div style="background:var(--clr-surface);border-radius:12px;width:460px;max-width:calc(100vw - 32px);box-shadow:0 16px 48px rgba(0,0,0,.16);border:1px solid var(--clr-border);overflow:hidden;">
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--clr-border);background:#faf9f7;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;color:var(--clr-text)">Finance Approval Status</div>
+        <div style="font-size:.78rem;color:var(--clr-text-sub);margin-top:2px" id="approvalModalSub"></div>
+      </div>
+      <button class="modal-close-btn" onclick="closeApprovalModal()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div style="padding:22px 22px 24px">
+      <!-- Status badge display -->
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:10px;margin-bottom:18px;" id="approvalStatusDisplay">
+        <div id="approvalStatusIcon" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--clr-text-sub);margin-bottom:4px">Current Status</div>
+          <div id="approvalStatusLabel" style="font-size:1.05rem;font-weight:700;"></div>
+        </div>
+      </div>
+      <!-- Reason / Note -->
+      <div id="approvalReasonSection">
+        <div style="font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--clr-text-sub);margin-bottom:8px">Reason / Note</div>
+        <div id="approvalReasonDisplay" style="padding:14px 16px;background:var(--clr-bg);border:1px solid var(--clr-border);border-radius:8px;font-size:.88rem;color:var(--clr-text);line-height:1.55;min-height:52px;"></div>
+      </div>
+    </div>
+    <div style="padding:14px 22px 18px;border-top:1px solid var(--clr-border);background:#faf9f7;display:flex;justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeApprovalModal()" style="padding:9px 20px;font-size:.85rem">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="lightbox" style="display:none" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.CAMPAIGN_CFG = {
+    listUrl:   "{% url 'marketing:campaign_api_list' %}",
+    createUrl: "{% url 'marketing:campaign_api_create' %}",
+    updateTmpl:"{% url 'marketing:campaign_api_update' '00000000-0000-0000-0000-000000000000' %}",
+    deleteTmpl:"{% url 'marketing:campaign_api_delete' '00000000-0000-0000-0000-000000000000' %}",
+    csrf: "{{ csrf_token }}",
+    canUpdate: {% if request.user|can:'marketing.campaign.update' %}true{% else %}false{% endif %},
+    canDelete: {% if request.user|can:'marketing.campaign.delete' %}true{% else %}false{% endif %}
+  };
+</script>
+<script src="{% static 'marketing/js/campaigns.js' %}"></script>
 {% endblock %}

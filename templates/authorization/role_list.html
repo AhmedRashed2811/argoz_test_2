@@ -1,17 +1,311 @@
 {% extends "base.html" %}
-{% block title %}Roles · Argoz CRM{% endblock %}
+{% load crm_permissions %}
+
+{% block title %}Roles & Permissions · Argoz CRM{% endblock %}
+
 {% block content %}
-  <h1>Roles & Permissions</h1>
-  <a href="{% url 'authorization:role_create' %}">+ New role</a> ·
-  <a href="{% url 'authorization:permission_catalog' %}">Permission catalog</a>
-  <table border="1">
-    <thead><tr><th>Name</th><th>Code</th><th>System</th><th>Active</th></tr></thead>
-    <tbody>
-      {% for r in roles %}
-        <tr><td>{{ r.name }}</td><td>{{ r.code }}</td><td>{{ r.is_system_default }}</td><td>{{ r.is_active }}</td></tr>
-      {% empty %}
-        <tr><td colspan="4">No roles.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-color: #0c0d12;
+    --card-bg: rgba(20, 21, 31, 0.6);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #6366f1;
+    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+    --success: #10b981;
+    --danger: #ef4444;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    background-image:
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.2rem;
+    margin: 0;
+    background: linear-gradient(to right, #ffffff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-header p { color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem; }
+
+  .header-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+  .btn-create {
+    background: var(--accent-gradient);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+  .btn-create:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45); filter: brightness(1.1); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 11px 20px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.15); }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+
+  .table-responsive { width: 100%; overflow-x: auto; }
+
+  table.role-table { width: 100%; border-collapse: collapse; text-align: left; }
+
+  table.role-table th {
+    padding: 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  table.role-table td {
+    padding: 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+  }
+
+  table.role-table tr:hover td { background: rgba(255, 255, 255, 0.015); }
+
+  .role-name { font-size: 1rem; font-weight: 600; color: #fff; }
+  .role-code { font-size: 0.78rem; color: var(--text-secondary); font-family: monospace; margin-top: 0.15rem; }
+  .role-desc { font-size: 0.82rem; color: #64748b; max-width: 300px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-system {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+
+  .badge-custom {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .member-count {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #a5b4fc;
+  }
+  .member-label { font-size: 0.75rem; color: var(--text-secondary); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .status-pill.active { color: #34d399; background: rgba(16, 185, 129, 0.1); }
+  .status-pill.inactive { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .status-pill.active .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+  .status-pill.inactive .status-dot { background: var(--danger); }
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  }
+
+  .actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  .btn-action {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    font-family: inherit;
+  }
+  .btn-action:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+  .btn-action.btn-edit { border-color: rgba(99,102,241,0.25); color: #a5b4fc; }
+  .btn-action.btn-edit:hover { background: rgba(99,102,241,0.1); border-color: var(--accent); }
+  .btn-action.btn-danger { border-color: rgba(239,68,68,0.25); color: #fca5a5; }
+  .btn-action.btn-danger:hover { background: rgba(239,68,68,0.1); border-color: var(--danger); }
+  .btn-action.btn-success { border-color: rgba(16,185,129,0.25); color: #34d399; }
+  .btn-action.btn-success:hover { background: rgba(16,185,129,0.1); border-color: var(--success); }
+
+  .empty-state { text-align: center; padding: 3rem 0; color: var(--text-secondary); }
+</style>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Roles & Permissions</h1>
+      <p>Manage role templates and their default permission bundles.</p>
+    </div>
+    <div class="header-actions">
+      <a href="{% url 'authorization:permission_catalog' %}" class="btn-secondary">Permission Catalog</a>
+      {% if request.user|can:'authorization.roles.manage' %}
+        <a href="{% url 'authorization:role_create' %}" class="btn-create"><span>+</span> New Role</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <div class="table-responsive">
+      <table class="role-table">
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th>Members</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for role in roles %}
+            <tr>
+              <td>
+                <div class="role-name">{{ role.name }}</div>
+                <div class="role-code">{{ role.code }}</div>
+              </td>
+              <td>
+                <div class="role-desc">{{ role.description|default:"—" }}</div>
+              </td>
+              <td>
+                {% if role.is_system_default %}
+                  <span class="badge badge-system">System</span>
+                {% else %}
+                  <span class="badge badge-custom">Custom</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="member-count">{{ role.member_count }}</div>
+                <div class="member-label">active user{{ role.member_count|pluralize }}</div>
+              </td>
+              <td>
+                {% if role.is_active %}
+                  <span class="status-pill active"><span class="status-dot"></span> Active</span>
+                {% else %}
+                  <span class="status-pill inactive"><span class="status-dot"></span> Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="actions-cell">
+                  {% if request.user|can:'authorization.roles.manage' %}
+                    <a href="{% url 'authorization:role_edit' role.id %}" class="btn-action btn-edit">Edit</a>
+                    {% if not role.is_system_default %}
+                      {% if role.is_active %}
+                        <a href="{% url 'authorization:role_toggle' role.id %}"
+                           class="btn-action btn-danger"
+                           onclick="return confirm('Deactivate role {{ role.name }}?');">Deactivate</a>
+                      {% else %}
+                        <a href="{% url 'authorization:role_toggle' role.id %}"
+                           class="btn-action btn-success"
+                           onclick="return confirm('Activate role {{ role.name }}?');">Activate</a>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <h3>No Roles Found</h3>
+                  <p>No roles have been created yet. Run <code>seed_crm</code> to add defaults.</p>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

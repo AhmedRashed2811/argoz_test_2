@@ -186,6 +186,127 @@ class TeamService:
         )
         return member
 
+    @staticmethod
+    @transaction.atomic
+    def create_team(*, company, name, region="", order_index=0,
+                    head_ids=None, member_ids=None, actor=None, request_meta=None) -> Team:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        first_head = User.objects.filter(id__in=(head_ids or [])).first()
+        team = Team.objects.create(
+            company=company, name=name, region=region,
+            order_index=order_index, sales_head=first_head, is_active=True,
+        )
+        for uid in (head_ids or []):
+            TeamMember.objects.get_or_create(team=team, user_id=uid, defaults={"position": "HEAD"})
+        for uid in (member_ids or []):
+            TeamMember.objects.get_or_create(team=team, user_id=uid)
+
+        AuditService.log(
+            action=AuditAction.CREATE, instance=team, actor=actor, company=company,
+            module="accounts", request_meta=request_meta,
+            after={"name": name, "region": region, "order_index": order_index,
+                   "heads": list(head_ids or []), "members": list(member_ids or [])},
+            entity_display=name,
+        )
+        return team
+
+    @staticmethod
+    @transaction.atomic
+    def update_team(*, team: Team, name, region="", order_index=0,
+                    head_ids=None, member_ids=None, actor=None, request_meta=None) -> Team:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        before = {
+            "name": team.name, "region": team.region, "order_index": team.order_index,
+            "heads": list(team.members.filter(position="HEAD").values_list("user_id", flat=True)),
+            "members": list(team.members.exclude(position="HEAD").values_list("user_id", flat=True)),
+        }
+
+        first_head = User.objects.filter(id__in=(head_ids or [])).first()
+        team.name = name
+        team.region = region
+        team.order_index = order_index
+        team.sales_head = first_head
+        team.save()
+
+        # Sync heads
+        wanted_heads = set(str(uid) for uid in (head_ids or []))
+        existing_heads = {str(m.user_id): m for m in team.members.filter(position="HEAD")}
+        for uid in wanted_heads - existing_heads.keys():
+            TeamMember.objects.get_or_create(team=team, user_id=uid, defaults={"position": "HEAD"})
+        for uid, m in existing_heads.items():
+            if uid not in wanted_heads:
+                m.delete()
+
+        # Sync members
+        wanted_members = set(str(uid) for uid in (member_ids or []))
+        existing_members = {str(m.user_id): m for m in team.members.exclude(position="HEAD")}
+        for uid in wanted_members - existing_members.keys():
+            TeamMember.objects.get_or_create(team=team, user_id=uid)
+        for uid, m in existing_members.items():
+            if uid not in wanted_members:
+                m.delete()
+
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=team, actor=actor, company=team.company,
+            module="accounts", request_meta=request_meta,
+            before=before,
+            after={"name": name, "region": region, "order_index": order_index,
+                   "heads": list(head_ids or []), "members": list(member_ids or [])},
+            entity_display=name,
+        )
+        return team
+
+    @staticmethod
+    @transaction.atomic
+    def delete_team(*, team: Team, actor=None, request_meta=None) -> None:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        AuditService.log(
+            action=AuditAction.DELETE, instance=team, actor=actor, company=team.company,
+            module="accounts", request_meta=request_meta,
+            reason="Deleted sales team", entity_display=team.name,
+        )
+
+        team.delete()
+
+    @staticmethod
+    @transaction.atomic
+    def activate_team(*, team: Team, actor=None, request_meta=None) -> None:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        team.is_active = True
+        team.save()
+
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=team, actor=actor, company=team.company,
+            module="accounts", request_meta=request_meta,
+            after={"is_active": True}, entity_display=team.name,
+        )
+
+    @staticmethod
+    def get_team_context(*, company, team=None):
+        from .selectors import available_heads, available_members
+        current_head_ids, current_member_ids = set(), set()
+        if team is not None:
+            current_head_ids = set(
+                str(uid) for uid in team.members.filter(position="HEAD").values_list("user_id", flat=True)
+            )
+            current_member_ids = set(
+                str(uid) for uid in team.members.exclude(position="HEAD").values_list("user_id", flat=True)
+            )
+        return {
+            "available_heads": available_heads(company, team),
+            "available_members": available_members(company, team),
+            "current_head_ids": current_head_ids,
+            "current_member_ids": current_member_ids,
+        }
+
 
 class AvailabilityService:
     @staticmethod

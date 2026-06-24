@@ -8,10 +8,10 @@ from django.shortcuts import redirect, render, get_object_or_404
 
 from apps.authorization.decorators import crm_permission_required
 
-from .forms import UserCreateForm, UserEditForm
-from .models import User
-from .selectors import users_for_company
-from .services import UserService
+from .forms import TeamForm, UserCreateForm, UserEditForm
+from .models import Team, User
+from .selectors import teams_for_company, users_for_company
+from .services import TeamService, UserService
 
 
 @login_required
@@ -70,7 +70,7 @@ def user_edit(request, user_id):
             last_name=data["last_name"],
             phone=data["phone"],
             job_title=data["job_title"],
-            permission_codes=None,
+            permission_codes=request.POST.getlist("permissions"),
             created_by=request.user,
             request_meta=request.request_meta
         )
@@ -106,3 +106,81 @@ def user_activate(request, user_id):
     UserService.activate_user(user=target_user, actor=request.user, request_meta=request.request_meta)
     messages.success(request, f"User {target_user.email} activated successfully.")
     return redirect("accounts:user_list")
+
+
+# ── Sales Teams ──────────────────────────────────────────────────────────────
+
+@login_required
+@crm_permission_required("admin.teams.access")
+def team_list(request):
+    return render(request, "accounts/team_list.html", {
+        "teams": teams_for_company(request.company),
+    })
+
+
+@login_required
+@crm_permission_required("admin.teams.create")
+def team_create(request):
+    form = TeamForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        TeamService.create_team(
+            company=request.company,
+            name=data["name"],
+            region=data["region"],
+            order_index=data["order_index"],
+            head_ids=request.POST.getlist("heads"),
+            member_ids=request.POST.getlist("members"),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        messages.success(request, "Sales team created.")
+        return redirect("accounts:team_list")
+    context = TeamService.get_team_context(company=request.company)
+    context["form"] = form
+    return render(request, "accounts/team_form.html", context)
+
+
+@login_required
+@crm_permission_required("admin.teams.update")
+def team_edit(request, team_id):
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    initial = {"name": team.name, "region": team.region, "order_index": team.order_index}
+    form = TeamForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        TeamService.update_team(
+            team=team,
+            name=data["name"],
+            region=data["region"],
+            order_index=data["order_index"],
+            head_ids=request.POST.getlist("heads"),
+            member_ids=request.POST.getlist("members"),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        messages.success(request, "Sales team updated.")
+        return redirect("accounts:team_list")
+    context = TeamService.get_team_context(company=request.company, team=team)
+    context["form"] = form
+    context["team_instance"] = team
+    context["is_edit_mode"] = True
+    return render(request, "accounts/team_form.html", context)
+
+
+@login_required
+@crm_permission_required("admin.teams.delete")
+def team_delete(request, team_id):
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    TeamService.delete_team(team=team, actor=request.user, request_meta=request.request_meta)
+    messages.success(request, f"Team \"{team.name}\" deleted.")
+    return redirect("accounts:team_list")
+
+
+@login_required
+@crm_permission_required("admin.teams.update")
+def team_activate(request, team_id):
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    TeamService.activate_team(team=team, actor=request.user, request_meta=request.request_meta)
+    messages.success(request, f"Team \"{team.name}\" activated.")
+    return redirect("accounts:team_list")

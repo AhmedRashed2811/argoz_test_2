@@ -4,7 +4,7 @@ venv/
 __pycache__/
 *.pyc
 myproject/__pycache__/
-media/company_logos/
+media/campaign_assets/
 media/masterplans/
 media/market-project-images/
 media/market-masterplans/

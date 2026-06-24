@@ -3,6 +3,8 @@ DecimalField with non-negative DB constraints (§10.4, §17); heavy creation liv
 in services, never views (§10.3)."""
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from apps.core.models import BaseModel, CompanyOwnedModel
 
@@ -259,6 +261,8 @@ class SocialMediaAdRecord(BaseModel):
         Campaign, on_delete=models.CASCADE, related_name="social_ads"
     )
     name = models.CharField(max_length=200)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     target_kpi = models.CharField(max_length=120, blank=True)
     linked_event = models.ForeignKey(
         EventRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -352,6 +356,14 @@ class EventAttendee(BaseModel):
         related_name="+",
     )
     checked_in_at = models.DateTimeField(null=True, blank=True)
+
+
+@receiver(post_delete, sender="marketing.CampaignAsset")
+def _delete_campaign_asset_file(sender, instance, **kwargs):
+    """Remove the file from storage when its row is deleted — covers child
+    rebuild on edit and the cascade when a campaign is deleted."""
+    if instance.file:
+        instance.file.delete(save=False)
 
 
 class CampaignBudgetSnapshot(BaseModel):

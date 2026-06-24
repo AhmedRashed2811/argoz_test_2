@@ -541,18 +541,18 @@
             <span class="info-label">Job Title</span>
             <span class="info-val">{{ target.profile.job_title|default:"-" }}</span>
           </div>
-          <div class="info-item">
+          {% comment %} <div class="info-item">
             <span class="info-label">Department</span>
             <span class="info-val">{{ target.profile.department|default:"-" }}</span>
-          </div>
+          </div> {% endcomment %}
           <div class="info-item">
             <span class="info-label">Seed Role</span>
             <span class="info-val" style="color: var(--accent);">{{ target.profile.default_role.name|default:"None" }}</span>
           </div>
-          <div class="info-item">
+          {% comment %} <div class="info-item">
             <span class="info-label">Availability</span>
             <span class="info-val">{{ target.profile.get_availability_status_display }}</span>
-          </div>
+          </div> {% endcomment %}
         </div>
 
         <div class="metrics-box">

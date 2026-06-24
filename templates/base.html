@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Argoz CRM{% endblock %}</title>
+  {% block extra_css %}{% endblock %}
 </head>
 <body>
   {# Nav is built from PageDefinition filtered by the effective permission set (docs §14). #}
@@ -13,5 +14,6 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

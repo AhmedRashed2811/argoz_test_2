@@ -16,4 +16,9 @@ urlpatterns = [
     path("users/<int:user_id>/edit/", views.user_edit, name="user_edit"),
     path("users/<int:user_id>/delete/", views.user_delete, name="user_delete"),
     path("users/<int:user_id>/activate/", views.user_activate, name="user_activate"),
+    path("teams/", views.team_list, name="team_list"),
+    path("teams/create/", views.team_create, name="team_create"),
+    path("teams/<uuid:team_id>/edit/", views.team_edit, name="team_edit"),
+    path("teams/<uuid:team_id>/delete/", views.team_delete, name="team_delete"),
+    path("teams/<uuid:team_id>/activate/", views.team_activate, name="team_activate"),
 ]

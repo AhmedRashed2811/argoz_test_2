@@ -2,19 +2,25 @@
 CampaignBudgetService. Views never create child records directly."""
 from __future__ import annotations
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.authorization.decorators import crm_permission_required
+from apps.core.exceptions import ValidationError
 
 from .forms import CampaignForm, OtherCostForm
 from .models import Campaign, OtherCost
-from .selectors import campaigns_for_company
+from .selectors import campaigns_for_company, campaigns_for_user
 from .services import (
     CampaignApprovalService,
     CampaignBudgetService,
     CampaignCreationService,
+    CampaignPayloadService,
     CampaignROIService,
 )
 
@@ -22,9 +28,62 @@ from .services import (
 @login_required
 @crm_permission_required("marketing.campaigns.access")
 def campaign_list(request):
-    return render(request, "marketing/campaign_list.html", {
-        "campaigns": campaigns_for_company(request.company),
-    })
+    return render(request, "marketing/campaign_list.html", {})
+
+
+# ── AJAX API for the campaigns page (thin: all work in services, §10.3) ──
+@login_required
+@crm_permission_required("marketing.campaigns.access")
+def campaign_api_list(request):
+    campaigns = campaigns_for_user(request.user, request.company).prefetch_related(
+        "events__celebrities", "events__giveaways", "events__catering",
+        "tv_ads__channels", "tv_ads__slots",
+        "street_ads__type_lines__ad_type", "street_ads__type_lines__locations",
+        "social_ads__platform_lines__platform", "social_ads__linked_event",
+        "exhibitions", "other_costs", "assets",
+    )
+    return JsonResponse([CampaignPayloadService.serialize(c) for c in campaigns], safe=False)
+
+
+@login_required
+@crm_permission_required("marketing.campaign.create")
+@require_POST
+def campaign_api_create(request):
+    try:
+        campaign = CampaignPayloadService.create(
+            company=request.company, actor=request.user, payload=json.loads(request.body),
+            request_meta=getattr(request, "request_meta", None),
+        )
+    except ValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    return JsonResponse({"id": str(campaign.id)}, status=201)
+
+
+@login_required
+@crm_permission_required("marketing.campaign.update")
+@require_POST
+def campaign_api_update(request, campaign_id):
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
+    try:
+        CampaignPayloadService.update(
+            campaign=campaign, actor=request.user, payload=json.loads(request.body),
+            request_meta=getattr(request, "request_meta", None),
+        )
+    except ValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    return JsonResponse({"id": str(campaign.id)})
+
+
+@login_required
+@crm_permission_required("marketing.campaign.delete")
+@require_POST
+def campaign_api_delete(request, campaign_id):
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
+    CampaignPayloadService.delete(
+        campaign=campaign, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -49,7 +108,7 @@ def campaign_create(request):
 @login_required
 @crm_permission_required("marketing.campaigns.access")
 def campaign_detail(request, campaign_id):
-    campaign = get_object_or_404(Campaign, id=campaign_id, company=request.company)
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
     return render(request, "marketing/campaign_detail.html", {
         "campaign": campaign,
         "roi": CampaignROIService.calculate(campaign=campaign),
@@ -60,7 +119,7 @@ def campaign_detail(request, campaign_id):
 @login_required
 @crm_permission_required("marketing.budget.manage")
 def campaign_budget(request, campaign_id):
-    campaign = get_object_or_404(Campaign, id=campaign_id, company=request.company)
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
     if request.method == "POST":
         form = OtherCostForm(request.POST)
         if form.is_valid():
@@ -76,9 +135,9 @@ def campaign_budget(request, campaign_id):
 
 
 @login_required
-@crm_permission_required("marketing.campaign.create")
+@crm_permission_required("marketing.campaign.update")
 def campaign_update(request, campaign_id):
-    campaign = get_object_or_404(Campaign, id=campaign_id, company=request.company)
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
     form = CampaignForm(request.POST or None, initial={
         "name": campaign.name, "description": campaign.description,
         "start_date": campaign.start_date, "end_date": campaign.end_date,
@@ -102,6 +161,7 @@ def campaign_update(request, campaign_id):
 @login_required
 @crm_permission_required("marketing.campaign.submit_finance")
 def campaign_submit_finance(request, campaign_id):
+    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
     try:
         CampaignApprovalService.submit_for_finance(
             campaign_id=campaign_id, actor=request.user,

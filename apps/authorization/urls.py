@@ -8,6 +8,8 @@ app_name = "authorization"
 urlpatterns = [
     path("roles/", views.role_list, name="role_list"),
     path("roles/create/", views.role_create, name="role_create"),
+    path("roles/<uuid:role_id>/edit/", views.role_edit, name="role_edit"),
+    path("roles/<uuid:role_id>/toggle/", views.role_toggle, name="role_toggle"),
     path("permissions/", views.permission_catalog, name="permission_catalog"),
     path("users/<int:user_id>/matrix/", views.user_permission_matrix,
          name="user_matrix"),

@@ -12,15 +12,14 @@ from apps.accounts.models import User
 from .decorators import crm_permission_required
 from .forms import RoleForm, UserOverrideForm
 from .models import PermissionDefinition, RoleGroup
-from .services import EffectivePermissionResolver, PermissionManagementService
+from .services import EffectivePermissionResolver, PermissionManagementService, RoleService
 
 
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def role_list(request):
-    return render(request, "authorization/role_list.html", {
-        "roles": RoleGroup.objects.filter(company=request.company),
-    })
+    roles = RoleService.get_roles_for_company(request.company)
+    return render(request, "authorization/role_list.html", {"roles": roles})
 
 
 @login_required
@@ -28,19 +27,76 @@ def role_list(request):
 def role_create(request):
     form = RoleForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        role = form.save(commit=False)
-        role.company = request.company
-        role.save()
+        RoleService.create_role(
+            company=request.company,
+            code=form.cleaned_data["code"],
+            name=form.cleaned_data["name"],
+            description=form.cleaned_data["description"],
+            is_active=form.cleaned_data["is_active"],
+            permission_ids=request.POST.getlist("permissions"),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
         messages.success(request, "Role created.")
         return redirect("authorization:role_list")
-    return render(request, "form.html", {"title": "New role", "form": form})
+    
+    context = {
+        "form": form,
+        "permissions": PermissionManagementService.get_active_permissions(),
+        "selected_permission_ids": set(),
+    }
+    return render(request, "authorization/role_form.html", context)
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+def role_edit(request, role_id):
+    role = get_object_or_404(RoleGroup, id=role_id, company=request.company)
+    form = RoleForm(request.POST or None, instance=role)
+    if request.method == "POST" and form.is_valid():
+        RoleService.update_role(
+            role=role,
+            code=form.cleaned_data["code"],
+            name=form.cleaned_data["name"],
+            description=form.cleaned_data["description"],
+            is_active=form.cleaned_data["is_active"],
+            permission_ids=request.POST.getlist("permissions"),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        messages.success(request, "Role updated.")
+        return redirect("authorization:role_list")
+    
+    current_permission_ids = set(
+        str(pid) for pid in role.permissions.values_list("permission_id", flat=True)
+    )
+    context = {
+        "form": form,
+        "role_instance": role,
+        "is_edit_mode": True,
+        "permissions": PermissionManagementService.get_active_permissions(),
+        "selected_permission_ids": current_permission_ids,
+    }
+    return render(request, "authorization/role_form.html", context)
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+def role_toggle(request, role_id):
+    role = get_object_or_404(RoleGroup, id=role_id, company=request.company)
+    try:
+        is_active = RoleService.toggle_role(role=role, actor=request.user, request_meta=request.request_meta)
+        messages.success(request, f"Role {'activated' if is_active else 'deactivated'}.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect("authorization:role_list")
 
 
 @login_required
 @crm_permission_required("authorization.permissions.manage")
 def permission_catalog(request):
     return render(request, "authorization/permission_catalog.html", {
-        "permissions": PermissionDefinition.objects.all().order_by("module", "code"),
+        "permissions": PermissionManagementService.get_permission_catalog(),
     })
 
 
