@@ -82,3 +82,9 @@ class NotificationService:
         if not notification.is_read:
             notification.is_read = True
             notification.save(update_fields=["is_read", "updated_at"])
+
+    @staticmethod
+    def mark_all_read(*, recipient) -> int:
+        return Notification.objects.filter(
+            recipient=recipient, is_read=False
+        ).update(is_read=True)

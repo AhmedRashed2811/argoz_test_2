@@ -5,6 +5,7 @@ from .models import (
     WebhookEndpoint,
     WebhookEvent,
     WebhookMapping,
+    WebhookRetry,
 )
 
 
@@ -26,6 +27,12 @@ class WebhookEventAdmin(admin.ModelAdmin):
     list_display = ("endpoint", "status", "received_at", "processed_at")
     list_filter = ("status",)
     readonly_fields = ("payload", "dedupe_hash", "external_event_id")
+
+
+@admin.register(WebhookRetry)
+class WebhookRetryAdmin(admin.ModelAdmin):
+    list_display = ("webhook_event", "attempt_number", "status", "scheduled_at")
+    list_filter = ("status",)
 
 
 admin.site.register(IntegrationProvider)

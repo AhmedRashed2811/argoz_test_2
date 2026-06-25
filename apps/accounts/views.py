@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
+from django.views.decorators.http import require_POST
 
 from apps.authorization.decorators import crm_permission_required
 
@@ -17,9 +19,124 @@ from .services import TeamService, UserService
 @login_required
 @crm_permission_required("admin.users.access")
 def user_list(request):
-    return render(request, "accounts/user_list.html", {
-        "users": users_for_company(request.company),
-    })
+    context = UserService.get_user_creation_context(company=request.company)
+    return render(request, "accounts/user_list.html", context)
+
+
+@login_required
+@crm_permission_required("admin.users.access")
+def user_api_list(request):
+    return JsonResponse(UserService.directory_payload(company=request.company))
+
+
+@login_required
+@crm_permission_required("admin.users.delete")
+@require_POST
+def user_api_deactivate(request, user_id):
+    target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    if target_user == request.user:
+        return JsonResponse(
+            {"error": "You cannot deactivate your own account."}, status=400
+        )
+    UserService.delete_user(
+        user=target_user, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@crm_permission_required("admin.users.update")
+@require_POST
+def user_api_activate(request, user_id):
+    target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    UserService.activate_user(
+        user=target_user, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@crm_permission_required("admin.users.delete")
+@require_POST
+def user_api_delete(request, user_id):
+    target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    if target_user == request.user:
+        return JsonResponse(
+            {"error": "You cannot delete your own account."}, status=400
+        )
+    UserService.destroy_user(
+        user=target_user, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
+
+
+
+@login_required
+@crm_permission_required("admin.users.create")
+@require_POST
+def user_api_create(request):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    form = UserCreateForm(data, company=request.company)
+    if form.is_valid():
+        cleaned = form.cleaned_data
+        UserService.create_user(
+            company=request.company,
+            email=cleaned["email"],
+            password=cleaned["password"],
+            default_role=cleaned["default_role"],
+            first_name=cleaned["first_name"],
+            last_name=cleaned["last_name"],
+            phone=cleaned["phone"],
+            job_title=cleaned["job_title"],
+            permission_codes=data.get("permissions"),
+            created_by=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.users.update")
+@require_POST
+def user_api_edit(request, user_id):
+    import json
+    target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    form = UserEditForm(data, company=request.company, user_instance=target_user)
+    if form.is_valid():
+        cleaned = form.cleaned_data
+        UserService.update_user(
+            user=target_user,
+            email=cleaned["email"],
+            password=cleaned.get("password") or None,
+            default_role=cleaned["default_role"],
+            first_name=cleaned["first_name"],
+            last_name=cleaned["last_name"],
+            phone=cleaned["phone"],
+            job_title=cleaned["job_title"],
+            permission_codes=data.get("permissions"),
+            created_by=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
 
 
 @login_required

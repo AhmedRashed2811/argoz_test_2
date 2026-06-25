@@ -1,6 +1,5 @@
-"""Accounts read queries (docs §15.1)."""
-from django.db.models import Q
-
+from django.db.models import Count, Q
+from django.utils import timezone
 from .models import Team, User
 
 
@@ -9,6 +8,24 @@ def users_for_company(company):
         User.objects.filter(profile__company=company)
         .select_related("profile", "profile__default_role")
         .order_by("email")
+    )
+
+
+def user_directory(company):
+    """Users + role + teams + active-override count for the directory page."""
+    now = timezone.now()
+    return (
+        User.objects.filter(profile__company=company)
+        .select_related("profile", "profile__default_role")
+        .prefetch_related("team_memberships__team")
+        .annotate(
+            overrides_count=Count(
+                "permission_overrides",
+                filter=Q(permission_overrides__expires_at__isnull=True) | Q(permission_overrides__expires_at__gt=now),
+                distinct=True,
+            )
+        )
+        .order_by("first_name", "last_name", "email")
     )
 
 

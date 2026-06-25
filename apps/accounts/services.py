@@ -134,6 +134,24 @@ class UserService:
 
     @staticmethod
     @transaction.atomic
+    def destroy_user(*, user, actor=None, request_meta=None) -> None:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        email = user.email
+        company = user.profile.company
+
+        AuditService.log(
+            action=AuditAction.DELETE, instance=user, actor=actor, company=company,
+            module="accounts", request_meta=request_meta,
+            reason="Permanently deleted user account",
+            entity_display=email,
+        )
+
+        user.delete()
+
+    @staticmethod
+    @transaction.atomic
     def activate_user(*, user, actor=None, request_meta=None):
         user.is_active = True
         user.save()
@@ -151,6 +169,48 @@ class UserService:
             after={"is_active": True, "availability_status": "AVAILABLE"},
             entity_display=user.email,
         )
+
+    @staticmethod
+    def directory_payload(*, company):
+        """Serialize the user directory for the AJAX users page (read-only).
+        Heavy query/annotation lives in the selector; this only shapes JSON."""
+        from apps.authorization.models import RoleGroup
+
+        from .selectors import user_directory
+
+        users = []
+        for u in user_directory(company):
+            profile = getattr(u, "profile", None)
+            role = profile.default_role if profile else None
+            users.append({
+                "id": u.id,
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "phone": u.phone or None,
+                "is_active": u.is_active,
+                "profile": {
+                    "job_title": profile.job_title if profile else "",
+                    "department": profile.department if profile else "",
+                    "availability_status": profile.availability_status if profile else "",
+                    "availability_status_display": (
+                        profile.get_availability_status_display() if profile else ""
+                    ),
+                    "default_role": (
+                        {"id": role.id, "name": role.name, "code": role.code}
+                        if role else None
+                    ),
+                },
+                "team_memberships": [
+                    {"team": {"name": m.team.name}} for m in u.team_memberships.all()
+                ],
+                "permission_overrides_count": getattr(u, "overrides_count", 0),
+            })
+        roles = [
+            {"id": r.id, "name": r.name, "code": r.code}
+            for r in RoleGroup.objects.filter(company=company, is_active=True).order_by("name")
+        ]
+        return {"users": users, "roles": roles}
 
     @staticmethod
     def get_user_creation_context(*, company):
