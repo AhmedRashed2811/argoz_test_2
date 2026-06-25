@@ -15,27 +15,37 @@ def fanout_notification(notification_id: str):
     from .models import Notification, NotificationDelivery
     from .constants import Channel
 
+    import json
+    import redis as sync_redis
+    from django.conf import settings
+
     notif = Notification.objects.filter(id=notification_id).select_related(
         "recipient", "notification_type"
     ).first()
     if notif is None:
         return
+
+    payload = {
+        "id": str(notif.id),
+        "title": notif.title,
+        "body": notif.body,
+        "code": notif.notification_type.code,
+        "type": notif.notification_type.name,
+        "created_at": notif.created_at.isoformat(),
+    }
+
+    # WebSocket delivery via Django Channels layer.
     layer = get_channel_layer()
     if layer is not None:
         async_to_sync(layer.group_send)(
             f"notifications_{notif.recipient_id}",
-            {
-                "type": "notify",
-                "payload": {
-                    "id": str(notif.id),
-                    "title": notif.title,
-                    "body": notif.body,
-                    "code": notif.notification_type.code,
-                    "type": notif.notification_type.name,
-                    "created_at": notif.created_at.isoformat(),
-                },
-            },
+            {"type": "notify", "payload": payload},
         )
+
+    # SSE delivery via direct Redis pub/sub (more reliable cross-process).
+    r = sync_redis.from_url(settings.REDIS_URL)
+    r.publish(f"sse_notif:{notif.recipient_id}", json.dumps(payload))
+    r.close()
     NotificationDelivery.objects.filter(
         notification=notif, channel=Channel.WEBSOCKET
     ).update(status="SENT", sent_at=timezone.now())

@@ -6,57 +6,83 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+# Map reminder_type → (NotificationCode attr, human title)
+_REMINDER_MAP = {
+    "MEETING":          ("MEETING_DUE",      "Meeting reminder"),
+    "STAGE_MEETING":    ("MEETING_DUE",      "Meeting reminder"),
+    "FOLLOWUP":         ("FOLLOWUP_DUE",     "Follow-up due"),
+    "STAGE_FOLLOW_UP":  ("FOLLOWUP_DUE",     "Follow-up due"),
+    "STAGE_NOT_REACHED":("FOLLOWUP_DUE",     "Unreached lead — follow-up due"),
+    "STAGE_FRESH":      ("FOLLOWUP_DUE",     "Fresh lead requires attention"),
+    "STAGE_FROZEN":     ("FROZEN_LEAD_RETURN","Frozen lead — action required"),
+    "SLA_WARNING":      ("SLA_WARNING",      "SLA expiry warning"),
+}
+
 
 @shared_task(bind=True)
 def check_lead_sla_expiry(self, batch_size: int = 100):
-    """Beat every 1-5 min: rotate/reassign/escalate expired SLAs (docs §12.2).
-    Locks each batch with skip_locked so workers never double-process."""
+    """Beat every 1-5 min: rotate/reassign/escalate expired SLAs, and schedule
+    SLA_WARNING reminders for near-expiry instances (docs §12.2).
+    Each SLA is processed in its own savepoint so one failure never blocks others."""
     from apps.audit.models import JobExecutionLog
     from apps.distribution.locks import expired_sla_batch
     from apps.distribution.services import SLAExpiryService
+    from apps.leads.services.sla_service import SLAService
 
     task_id = getattr(self.request, "id", "") or ""
+    now = timezone.now()
     processed = 0
+
     with transaction.atomic():
-        for sla in expired_sla_batch(timezone.now(), limit=batch_size):
-            if SLAExpiryService.process_instance(sla, task_id=task_id):
-                processed += 1
+        for sla in expired_sla_batch(now, limit=batch_size):
+            try:
+                with transaction.atomic():
+                    if SLAExpiryService.process_instance(sla, task_id=task_id):
+                        processed += 1
+            except Exception as exc:
+                JobExecutionLog.objects.create(
+                    task_name="check_lead_sla_expiry", task_id=task_id,
+                    status="ERROR", finished_at=timezone.now(), error=str(exc)[:500],
+                )
+
+    warned = SLAService.schedule_warnings(now)
+
     JobExecutionLog.objects.create(
         task_name="check_lead_sla_expiry", task_id=task_id, status="DONE",
         finished_at=timezone.now(), processed_count=processed,
+        metadata={"sla_warnings_scheduled": warned},
     )
     return processed
 
 
 @shared_task
 def send_due_reminders():
-    """Beat ~every minute: deliver due reminders (docs §12.1)."""
+    """Beat ~every minute: deliver due reminders as in-app (and email when the
+    reminder channel is EMAIL) notifications (docs §12.1)."""
     from apps.leads.models import Reminder
-    from apps.notifications.services import NotificationService
     from apps.notifications.constants import NotificationCode
+    from apps.notifications.services import NotificationService
 
     due = Reminder.objects.select_related("lead", "company", "user").filter(
         status="PENDING", due_at__lte=timezone.now()
     )[:500]
+
     count = 0
     for reminder in due:
         if reminder.user_id:
-            code = NotificationCode.FOLLOWUP_DUE
-            rtype = reminder.reminder_type
-            if rtype in ("MEETING", "STAGE_MEETING"):
-                code = NotificationCode.MEETING_DUE
-            elif rtype in ("FOLLOWUP", "STAGE_FOLLOW_UP"):
-                code = NotificationCode.FOLLOWUP_DUE
-            elif rtype == "STAGE_FROZEN":
-                code = NotificationCode.FROZEN_LEAD_RETURN
-            elif rtype == "SLA_WARNING":
-                code = NotificationCode.SLA_WARNING
-
+            code_attr, title = _REMINDER_MAP.get(
+                reminder.reminder_type,
+                ("FOLLOWUP_DUE", f"Reminder: {reminder.reminder_type}"),
+            )
             NotificationService.create(
-                company=reminder.company, recipient=reminder.user,
-                code=code,
-                title=f"Reminder: {reminder.reminder_type}",
-                related_type="Lead", related_id=reminder.lead_id or "",
+                company=reminder.company,
+                recipient=reminder.user,
+                code=getattr(NotificationCode, code_attr),
+                title=title,
+                body=str(reminder.lead) if reminder.lead else "",
+                related_type="Lead",
+                related_id=reminder.lead_id or "",
+                channels=[reminder.channel] if reminder.channel else None,
             )
         reminder.status = "SENT"
         reminder.sent_at = timezone.now()

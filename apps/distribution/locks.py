@@ -23,12 +23,20 @@ def expired_sla_batch(now, limit=100):
     from apps.leads.constants import SLAStatus
     from apps.leads.models import SLAInstance
 
-    qs = (
+    base_qs = (
         SLAInstance.objects.select_related("lead", "lead__company", "lead__assigned_salesman")
         .filter(status=SLAStatus.ACTIVE, deadline_at__lte=now)
         .order_by("deadline_at")[:limit]
     )
-    try:
-        return qs.select_for_update(skip_locked=True)
-    except Exception:
-        return qs.select_for_update()
+    # Evaluate eagerly so the exception surfaces here, not at iteration time.
+    # Degrade: skip_locked → plain lock → no lock (SQLite / dev).
+    for attempt in (
+        lambda q: q.select_for_update(skip_locked=True),
+        lambda q: q.select_for_update(),
+        lambda q: q,
+    ):
+        try:
+            return list(attempt(base_qs))
+        except Exception:
+            continue
+    return []

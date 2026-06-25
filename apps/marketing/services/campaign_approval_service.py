@@ -105,7 +105,7 @@ def _marketing_team(company):
 def _campaign_approved_recipients(company):
     from apps.accounts.models import User
     from django.db.models import Q
-    role_codes = ["FINANCE_MANAGERS", "DIRECTORS", "MARKETING_MEMBERS"]
+    role_codes = ["FINANCE_MANAGERS", "DIRECTORS", "MARKETING_MEMBERS", "MARKETING_MANAGERS"]
     return list(User.objects.filter(
         is_active=True,
         profile__company=company

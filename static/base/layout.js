@@ -195,45 +195,54 @@
   /* ── SSE: push new notifications without polling ── */
   if (CFG.sseUrl && typeof EventSource !== 'undefined') {
     let sse;
-    let retryDelay = 3000;
+    let retryTimer = null;
+    let retryDelay = 2000;
 
     function connectSSE() {
+      if (sse) { sse.close(); sse = null; }
       sse = new EventSource(CFG.sseUrl, { withCredentials: true });
+
+      sse.onopen = () => { retryDelay = 2000; };
 
       sse.onmessage = (e) => {
         try {
           const payload = JSON.parse(e.data);
           if (!payload.id) return;
-          const exists = NOTIFS.some(n => n.id === payload.id);
-          if (!exists) {
-            NOTIFS.unshift({
-              id: payload.id,
-              title: payload.title || '',
-              body: payload.body || '',
-              code: payload.code || '',
-              type: payload.code || '',
-              priority: payload.priority || 'NORMAL',
-              related_type: payload.related_type || null,
-              created_at: payload.created_at || new Date().toISOString(),
-              is_read: false,
-            });
-            unreadCount += 1;
-            renderPanel();
-          }
+          if (NOTIFS.some(n => n.id === payload.id)) return;
+          NOTIFS.unshift({
+            id: payload.id,
+            title: payload.title || '',
+            body: payload.body || '',
+            code: payload.code || '',
+            type: payload.type || payload.code || '',
+            priority: payload.priority || 'NORMAL',
+            related_type: payload.related_type || null,
+            created_at: payload.created_at || new Date().toISOString(),
+            is_read: false,
+          });
+          unreadCount += 1;
+          renderPanel();
         } catch (_) {}
       };
 
-      sse.onopen = () => { retryDelay = 3000; };
-
       sse.onerror = () => {
         sse.close();
-        // ponytail: exponential back-off capped at 30s, upgrade to WS if needed
-        retryDelay = Math.min(retryDelay * 2, 30000);
-        setTimeout(connectSSE, retryDelay);
+        sse = null;
+        retryDelay = Math.min(retryDelay * 1.5, 15000);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(connectSSE, retryDelay);
       };
     }
 
     connectSSE();
+
+    // Re-establish on tab focus in case connection silently dropped
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && (!sse || sse.readyState === EventSource.CLOSED)) {
+        retryDelay = 2000;
+        connectSSE();
+      }
+    });
   } else {
     setInterval(fetchNotifs, 60000);
   }

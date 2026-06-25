@@ -79,23 +79,46 @@ class NotificationService:
 
     @staticmethod
     async def sse_stream(user):
-        """Async generator that yields SSE-formatted lines for *user*."""
-        import asyncio
-        import json
-        from channels.layers import get_channel_layer
+        """Async generator that yields SSE-formatted lines for *user*.
 
-        layer = get_channel_layer()
-        channel_name = await layer.new_channel()
-        await layer.group_add(f"notifications_{user.id}", channel_name)
+        Uses Redis pub/sub directly (bypasses channels_redis) so messages
+        published by fanout_notification in the Celery worker are received
+        immediately without cross-process channel-layer timing issues.
+        """
+        import asyncio
+        import redis.asyncio as aioredis
+        from django.conf import settings
+
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = r.pubsub()
+        channel = f"sse_notif:{user.id}"
+        await pubsub.subscribe(channel)
+
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def _listen():
+            try:
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        await queue.put(message["data"])
+            except Exception:
+                pass
+
+        task = asyncio.create_task(_listen())
         try:
             while True:
                 try:
-                    message = await asyncio.wait_for(layer.receive(channel_name), timeout=25)
-                    yield f"data: {json.dumps(message.get('payload', {}))}\n\n"
+                    data = await asyncio.wait_for(queue.get(), timeout=25)
+                    yield f"data: {data}\n\n"
                 except asyncio.TimeoutError:
                     yield ": heartbeat\n\n"
         finally:
-            await layer.group_discard(f"notifications_{user.id}", channel_name)
+            task.cancel()
+            try:
+                await pubsub.unsubscribe(channel)
+                await r.aclose()
+            except Exception:
+                pass
 
     @staticmethod
     def mark_read(*, notification: Notification) -> None:

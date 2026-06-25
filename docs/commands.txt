@@ -1,0 +1,11 @@
+(venv) C:\Users\ahmed\argoz>uvicorn config.asgi:application --reload
+
+docker run -d --name redis -p 6379:6379 redis:alpine
+docker start redis
+docker stop redis
+
+(venv) C:\Users\ahmed\argoz>celery -A config worker -l info --pool=solo
+
+(venv) C:\Users\ahmed\argoz>celery -A config.celery beat -l info
+
+(venv) C:\Users\ahmed\argoz>python manage.py seed_crm.py

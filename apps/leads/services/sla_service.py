@@ -56,6 +56,44 @@ class SLAService:
         return (now + delta) if delta else None
 
     @staticmethod
+    def schedule_warnings(now) -> int:
+        """Create SLA_WARNING Reminders for active SLAs within the warning window.
+        Per-company threshold from policy 'lead.sla_warning_threshold' (default 30 min)."""
+        from datetime import timedelta
+        from apps.policies.services import PolicyResolver
+        from ..models import Reminder
+        from .reminder_service import ReminderService
+
+        MAX_LOOKAHEAD = timedelta(hours=1)
+        near_expiry = (
+            SLAInstance.objects
+            .select_related("lead", "lead__company", "lead__assigned_salesman")
+            .filter(status=SLAStatus.ACTIVE, deadline_at__gt=now, deadline_at__lte=now + MAX_LOOKAHEAD)
+        )
+        count = 0
+        for sla in near_expiry:
+            if not sla.lead.assigned_salesman_id:
+                continue
+            threshold_val = PolicyResolver.value(
+                sla.lead.company, "lead.sla_warning_threshold", default={"minutes": 30}
+            )
+            threshold = _duration_to_timedelta(threshold_val, default_minutes=30)
+            if sla.deadline_at - threshold > now:
+                continue  # too early
+            already = Reminder.objects.filter(
+                lead=sla.lead, reminder_type="SLA_WARNING",
+                status__in=("PENDING", "SENT"),
+            ).exists()
+            if already:
+                continue
+            ReminderService.create(
+                company=sla.lead.company, user=sla.lead.assigned_salesman,
+                due_at=now, reminder_type="SLA_WARNING", lead=sla.lead,
+            )
+            count += 1
+        return count
+
+    @staticmethod
     def open_instance(*, lead: Lead, stage: LeadStageDefinition, deadline, salesman=None):
         """Close any active SLA, open a fresh one (idempotent rotation helper)."""
         SLAInstance.objects.filter(lead=lead, status=SLAStatus.ACTIVE).update(
