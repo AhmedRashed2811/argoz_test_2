@@ -238,6 +238,11 @@
 .toast-msg { font-size: .76rem; color: var(--clr-text-sub); margin-top: 2px; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 
+.lang-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.lang-pill { padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-weight: 500; cursor: pointer; border: 1.5px solid var(--clr-border); color: var(--clr-text-sub); background: transparent; transition: all .15s; user-select: none; }
+.lang-pill:hover { border-color: var(--clr-orange); color: var(--clr-orange); }
+.lang-pill.selected { background: var(--clr-orange); border-color: var(--clr-orange); color: #fff; }
+
 @media (max-width: 1060px) {
   .form-layout { grid-template-columns: 1fr; }
   .left-col { position: static; }

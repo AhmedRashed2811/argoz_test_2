@@ -114,6 +114,17 @@
               </div>
             </div>
 
+            <!-- Languages (shown only on create) -->
+            <div class="field" id="field-languages" style="display:none">
+              <label>
+                <svg viewBox="0 0 24 24"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><rect x="12" y="12" width="8" height="8" rx="1"/><path d="m16 16 1.5 3 1.5-3"/><path d="M15.5 18.5h3"/></svg>
+                Languages Spoken
+              </label>
+              <div class="lang-pills" id="langPills">
+                <!-- populated by JS -->
+              </div>
+            </div>
+
             <!-- Role -->
             <div class="field" id="field-default_role">
               <label>
@@ -194,6 +205,7 @@
   ];
   
   window.ROLE_PERMS = {{ role_permissions_json|safe }};
+
   
   window.USER_DATA = {
     first_name: "{{ user_instance.first_name|default_if_none:''|escapejs }}",
@@ -201,7 +213,9 @@
     email: "{{ user_instance.email|default_if_none:''|escapejs }}",
     phone: "{{ user_instance.phone|default_if_none:''|escapejs }}",
     job_title: "{{ user_instance.profile.job_title|default_if_none:''|escapejs }}",
-    default_role: "{{ user_instance.profile.default_role.id|default_if_none:''|escapejs }}"
+    default_role: "{{ user_instance.profile.default_role.id|default_if_none:''|escapejs }}",
+    default_role_code: "{{ user_instance.profile.default_role.code|default_if_none:''|escapejs }}",
+    language_codes: [{% for ul in user_languages %}"{{ ul.language.code|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]
   };
 </script>
 <script src="{% static 'accounts/user_form.js' %}"></script>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from .models import Team, TeamMember, User, UserProfile
+from .models import Language, Team, TeamMember, User, UserLanguage, UserProfile
 
 
 class UserService:
@@ -12,7 +12,7 @@ class UserService:
     @transaction.atomic
     def create_user(*, company, email, password=None, default_role=None,
                     first_name="", last_name="", phone="", permission_codes=None,
-                    created_by=None, request_meta=None, **profile):
+                    language_codes=None, created_by=None, request_meta=None, **profile):
         user = User.objects.create_user(
             email=email, password=password, first_name=first_name,
             last_name=last_name, phone=phone,
@@ -37,6 +37,13 @@ class UserService:
                 audit=False,
             )
 
+        if default_role and default_role.code == "SALES" and language_codes:
+            langs = [Language.objects.get_or_create(code=c, defaults={"name": c})[0] for c in language_codes]
+            UserLanguage.objects.bulk_create([
+                UserLanguage(user=user, language=lang)
+                for lang in langs
+            ], ignore_conflicts=True)
+
         # Audit creation
         from apps.audit.services import AuditService, DiffService
         from apps.core.constants import AuditAction
@@ -58,7 +65,7 @@ class UserService:
     @transaction.atomic
     def update_user(*, user, email, password=None, default_role=None,
                     first_name="", last_name="", phone="", permission_codes=None,
-                    created_by=None, request_meta=None, **profile_data):
+                    language_codes=None, created_by=None, request_meta=None, **profile_data):
         from apps.audit.services import AuditService, DiffService
         from apps.core.constants import AuditAction
 
@@ -98,6 +105,13 @@ class UserService:
                 request_meta=request_meta,
                 audit=True,
             )
+
+        if language_codes is not None:
+            UserLanguage.objects.filter(user=user).delete()
+            role = default_role or (user.profile.default_role if hasattr(user, "profile") else None)
+            if role and role.code == "SALES" and language_codes:
+                langs = [Language.objects.get_or_create(code=c, defaults={"name": c})[0] for c in language_codes]
+                UserLanguage.objects.bulk_create([UserLanguage(user=user, language=lang) for lang in langs])
 
         # Capture state after update
         after_data = DiffService.snapshot(user, fields=["email", "first_name", "last_name", "phone", "is_active"])
@@ -205,6 +219,7 @@ class UserService:
                     {"team": {"name": m.team.name}} for m in u.team_memberships.all()
                 ],
                 "permission_overrides_count": getattr(u, "overrides_count", 0),
+                "language_codes": [ul.language.code for ul in u.languages.select_related("language").all()],
             })
         roles = [
             {"id": r.id, "name": r.name, "code": r.code}

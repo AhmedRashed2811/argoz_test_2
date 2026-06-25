@@ -123,6 +123,7 @@ def user_api_create(request):
             phone=cleaned["phone"],
             job_title=cleaned["job_title"],
             permission_codes=data.get("permissions"),
+            language_codes=data.get("language_codes") or [],
             created_by=request.user,
             request_meta=request.request_meta,
         )
@@ -156,6 +157,7 @@ def user_api_edit(request, user_id):
             phone=cleaned["phone"],
             job_title=cleaned["job_title"],
             permission_codes=data.get("permissions"),
+            language_codes=data.get("language_codes") or [],
             created_by=request.user,
             request_meta=request.request_meta,
         )
@@ -227,6 +229,7 @@ def user_edit(request, user_id):
     from apps.authorization.services import EffectivePermissionResolver
     context["user_active_permissions"] = EffectivePermissionResolver.get_codes(target_user)
     context["is_edit_mode"] = True
+    context["user_languages"] = target_user.languages.select_related("language").all()
     return render(request, "accounts/user_form.html", context)
 
 

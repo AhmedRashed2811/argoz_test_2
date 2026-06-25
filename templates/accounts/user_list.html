@@ -1102,6 +1102,11 @@ Argoz CRM{% endblock %} {% block content %}
       display: block;
     }
 
+    .lang-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+    .lang-pill { padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-weight: 500; cursor: pointer; border: 1.5px solid var(--clr-border); color: var(--clr-text-sub); background: transparent; transition: all .15s; user-select: none; }
+    .lang-pill:hover { border-color: var(--clr-orange); color: var(--clr-orange); }
+    .lang-pill.selected { background: var(--clr-orange); border-color: var(--clr-orange); color: #fff; }
+
     /* Responsive */
     @media (max-width: 900px) {
       .page-body {
@@ -1666,6 +1671,14 @@ Argoz CRM{% endblock %} {% block content %}
         </div>
       </div>
 
+      <div class="field" id="field-languages" style="display:none">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><rect x="12" y="12" width="8" height="8" rx="1"/><path d="m16 16 1.5 3 1.5-3"/><path d="M15.5 18.5h3"/></svg>
+          Languages Spoken
+        </label>
+        <div class="lang-pills" id="langPills"></div>
+      </div>
+
       <div
         id="edit-matrix-hint"
         style="
@@ -2189,11 +2202,43 @@ Argoz CRM{% endblock %} {% block content %}
   function openModal(id) { document.getElementById(id).classList.add('open'); }
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+  const KNOWN_LANGUAGES = [
+    { code: 'ar', name: 'Arabic' },
+    { code: 'en', name: 'English' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'it', name: 'Italian' },
+    { code: 'ru', name: 'Russian' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'tr', name: 'Turkish' },
+    { code: 'ur', name: 'Urdu' },
+  ];
+
+  function buildLangPills() {
+    const container = document.getElementById('langPills');
+    if (!container || container.children.length) return;
+    KNOWN_LANGUAGES.forEach(lang => {
+      const pill = document.createElement('span');
+      pill.className = 'lang-pill';
+      pill.dataset.code = lang.code;
+      pill.textContent = lang.name;
+      pill.addEventListener('click', () => pill.classList.toggle('selected'));
+      container.appendChild(pill);
+    });
+  }
+
+  function setLangVisibility(roleCode) {
+    document.getElementById('field-languages').style.display = roleCode === 'SALES' ? '' : 'none';
+  }
+
   function clearForm() {
     ['first_name','last_name','email','password','phone','job_title'].forEach(f => {
       const el = document.getElementById(`inp-${f}`); if (el) el.value = '';
     });
     document.getElementById('inp-default_role').value = '';
+    document.querySelectorAll('#langPills .lang-pill').forEach(p => p.classList.remove('selected'));
+    document.getElementById('field-languages').style.display = 'none';
     document.querySelectorAll('.field').forEach(f => f.classList.remove('has-error'));
     document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
   }
@@ -2228,7 +2273,13 @@ Argoz CRM{% endblock %} {% block content %}
     document.getElementById('inp-email').value = u.email || '';
     document.getElementById('inp-phone').value = u.phone || '';
     document.getElementById('inp-job_title').value = u.profile?.job_title || '';
-    document.getElementById('inp-default_role').value = u.profile?.default_role?.id || '';
+    const roleId = u.profile?.default_role?.id || '';
+    document.getElementById('inp-default_role').value = roleId;
+    setLangVisibility(u.profile?.default_role?.code || '');
+    (u.language_codes || []).forEach(code => {
+      const pill = document.querySelector(`#langPills .lang-pill[data-code="${code}"]`);
+      if (pill) pill.classList.add('selected');
+    });
 
     openModal('userModal');
   }
@@ -2283,6 +2334,14 @@ Argoz CRM{% endblock %} {% block content %}
 
     const pwVal = document.getElementById('inp-password').value;
     if (pwVal) payload.password = pwVal;
+
+    const roleId = document.getElementById('inp-default_role').value;
+    const role = ROLES.find(r => String(r.id) === String(roleId));
+    if (role && role.code === 'SALES') {
+      payload.language_codes = [...document.querySelectorAll('#langPills .lang-pill.selected')].map(p => p.dataset.code);
+    } else {
+      payload.language_codes = [];
+    }
 
     try {
       await apiEditUser(editUserId, payload);
@@ -2436,6 +2495,12 @@ Argoz CRM{% endblock %} {% block content %}
     document.querySelectorAll('.table-scroll-wrap').forEach(el => {
       el.addEventListener('scroll', repositionOpenDropdown, { passive: true });
     });
+    document.getElementById('inp-default_role').addEventListener('change', e => {
+      const roleId = e.target.value;
+      const role = ROLES.find(r => String(r.id) === String(roleId));
+      setLangVisibility(role ? role.code : '');
+    });
+    buildLangPills();
     loadUserData();
   });
 </script>

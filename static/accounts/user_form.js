@@ -97,6 +97,7 @@ function onRoleChange() {
   const roleSelect = document.getElementById('inp-default_role');
   if (!roleSelect) return;
   const roleId = roleSelect.value;
+  updateLanguageVisibility(roleId);
   roleDefaultCodes.clear();
 
   if (!roleId) {
@@ -165,6 +166,11 @@ function initPage() {
     if (user.default_role) {
       setTimeout(() => {
         document.getElementById('inp-default_role').value = user.default_role;
+        updateLanguageVisibility(user.default_role);
+        (user.language_codes || []).forEach(code => {
+          const pill = document.querySelector(`.lang-pill[data-code="${code}"]`);
+          if (pill) pill.classList.add('selected');
+        });
       }, 50);
     }
   } else {
@@ -221,6 +227,9 @@ if (submitBtn) {
       job_title: document.getElementById('inp-job_title').value.trim(),
       default_role: document.getElementById('inp-default_role').value,
       permissions: window.IS_EDIT ? [] : checkedCodes,
+      language_codes: isSalesRole(document.getElementById('inp-default_role').value)
+        ? [...document.querySelectorAll('.lang-pill.selected')].map(p => p.dataset.code)
+        : [],
     };
     if (!window.IS_EDIT) payload.password = document.getElementById('inp-password').value;
 
@@ -320,8 +329,48 @@ function showToast(type, title, msg) {
   setTimeout(() => el.remove(), 4000);
 }
 
+const KNOWN_LANGUAGES = [
+  { code: 'ar', name: 'Arabic', default: true },
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'it', name: 'Italian' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'ur', name: 'Urdu' },
+];
+
+const SALES_ROLE_CODES = ['SALES'];
+
+function isSalesRole(roleId) {
+  const role = (window.ROLES || []).find(r => String(r.id) === String(roleId));
+  return role ? SALES_ROLE_CODES.includes(role.code) : false;
+}
+
+function buildLanguagePills() {
+  const container = document.getElementById('langPills');
+  if (!container) return;
+  KNOWN_LANGUAGES.forEach(lang => {
+    const pill = document.createElement('span');
+    const isSelected = !window.IS_EDIT && lang.default;
+    pill.className = 'lang-pill' + (isSelected ? ' selected' : '');
+    pill.dataset.code = lang.code;
+    pill.textContent = lang.name;
+    pill.addEventListener('click', () => pill.classList.toggle('selected'));
+    container.appendChild(pill);
+  });
+}
+
+function updateLanguageVisibility(roleId) {
+  const field = document.getElementById('field-languages');
+  if (field) field.style.display = isSalesRole(roleId) ? '' : 'none';
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initRoles();
   buildPermissions();
+  buildLanguagePills();
   initPage();
 });
