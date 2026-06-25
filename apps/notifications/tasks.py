@@ -31,6 +31,7 @@ def fanout_notification(notification_id: str):
                     "title": notif.title,
                     "body": notif.body,
                     "code": notif.notification_type.code,
+                    "type": notif.notification_type.name,
                     "created_at": notif.created_at.isoformat(),
                 },
             },

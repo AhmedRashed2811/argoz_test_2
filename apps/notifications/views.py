@@ -3,7 +3,7 @@ plus a single state toggle through the service."""
 from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -67,3 +67,15 @@ def notification_api_mark_read(request, notification_id):
 def notification_api_mark_all_read(request):
     count = NotificationService.mark_all_read(recipient=request.user)
     return JsonResponse({"ok": True, "marked": count})
+
+
+async def notification_sse(request):
+    from asgiref.sync import sync_to_async
+    from django.contrib.auth import get_user
+    user = await sync_to_async(get_user)(request)
+    if not user.is_authenticated:
+        return HttpResponseForbidden()
+    response = StreamingHttpResponse(NotificationService.sse_stream(user), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response

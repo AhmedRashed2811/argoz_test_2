@@ -78,6 +78,26 @@ class NotificationService:
         )
 
     @staticmethod
+    async def sse_stream(user):
+        """Async generator that yields SSE-formatted lines for *user*."""
+        import asyncio
+        import json
+        from channels.layers import get_channel_layer
+
+        layer = get_channel_layer()
+        channel_name = await layer.new_channel()
+        await layer.group_add(f"notifications_{user.id}", channel_name)
+        try:
+            while True:
+                try:
+                    message = await asyncio.wait_for(layer.receive(channel_name), timeout=25)
+                    yield f"data: {json.dumps(message.get('payload', {}))}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+        finally:
+            await layer.group_discard(f"notifications_{user.id}", channel_name)
+
+    @staticmethod
     def mark_read(*, notification: Notification) -> None:
         if not notification.is_read:
             notification.is_read = True

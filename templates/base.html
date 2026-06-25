@@ -139,6 +139,7 @@
     notifListUrl: "{% url 'notifications:api_list' %}",
     notifReadTmpl: "{% url 'notifications:api_mark_read' '00000000-0000-0000-0000-000000000000' %}",
     notifReadAllUrl: "{% url 'notifications:api_mark_all_read' %}",
+    sseUrl: "{% url 'notifications:sse' %}",
     logoutUrl: "{% url 'accounts:logout' %}",
     csrf: "{{ csrf_token }}"
   };

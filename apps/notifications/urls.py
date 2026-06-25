@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/<uuid:notification_id>/read/", views.notification_api_mark_read,
          name="api_mark_read"),
     path("api/read-all/", views.notification_api_mark_all_read, name="api_mark_all_read"),
+    path("sse/", views.notification_sse, name="sse"),
 ]
