@@ -623,7 +623,7 @@ Argoz CRM{% endblock %} {% block content %}
 
     /* ── Filter Dropdown ── */
     .filter-dropdown {
-      position: fixed;
+      position: absolute;
       width: 240px;
       background: var(--clr-surface);
       border: 1px solid var(--clr-border);
@@ -2418,8 +2418,24 @@ Argoz CRM{% endblock %} {% block content %}
     }
   });
 
+  function repositionOpenDropdown() {
+    const openDd = document.querySelector('.filter-dropdown.open');
+    if (!openDd) return;
+    const btnId = openDd.id.replace('Dropdown', 'Btn');
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      openDd.style.top = r.bottom + window.scrollY + 4 + 'px';
+      openDd.style.left = Math.min(r.left + window.scrollX, window.innerWidth - openDd.offsetWidth - 8) + 'px';
+    }
+  }
+
   // Initialize
   document.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('scroll', repositionOpenDropdown, { passive: true });
+    document.querySelectorAll('.table-scroll-wrap').forEach(el => {
+      el.addEventListener('scroll', repositionOpenDropdown, { passive: true });
+    });
     loadUserData();
   });
 </script>

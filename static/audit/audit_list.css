@@ -208,7 +208,7 @@ col.col-meta      { width: 20%; }
 .th-icon-btn.active-sort { color: var(--clr-orange); }
 
 /* ── Filter Dropdown ── */
-.filter-dropdown { position: fixed; width: 240px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 8px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; display: none; }
+.filter-dropdown { position: absolute; width: 240px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 8px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; display: none; }
 .filter-dropdown.open { display: block; }
 .filter-dd-head { padding: 10px 14px 8px; border-bottom: 1px solid var(--clr-border); background: #faf9f7; }
 .filter-dd-head p { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--clr-text-sub); margin-bottom: 8px; }
@@ -218,7 +218,7 @@ col.col-meta      { width: 20%; }
 .filter-item { display: flex; align-items: center; gap: 9px; padding: 7px 14px; cursor: pointer; transition: background .12s; }
 .filter-item:hover { background: #f7f3ee; }
 .filter-item input[type="checkbox"] { accent-color: var(--clr-orange); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
-.filter-actions { display: flex; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--clr-border); }
+.filter-actions { display: contents; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--clr-border); }
 .filter-btn { flex: 1; padding: 7px 0; font-family: 'Times New Roman', Times, serif; font-size: .76rem; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; letter-spacing: .03em; border: none; transition: background .15s; }
 .filter-btn.select-all { background: var(--clr-orange); color: #fff; }
 .filter-btn.select-all:hover { background: var(--clr-orange-dk); }
@@ -229,6 +229,7 @@ table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout:
 thead th, tbody td { white-space: nowrap !important; }
 thead th:nth-child(3), tbody td:nth-child(3),
 thead th:nth-child(5), tbody td:nth-child(5),
+thead th:nth-child(4), tbody td:nth-child(4),
 thead th:nth-child(6), tbody td:nth-child(6) {
   white-space: normal !important;
 }

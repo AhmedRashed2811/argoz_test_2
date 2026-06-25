@@ -537,5 +537,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  function repositionOpenDropdown() {
+    const openDd = document.querySelector('.filter-dropdown.open');
+    if (!openDd) return;
+    const btnId = openDd.id.replace('Dropdown', 'Btn');
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      openDd.style.top = r.bottom + window.scrollY + 4 + 'px';
+      openDd.style.left = Math.min(r.left + window.scrollX, window.innerWidth - openDd.offsetWidth - 8) + 'px';
+    }
+  }
+
+  window.addEventListener('scroll', repositionOpenDropdown, { passive: true });
+  document.querySelectorAll('.table-scroll-wrap').forEach(el => {
+    el.addEventListener('scroll', repositionOpenDropdown, { passive: true });
+  });
+
   fetchAuditLogs();
 });

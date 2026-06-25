@@ -111,7 +111,7 @@ tbody td { padding: 14px 12px; font-size: .87rem; color: var(--clr-text); vertic
 .th-icon-btn.active-sort { color: var(--clr-orange); }
 
 /* ── Filter Dropdown ── */
-.filter-dropdown { position: fixed; width: 240px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 8px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; display: none; }
+.filter-dropdown { position: absolute; width: 240px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 8px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; display: none; }
 .filter-dropdown.open { display: block; }
 .filter-dd-head { padding: 10px 14px 8px; border-bottom: 1px solid var(--clr-border); background: #faf9f7; }
 .filter-dd-head p { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--clr-text-sub); margin-bottom: 8px; }
