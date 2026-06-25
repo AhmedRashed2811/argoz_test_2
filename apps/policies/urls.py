@@ -8,4 +8,5 @@ app_name = "policies"
 urlpatterns = [
     path("", views.policy_list, name="list"),
     path("<uuid:policy_id>/edit/", views.policy_edit, name="edit"),
+    path("<uuid:policy_id>/api/edit/", views.policy_api_edit, name="api_edit"),
 ]

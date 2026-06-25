@@ -1,0 +1,82 @@
+/* CSS for Policies list page */
+.page-body {
+  padding: 16px 24px 40px;
+  margin-top: var(--header-h);
+}
+
+/* Page Header */
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 20px; margin-bottom: 14px;
+}
+.page-header-left { display: flex; align-items: center; gap: 16px; }
+.page-icon {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, rgba(224,123,32,.12), rgba(224,123,32,.06));
+  border: 1.5px solid rgba(224,123,32,.25); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.page-icon svg { width: 26px; height: 26px; stroke: var(--clr-orange); fill: none; stroke-width: 1.6; }
+.page-title h1 { font-family: 'Times New Roman', Times, serif; font-size: 1.65rem; font-weight: 700; color: var(--clr-text); line-height: 1.1; }
+.page-title p { font-size: .8rem; color: var(--clr-text-sub); margin-top: 3px; }
+
+/* Search Box */
+.search-wrapper { position: relative; flex: 0 0 300px; }
+.search-wrapper svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; stroke: var(--clr-gray); fill: none; stroke-width: 1.8; }
+.search-input {
+  width: 100%; padding: 8px 12px 8px 34px;
+  border: 1px solid var(--clr-border); border-radius: var(--radius);
+  background: var(--clr-surface); font-family: 'Times New Roman', Times, serif;
+  font-size: .84rem; color: var(--clr-text); outline: none; transition: border-color var(--transition);
+}
+.search-input:focus { border-color: var(--clr-orange); }
+
+/* Module Sections */
+.module-section { margin-bottom: 24px; }
+.module-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.module-label { font-family: 'Times New Roman', Times, serif; font-size: .92rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--clr-text-sub); }
+.module-divider { flex: 1; height: 1px; background: var(--clr-border); }
+.module-count { font-size: .7rem; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: var(--clr-surface); border: 1px solid var(--clr-border); color: var(--clr-text-sub); }
+
+/* Grid Cards */
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.policy-card {
+  background: var(--clr-surface); border: 1px solid var(--clr-border);
+  border-radius: 10px; padding: 16px 18px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; transition: all var(--transition);
+  box-shadow: 0 2px 12px rgba(0,0,0,.03);
+}
+.policy-card:hover { border-color: var(--clr-gray); transform: translateY(-1px); box-shadow: 0 4px 18px rgba(0,0,0,.06); }
+.policy-card.is-set { border-left: 3px solid var(--clr-orange); }
+.policy-card.not-set { border-left: 3px solid var(--clr-gray); }
+
+.policy-info { flex: 1; min-width: 0; }
+.policy-name { font-size: 0.94rem; font-weight: 600; color: var(--clr-text); }
+.policy-code { font-size: 0.72rem; font-family: monospace; color: var(--clr-gray-lt); margin-top: 2px; word-break: break-all; margin-bottom: 8px; }
+
+.policy-value { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+.value-set { background: rgba(224,123,32,.08); color: var(--clr-orange-dk); border: 1px solid rgba(224,123,32,.2); }
+.value-unset { background: #f0ede8; color: var(--clr-text-sub); border: 1px solid var(--clr-border); }
+
+.type-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+  background: #f0ede8; color: var(--clr-text-sub); border: 1px solid var(--clr-border);
+  text-transform: uppercase; letter-spacing: 0.04em; margin-left: 6px; vertical-align: middle;
+}
+
+.edit-btn {
+  background: rgba(224,123,32,.08); border: 1px solid rgba(224,123,32,.25);
+  border-radius: 8px; color: var(--clr-orange-dk); padding: 7px 14px;
+  font-size: 0.8rem; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: all var(--transition); white-space: nowrap; flex-shrink: 0;
+  font-family: inherit;
+}
+.edit-btn:hover { background: rgba(224,123,32,.15); }
+
+.empty-state { text-align: center; padding: 3rem; color: var(--clr-text-sub); }
+.empty-state h3 { margin: 0 0 .4rem; font-size: 1rem; color: var(--clr-text); }

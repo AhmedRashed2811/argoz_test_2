@@ -13,7 +13,33 @@ from apps.authorization.decorators import crm_permission_required
 from .forms import TeamForm, UserCreateForm, UserEditForm
 from .models import Team, User
 from .selectors import teams_for_company, users_for_company
+from django.views.decorators.csrf import ensure_csrf_cookie
 from .services import TeamService, UserService
+
+
+@ensure_csrf_cookie
+def login_view(request):
+    if request.method == "POST":
+        import json
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
+        remember = data.get("remember", False)
+        
+        if not email or not password:
+            return JsonResponse({"error": "Email and password are required."}, status=400)
+            
+        user, error = UserService.login_user(request=request, email=email, password=password, remember=remember)
+        if user:
+            return JsonResponse({"ok": True})
+        return JsonResponse({"error": error}, status=400)
+        
+    return render(request, "accounts/login.html")
+
 
 
 @login_required
@@ -230,31 +256,23 @@ def user_activate(request, user_id):
 @login_required
 @crm_permission_required("admin.teams.access")
 def team_list(request):
-    return render(request, "accounts/team_list.html", {
-        "teams": teams_for_company(request.company),
-    })
+    return render(request, "accounts/team_list.html")
 
 
 @login_required
 @crm_permission_required("admin.teams.create")
 def team_create(request):
-    form = TeamForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data
-        TeamService.create_team(
-            company=request.company,
-            name=data["name"],
-            region=data["region"],
-            order_index=data["order_index"],
-            head_ids=request.POST.getlist("heads"),
-            member_ids=request.POST.getlist("members"),
-            actor=request.user,
-            request_meta=request.request_meta,
-        )
-        messages.success(request, "Sales team created.")
-        return redirect("accounts:team_list")
     context = TeamService.get_team_context(company=request.company)
-    context["form"] = form
+    import json
+    context["available_heads_json"] = json.dumps([
+        {"id": u.id, "email": u.email, "full_name": u.get_full_name()}
+        for u in context["available_heads"]
+    ])
+    context["available_members_json"] = json.dumps([
+        {"id": u.id, "email": u.email, "full_name": u.get_full_name()}
+        for u in context["available_members"]
+    ])
+    context["is_edit_mode"] = False
     return render(request, "accounts/team_form.html", context)
 
 
@@ -262,24 +280,18 @@ def team_create(request):
 @crm_permission_required("admin.teams.update")
 def team_edit(request, team_id):
     team = get_object_or_404(Team, id=team_id, company=request.company)
-    initial = {"name": team.name, "region": team.region, "order_index": team.order_index}
-    form = TeamForm(request.POST or None, initial=initial)
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data
-        TeamService.update_team(
-            team=team,
-            name=data["name"],
-            region=data["region"],
-            order_index=data["order_index"],
-            head_ids=request.POST.getlist("heads"),
-            member_ids=request.POST.getlist("members"),
-            actor=request.user,
-            request_meta=request.request_meta,
-        )
-        messages.success(request, "Sales team updated.")
-        return redirect("accounts:team_list")
     context = TeamService.get_team_context(company=request.company, team=team)
-    context["form"] = form
+    import json
+    context["available_heads_json"] = json.dumps([
+        {"id": u.id, "email": u.email, "full_name": u.get_full_name()}
+        for u in context["available_heads"]
+    ])
+    context["available_members_json"] = json.dumps([
+        {"id": u.id, "email": u.email, "full_name": u.get_full_name()}
+        for u in context["available_members"]
+    ])
+    context["current_head_ids_json"] = json.dumps(list(context["current_head_ids"]))
+    context["current_member_ids_json"] = json.dumps(list(context["current_member_ids"]))
     context["team_instance"] = team
     context["is_edit_mode"] = True
     return render(request, "accounts/team_form.html", context)
@@ -289,7 +301,7 @@ def team_edit(request, team_id):
 @crm_permission_required("admin.teams.delete")
 def team_delete(request, team_id):
     team = get_object_or_404(Team, id=team_id, company=request.company)
-    TeamService.delete_team(team=team, actor=request.user, request_meta=request.request_meta)
+    TeamService.delete_team(user=team, actor=request.user, request_meta=request.request_meta)
     messages.success(request, f"Team \"{team.name}\" deleted.")
     return redirect("accounts:team_list")
 
@@ -301,3 +313,141 @@ def team_activate(request, team_id):
     TeamService.activate_team(team=team, actor=request.user, request_meta=request.request_meta)
     messages.success(request, f"Team \"{team.name}\" activated.")
     return redirect("accounts:team_list")
+
+
+@login_required
+@crm_permission_required("admin.teams.access")
+def team_api_list(request):
+    return JsonResponse(TeamService.list_payload(company=request.company))
+
+
+@login_required
+@crm_permission_required("admin.teams.create")
+@require_POST
+def team_api_create(request):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    form = TeamForm(data)
+    if form.is_valid():
+        cleaned = form.cleaned_data
+        TeamService.create_team(
+            company=request.company,
+            name=cleaned["name"],
+            region=cleaned["region"],
+            order_index=cleaned["order_index"],
+            head_ids=data.get("heads", []),
+            member_ids=data.get("members", []),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.teams.update")
+@require_POST
+def team_api_edit(request, team_id):
+    import json
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    form = TeamForm(data)
+    if form.is_valid():
+        cleaned = form.cleaned_data
+        TeamService.update_team(
+            team=team,
+            name=cleaned["name"],
+            region=cleaned["region"],
+            order_index=cleaned["order_index"],
+            head_ids=data.get("heads", []),
+            member_ids=data.get("members", []),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.teams.delete")
+@require_POST
+def team_api_delete(request, team_id):
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    TeamService.delete_team(
+        team=team, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@crm_permission_required("admin.teams.update")
+@require_POST
+def team_api_activate(request, team_id):
+    team = get_object_or_404(Team, id=team_id, company=request.company)
+    TeamService.activate_team(
+        team=team, actor=request.user,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True})
+
+
+@login_required
+def profile_view(request):
+    return render(request, "accounts/profile.html")
+
+
+@login_required
+def profile_api(request):
+    from apps.authorization.services import PermissionManagementService
+    payload = PermissionManagementService.get_permission_preview_payload(request.user)
+    return JsonResponse(payload)
+
+
+@login_required
+def change_password_view(request):
+    return render(request, "accounts/change_password.html")
+
+
+@login_required
+@require_POST
+def change_password_api(request):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    if not current_password or not new_password:
+        return JsonResponse({"error": "Both current and new passwords are required."}, status=400)
+
+    if len(new_password) < 8:
+        return JsonResponse({"error": "New password must be at least 8 characters long."}, status=400)
+
+    success, error = UserService.change_password(
+        user=request.user,
+        current_password=current_password,
+        new_password=new_password,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    if success:
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+        return JsonResponse({"ok": True})
+    return JsonResponse({"error": error}, status=400)
+

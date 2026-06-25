@@ -1,9 +1,5 @@
-{% extends "base.html" %}
-{% load crm_permissions %}
-
-{% block title %}Users · Argoz CRM{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% load crm_permissions %} {% block title %}Users ·
+Argoz CRM{% endblock %} {% block content %}
 <main class="page-body">
   <style>
     :root {
@@ -18,218 +14,1155 @@
       --clr-gray-lt: #5a554f;
       --radius: 7px;
       --radius-sm: 5px;
-      --shadow: 0 8px 32px rgba(0,0,0,.12);
-      --transition: .18s ease;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      --transition: 0.18s ease;
     }
 
-    .page-body { padding: 16px 24px; margin-top: var(--header-h); }
+    .page-body {
+      padding: 16px 24px;
+      margin-top: var(--header-h);
+    }
 
     /* ── Page Header ── */
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; margin-bottom: 14px; }
-    .page-header-left { display: flex; align-items: center; gap: 16px; }
-    .page-icon { width: 52px; height: 52px; background: linear-gradient(135deg, rgba(224,123,32,.12), rgba(224,123,32,.06)); border: 1.5px solid rgba(224,123,32,.25); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .page-icon svg { width: 26px; height: 26px; stroke: var(--clr-orange); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-    .page-title h1 { font-family: 'Times New Roman', Times, serif; font-size: 1.65rem; font-weight: 700; color: var(--clr-text); letter-spacing: .01em; line-height: 1.1; }
-    .page-title p { font-size: .8rem; color: var(--clr-text-sub); margin-top: 3px; letter-spacing: .02em; }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 20px;
+      margin-bottom: 14px;
+    }
+    .page-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .page-icon {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(
+        135deg,
+        rgba(224, 123, 32, 0.12),
+        rgba(224, 123, 32, 0.06)
+      );
+      border: 1.5px solid rgba(224, 123, 32, 0.25);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .page-icon svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--clr-orange);
+      fill: none;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .page-title h1 {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--clr-text);
+      letter-spacing: 0.01em;
+      line-height: 1.1;
+    }
+    .page-title p {
+      font-size: 0.8rem;
+      color: var(--clr-text-sub);
+      margin-top: 3px;
+      letter-spacing: 0.02em;
+    }
 
-    .btn-primary { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: var(--clr-orange); color: #fff; border: none; border-radius: var(--radius); padding: 9px 18px; font-family: 'Times New Roman', Times, serif; font-size: .84rem; font-weight: 600; cursor: pointer; letter-spacing: .02em; transition: background var(--transition); }
-    .btn-primary:hover { background: var(--clr-orange-dk); }
-    .btn-primary svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-    .btn-primary .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
-    .btn-primary.loading .spinner { display: inline-block; }
-    .btn-primary.loading .btn-label { display: none; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-primary {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--clr-orange);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 9px 18px;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: background var(--transition);
+    }
+    .btn-primary:hover {
+      background: var(--clr-orange-dk);
+    }
+    .btn-primary svg {
+      width: 14px;
+      height: 14px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .btn-primary .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn-primary.loading .spinner {
+      display: inline-block;
+    }
+    .btn-primary.loading .btn-label {
+      display: none;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     /* ── KPI Cards ── */
-    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
-    .kpi-card { background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow var(--transition), border-color var(--transition); }
-    .kpi-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.07); border-color: rgba(224,123,32,.2); }
-    .kpi-icon { width: 42px; height: 42px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .kpi-icon svg { width: 20px; height: 20px; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-    .kpi-icon.orange { background: rgba(224,123,32,.1); } .kpi-icon.orange svg { stroke: var(--clr-orange); }
-    .kpi-icon.green  { background: rgba(39,174,96,.1);  } .kpi-icon.green svg  { stroke: #27ae60; }
-    .kpi-icon.blue   { background: rgba(41,128,185,.1); } .kpi-icon.blue svg   { stroke: #2980b9; }
-    .kpi-icon.red    { background: rgba(192,57,43,.1);  } .kpi-icon.red svg    { stroke: #c0392b; }
-    .kpi-value { font-family: 'Times New Roman', Times, serif; font-size: 1.55rem; font-weight: 700; color: var(--clr-text); line-height: 1; }
-    .kpi-label { font-size: .72rem; color: var(--clr-text-sub); letter-spacing: .05em; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .kpi-card {
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition:
+        box-shadow var(--transition),
+        border-color var(--transition);
+    }
+    .kpi-card:hover {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+      border-color: rgba(224, 123, 32, 0.2);
+    }
+    .kpi-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .kpi-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    .kpi-icon.orange {
+      background: rgba(224, 123, 32, 0.1);
+    }
+    .kpi-icon.orange svg {
+      stroke: var(--clr-orange);
+    }
+    .kpi-icon.green {
+      background: rgba(39, 174, 96, 0.1);
+    }
+    .kpi-icon.green svg {
+      stroke: #27ae60;
+    }
+    .kpi-icon.blue {
+      background: rgba(41, 128, 185, 0.1);
+    }
+    .kpi-icon.blue svg {
+      stroke: #2980b9;
+    }
+    .kpi-icon.red {
+      background: rgba(192, 57, 43, 0.1);
+    }
+    .kpi-icon.red svg {
+      stroke: #c0392b;
+    }
+    .kpi-value {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: var(--clr-text);
+      line-height: 1;
+    }
+    .kpi-label {
+      font-size: 0.72rem;
+      color: var(--clr-text-sub);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 4px;
+      font-weight: 500;
+    }
 
     /* ── Search Row ── */
-    .search-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-    .search-wrap { position: relative; flex: 0 0 300px; }
-    .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; stroke: var(--clr-gray); fill: none; stroke-width: 1.8; pointer-events: none; }
-    .search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-surface); font-family: 'Times New Roman', Times, serif; font-size: .84rem; color: var(--clr-text); outline: none; transition: border-color var(--transition), box-shadow var(--transition); }
-    .search-input::placeholder { color: var(--clr-gray); }
-    .search-input:focus { border-color: var(--clr-orange); box-shadow: 0 0 0 3px rgba(224,123,32,.1); }
-    .search-results-hint { font-size: .78rem; color: var(--clr-text-sub); }
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .search-wrap {
+      position: relative;
+      flex: 0 0 300px;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      stroke: var(--clr-gray);
+      fill: none;
+      stroke-width: 1.8;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius);
+      background: var(--clr-surface);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.84rem;
+      color: var(--clr-text);
+      outline: none;
+      transition:
+        border-color var(--transition),
+        box-shadow var(--transition);
+    }
+    .search-input::placeholder {
+      color: var(--clr-gray);
+    }
+    .search-input:focus {
+      border-color: var(--clr-orange);
+      box-shadow: 0 0 0 3px rgba(224, 123, 32, 0.1);
+    }
+    .search-results-hint {
+      font-size: 0.78rem;
+      color: var(--clr-text-sub);
+    }
 
     /* ── Table Card ── */
-    .table-card { background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 10px; overflow: visible; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
-    .table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; min-width: 800px; }
-    thead tr { background: #faf9f7; border-bottom: 1.5px solid var(--clr-border); }
-    thead th { padding: 9px 12px; text-align: center; font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--clr-text-sub); white-space: nowrap; }
-    tbody tr { border-bottom: 1px solid var(--clr-border); transition: background var(--transition); }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: #faf9f7; }
-    tbody td { padding: 10px 12px; font-size: .87rem; color: var(--clr-text); white-space: nowrap; text-align: center; vertical-align: middle; }
-    thead th:first-child, tbody td:first-child { position: sticky; left: 0; z-index: 3; background: var(--clr-surface); text-align: left; }
-    thead th:first-child { background: #faf9f7; z-index: 4; }
-    tbody tr:hover td:first-child { background: #faf9f7; }
+    .table-card {
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: 10px;
+      overflow: visible;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+    .table-scroll-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+    thead tr {
+      background: #faf9f7;
+      border-bottom: 1.5px solid var(--clr-border);
+    }
+    thead th {
+      padding: 9px 12px;
+      text-align: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--clr-text-sub);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--clr-border);
+      transition: background var(--transition);
+    }
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+    tbody tr:hover {
+      background: #faf9f7;
+    }
+    tbody td {
+      padding: 10px 12px;
+      font-size: 0.87rem;
+      color: var(--clr-text);
+      white-space: nowrap;
+      text-align: center;
+      vertical-align: middle;
+    }
+    thead th:first-child,
+    tbody td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: var(--clr-surface);
+      text-align: left;
+    }
+    thead th:first-child {
+      background: #faf9f7;
+      z-index: 4;
+    }
+    tbody tr:hover td:first-child {
+      background: #faf9f7;
+    }
 
     /* ── User Identity Cell ── */
-    .user-identity { display: flex; align-items: center; gap: 10px; }
-    .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(224,123,32,.1); border: 1.5px solid rgba(224,123,32,.25); display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 700; color: var(--clr-orange-dk); flex-shrink: 0; }
-    .user-name  { font-weight: 600; color: var(--clr-text); font-size: 0.94rem !important; }
-    .user-email { font-size: .75rem; color: var(--clr-text-sub); margin-top: 1px; }
-    .user-job   { font-size: .72rem; color: var(--gray); margin-top: 1px; }
+    .user-identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(224, 123, 32, 0.1);
+      border: 1.5px solid rgba(224, 123, 32, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--clr-orange-dk);
+      flex-shrink: 0;
+    }
+    .user-name {
+      font-weight: 600;
+      color: var(--clr-text);
+      font-size: 0.94rem !important;
+    }
+    .user-email {
+      font-size: 0.75rem;
+      color: var(--clr-text-sub);
+      margin-top: 1px;
+    }
+    .user-job {
+      font-size: 0.72rem;
+      color: var(--gray);
+      margin-top: 1px;
+    }
 
     /* ── Badges ── */
-    .role-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; border: 1px solid transparent; background: rgba(224,123,32,.1); color: var(--clr-orange-dk); border-color: rgba(224,123,32,.25); }
-    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; border: 1px solid transparent; }
-    .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-    .status-badge.active   { background: rgba(39,174,96,.12); color: #1e8449; border-color: rgba(39,174,96,.25); }
-    .status-badge.active .dot { animation: pulse 2s infinite; }
-    .status-badge.inactive { background: rgba(192,57,43,.1);  color: #c0392b; border-color: rgba(192,57,43,.2); }
-    .team-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: .72rem; font-weight: 500; background: rgba(0,0,0,.04); color: var(--clr-text-sub); border: 1px solid var(--clr-border); margin: 2px; }
-    .overrides-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; border: 1px solid transparent; }
-    .overrides-badge.has  { background: rgba(243,156,18,.12); color: #b7770d; border-color: rgba(243,156,18,.25); }
-    .overrides-badge.none { background: #f0ede8; color: var(--clr-gray-lt); border-color: var(--clr-border); }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(39,174,96,.6); } 70% { box-shadow: 0 0 0 5px rgba(39,174,96,0); } 100% { box-shadow: 0 0 0 0 rgba(39,174,96,0); } }
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      background: rgba(224, 123, 32, 0.1);
+      color: var(--clr-orange-dk);
+      border-color: rgba(224, 123, 32, 0.25);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .status-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .status-badge.active {
+      background: rgba(39, 174, 96, 0.12);
+      color: #1e8449;
+      border-color: rgba(39, 174, 96, 0.25);
+    }
+    .status-badge.active .dot {
+      animation: pulse 2s infinite;
+    }
+    .status-badge.inactive {
+      background: rgba(192, 57, 43, 0.1);
+      color: #c0392b;
+      border-color: rgba(192, 57, 43, 0.2);
+    }
+    .team-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--clr-text-sub);
+      border: 1px solid var(--clr-border);
+      margin: 2px;
+    }
+    .overrides-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .overrides-badge.has {
+      background: rgba(243, 156, 18, 0.12);
+      color: #b7770d;
+      border-color: rgba(243, 156, 18, 0.25);
+    }
+    .overrides-badge.none {
+      background: #f0ede8;
+      color: var(--clr-gray-lt);
+      border-color: var(--clr-border);
+    }
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.6);
+      }
+      70% {
+        box-shadow: 0 0 0 5px rgba(39, 174, 96, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(39, 174, 96, 0);
+      }
+    }
 
     /* ── Action Buttons ── */
-    .action-btns { display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .action-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: var(--radius-sm); font-family: 'Times New Roman', Times, serif; font-size: .75rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all var(--transition); }
-    .action-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .action-btn.edit     { background: rgba(224,123,32,.08); color: var(--clr-orange-dk); border-color: rgba(224,123,32,.3); }
-    .action-btn.edit:hover { background: rgba(224,123,32,.16); }
-    .action-btn.matrix   { background: rgba(99, 170, 241, 0.07); color: #3185ce; border-color: rgba(99,102,241,.25); }
-    .action-btn.matrix:hover { background: rgba(48, 109, 200, 0.14); }
-    .action-btn.preview  { background: rgba(16,185,129,.07); color: #059669; border-color: rgba(16,185,129,.25); }
-    .action-btn.preview:hover { background: rgba(16,185,129,.14); }
-    .action-btn.deactivate { background: rgba(192,57,43,.07); color: #c0392b; border-color: rgba(192,57,43,.25); }
-    .action-btn.deactivate:hover { background: rgba(192,57,43,.14); }
-    .action-btn.activate { background: rgba(39,174,96,.07); color: #1e8449; border-color: rgba(39,174,96,.25); }
-    .action-btn.activate:hover { background: rgba(39,174,96,.14); }
+    .action-btns {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all var(--transition);
+    }
+    .action-btn svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .action-btn.edit {
+      background: rgba(224, 123, 32, 0.08);
+      color: var(--clr-orange-dk);
+      border-color: rgba(224, 123, 32, 0.3);
+    }
+    .action-btn.edit:hover {
+      background: rgba(224, 123, 32, 0.16);
+    }
+    .action-btn.matrix {
+      background: rgba(99, 170, 241, 0.07);
+      color: #3185ce;
+      border-color: rgba(99, 102, 241, 0.25);
+    }
+    .action-btn.matrix:hover {
+      background: rgba(48, 109, 200, 0.14);
+    }
+    .action-btn.preview {
+      background: rgba(16, 185, 129, 0.07);
+      color: #059669;
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .action-btn.preview:hover {
+      background: rgba(16, 185, 129, 0.14);
+    }
+    .action-btn.deactivate {
+      background: rgba(192, 57, 43, 0.07);
+      color: #c0392b;
+      border-color: rgba(192, 57, 43, 0.25);
+    }
+    .action-btn.deactivate:hover {
+      background: rgba(192, 57, 43, 0.14);
+    }
+    .action-btn.activate {
+      background: rgba(39, 174, 96, 0.07);
+      color: #1e8449;
+      border-color: rgba(39, 174, 96, 0.25);
+    }
+    .action-btn.activate:hover {
+      background: rgba(39, 174, 96, 0.14);
+    }
 
     /* ── Pagination ── */
-    .pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px; flex-wrap: wrap; gap: 10px; }
-    .pg-info { font-size: .78rem; color: var(--clr-text-sub); }
-    .pg-controls { display: flex; align-items: center; gap: 4px; }
-    .pg-btn { min-width: 32px; height: 32px; padding: 0 6px; border: 1px solid var(--clr-border); background: var(--clr-surface); border-radius: var(--radius-sm); font-family: 'Times New Roman', Times, serif; font-size: .85rem; color: var(--clr-gray-lt); cursor: pointer; transition: all var(--transition); display: flex; align-items: center; justify-content: center; }
-    .pg-btn:hover:not(:disabled) { background: #f0ede8; border-color: #ccc; color: var(--clr-text); }
-    .pg-btn:disabled { opacity: .35; cursor: default; }
-    .pg-btn.active { background: var(--clr-orange); border-color: var(--clr-orange); color: #fff; font-weight: 600; }
-    .pg-numbers { display: flex; align-items: center; gap: 4px; }
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 4px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pg-info {
+      font-size: 0.78rem;
+      color: var(--clr-text-sub);
+    }
+    .pg-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pg-btn {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 6px;
+      border: 1px solid var(--clr-border);
+      background: var(--clr-surface);
+      border-radius: var(--radius-sm);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.85rem;
+      color: var(--clr-gray-lt);
+      cursor: pointer;
+      transition: all var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pg-btn:hover:not(:disabled) {
+      background: #f0ede8;
+      border-color: #ccc;
+      color: var(--clr-text);
+    }
+    .pg-btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .pg-btn.active {
+      background: var(--clr-orange);
+      border-color: var(--clr-orange);
+      color: #fff;
+      font-weight: 600;
+    }
+    .pg-numbers {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
 
     /* ── Empty State ── */
-    .empty-state { text-align: center; padding: 3rem; color: var(--clr-text-sub); }
-    .empty-state h3 { margin: 0 0 .4rem; font-size: 1rem; color: var(--clr-text); }
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--clr-text-sub);
+    }
+    .empty-state h3 {
+      margin: 0 0 0.4rem;
+      font-size: 1rem;
+      color: var(--clr-text);
+    }
 
     /* ── Column Sort / Filter ── */
-    .th-inner { display: inline-flex; align-items: center; gap: 6px; }
-    .th-icon-btn { width: 22px; height: 22px; border: none; background: none; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; color: var(--clr-gray); padding: 0; }
-    .th-icon-btn:hover { background: rgba(224,123,32,.1); color: var(--clr-orange); }
-    .th-icon-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .th-icon-btn.active-sort { color: var(--clr-orange); }
+    .th-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .th-icon-btn {
+      width: 22px;
+      height: 22px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition:
+        background 0.15s,
+        color 0.15s;
+      color: var(--clr-gray);
+      padding: 0;
+    }
+    .th-icon-btn:hover {
+      background: rgba(224, 123, 32, 0.1);
+      color: var(--clr-orange);
+    }
+    .th-icon-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .th-icon-btn.active-sort {
+      color: var(--clr-orange);
+    }
 
     /* ── Filter Dropdown ── */
-    .filter-dropdown { position: fixed; width: 240px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 8px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; display: none; }
-    .filter-dropdown.open { display: block; }
-    .filter-dd-head { padding: 10px 14px 8px; border-bottom: 1px solid var(--clr-border); background: #faf9f7; }
-    .filter-dd-head p { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--clr-text-sub); margin-bottom: 8px; }
-    .filter-search { width: 100%; padding: 7px 10px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); font-family: 'Times New Roman', Times, serif; font-size: .8rem; color: var(--clr-text); outline: none; }
-    .filter-search:focus { border-color: var(--clr-orange); }
-    .filter-list { max-height: 180px; overflow-y: auto; padding: 6px 0; scrollbar-width: thin; scrollbar-color: var(--clr-border) transparent; }
-    .filter-item { display: flex; align-items: center; gap: 9px; padding: 7px 14px; cursor: pointer; transition: background .12s; }
-    .filter-item:hover { background: #f7f3ee; }
-    .filter-item input[type="checkbox"] { accent-color: var(--clr-orange); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
-    .filter-actions { display: flex; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--clr-border); }
-    .filter-btn { flex: 1; padding: 7px 0; font-family: 'Times New Roman', Times, serif; font-size: .76rem; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; letter-spacing: .03em; border: none; transition: background .15s; }
-    .filter-btn.select-all { background: var(--clr-orange); color: #fff; }
-    .filter-btn.select-all:hover { background: var(--clr-orange-dk); }
-    .filter-btn.clear-all { background: #e8e5e0; color: var(--clr-gray-lt); }
-    .filter-btn.clear-all:hover { background: #d8d4ce; }
+    .filter-dropdown {
+      position: fixed;
+      width: 240px;
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+    .filter-dropdown.open {
+      display: block;
+    }
+    .filter-dd-head {
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--clr-border);
+      background: #faf9f7;
+    }
+    .filter-dd-head p {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--clr-text-sub);
+      margin-bottom: 8px;
+    }
+    .filter-search {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-sm);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.8rem;
+      color: var(--clr-text);
+      outline: none;
+    }
+    .filter-search:focus {
+      border-color: var(--clr-orange);
+    }
+    .filter-list {
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 6px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--clr-border) transparent;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .filter-item:hover {
+      background: #f7f3ee;
+    }
+    .filter-item input[type="checkbox"] {
+      accent-color: var(--clr-orange);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px 14px 10px;
+      border-top: 1px solid var(--clr-border);
+    }
+    .filter-btn {
+      flex: 1;
+      padding: 7px 0;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.76rem;
+      font-weight: 500;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      border: none;
+      transition: background 0.15s;
+    }
+    .filter-btn.select-all {
+      background: var(--clr-orange);
+      color: #fff;
+    }
+    .filter-btn.select-all:hover {
+      background: var(--clr-orange-dk);
+    }
+    .filter-btn.clear-all {
+      background: #e8e5e0;
+      color: var(--clr-gray-lt);
+    }
+    .filter-btn.clear-all:hover {
+      background: #d8d4ce;
+    }
 
     /* ── Modal footer action buttons ── */
-    .btn-modal-cancel { padding: 9px 20px; border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-surface); font-family: 'Times New Roman', Times, serif; font-size: .84rem; color: var(--clr-gray-lt); cursor: pointer; transition: background var(--transition); }
-    .btn-modal-cancel:hover { background: #f0ede8; border-color: #ccc; }
-    .btn-modal-save { padding: 9px 22px; border: none; border-radius: var(--radius); background: var(--clr-orange); color: #fff; font-family: 'Times New Roman', Times, serif; font-size: .84rem; font-weight: 500; cursor: pointer; transition: background var(--transition), box-shadow var(--transition); box-shadow: 0 2px 8px rgba(224,123,32,.3); display: inline-flex; align-items: center; gap: 6px; }
-    .btn-modal-save:hover { background: var(--clr-orange-dk); box-shadow: 0 3px 12px rgba(224,123,32,.4); }
-    .btn-modal-save .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
-    .btn-modal-save.loading .spinner { display: inline-block; }
-    .btn-modal-save.loading .btn-label { display: none; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-modal-cancel {
+      padding: 9px 20px;
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius);
+      background: var(--clr-surface);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.84rem;
+      color: var(--clr-gray-lt);
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .btn-modal-cancel:hover {
+      background: #f0ede8;
+      border-color: #ccc;
+    }
+    .btn-modal-save {
+      padding: 9px 22px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--clr-orange);
+      color: #fff;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.84rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition:
+        background var(--transition),
+        box-shadow var(--transition);
+      box-shadow: 0 2px 8px rgba(224, 123, 32, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-modal-save:hover {
+      background: var(--clr-orange-dk);
+      box-shadow: 0 3px 12px rgba(224, 123, 32, 0.4);
+    }
+    .btn-modal-save .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn-modal-save.loading .spinner {
+      display: inline-block;
+    }
+    .btn-modal-save.loading .btn-label {
+      display: none;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     /* ── Toast ── */
-    .toast-container { position: fixed; top: 16px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 99999; pointer-events: none; }
-    .toast { display: flex; align-items: flex-start; gap: 12px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 9px; padding: 14px 18px; box-shadow: 0 8px 32px rgba(0,0,0,.13); min-width: 280px; max-width: 360px; pointer-events: all; animation: toastIn .3s cubic-bezier(.4,0,.2,1); position: relative; overflow: hidden; }
-    .toast::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-    .toast.success::before { background: #27ae60; } .toast.error::before { background: #c0392b; } .toast.info::before { background: var(--clr-orange); }
-    .toast-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .toast.success .toast-icon { background: rgba(39,174,96,.1); } .toast.error .toast-icon { background: rgba(192,57,43,.1); } .toast.info .toast-icon { background: rgba(224,123,32,.1); }
-    .toast-icon svg { width: 14px; height: 14px; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-    .toast.success .toast-icon svg { stroke: #27ae60; } .toast.error .toast-icon svg { stroke: #c0392b; } .toast.info .toast-icon svg { stroke: var(--clr-orange); }
-    .toast-body { flex: 1; }
-    .toast-title { font-size: .85rem; font-weight: 700; color: var(--clr-text); }
-    .toast-msg { font-size: .78rem; color: var(--clr-text-sub); margin-top: 2px; }
-    @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 99999;
+      pointer-events: none;
+    }
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: 9px;
+      padding: 14px 18px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
+      min-width: 280px;
+      max-width: 360px;
+      pointer-events: all;
+      animation: toastIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .toast::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+    }
+    .toast.success::before {
+      background: #27ae60;
+    }
+    .toast.error::before {
+      background: #c0392b;
+    }
+    .toast.info::before {
+      background: var(--clr-orange);
+    }
+    .toast-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .toast.success .toast-icon {
+      background: rgba(39, 174, 96, 0.1);
+    }
+    .toast.error .toast-icon {
+      background: rgba(192, 57, 43, 0.1);
+    }
+    .toast.info .toast-icon {
+      background: rgba(224, 123, 32, 0.1);
+    }
+    .toast-icon svg {
+      width: 14px;
+      height: 14px;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    .toast.success .toast-icon svg {
+      stroke: #27ae60;
+    }
+    .toast.error .toast-icon svg {
+      stroke: #c0392b;
+    }
+    .toast.info .toast-icon svg {
+      stroke: var(--clr-orange);
+    }
+    .toast-body {
+      flex: 1;
+    }
+    .toast-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--clr-text);
+    }
+    .toast-msg {
+      font-size: 0.78rem;
+      color: var(--clr-text-sub);
+      margin-top: 2px;
+    }
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
 
     /* ── Modal Overlay ── */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(30,28,26,.4); backdrop-filter: blur(3px); z-index: 400; opacity: 0; visibility: hidden; transition: opacity .22s, visibility .22s; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .modal-overlay.open { opacity: 1; visibility: visible; }
-    .modal-panel { position: relative; width: 560px; max-width: 100%; max-height: calc(100vh - 48px); background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.22); z-index: 401; display: flex; flex-direction: column; transform: scale(.94); opacity: 0; transition: transform .22s cubic-bezier(.4,0,.2,1), opacity .22s; }
-    .modal-panel.sm { width: 400px; }
-    .modal-overlay.open .modal-panel { transform: scale(1); opacity: 1; }
-    .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--clr-border); background: #faf9f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-radius: 14px 14px 0 0; }
-    .modal-header h2 { font-family: 'Times New Roman', Times, serif; font-size: 1.05rem; font-weight: 700; color: var(--clr-text); margin: 0; }
-    .modal-close { width: 30px; height: 30px; border: none; background: none; cursor: pointer; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; transition: background var(--transition); color: var(--clr-gray); flex-shrink: 0; }
-    .modal-close:hover { background: rgba(0,0,0,.06); color: var(--clr-text); }
-    .modal-close svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
-    .modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; scrollbar-width: thin; scrollbar-color: var(--clr-border) transparent; }
-    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--clr-border); background: #faf9f7; display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; border-radius: 0 0 14px 14px; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30, 28, 26, 0.4);
+      backdrop-filter: blur(3px);
+      z-index: 400;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity 0.22s,
+        visibility 0.22s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-panel {
+      position: relative;
+      width: 560px;
+      max-width: 100%;
+      max-height: calc(100vh - 48px);
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+      z-index: 401;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.94);
+      opacity: 0;
+      transition:
+        transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.22s;
+    }
+    .modal-panel.sm {
+      width: 400px;
+    }
+    .modal-overlay.open .modal-panel {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--clr-border);
+      background: #faf9f7;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+      border-radius: 14px 14px 0 0;
+    }
+    .modal-header h2 {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--clr-text);
+      margin: 0;
+    }
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--transition);
+      color: var(--clr-gray);
+      flex-shrink: 0;
+    }
+    .modal-close:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--clr-text);
+    }
+    .modal-close svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--clr-border) transparent;
+    }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--clr-border);
+      background: #faf9f7;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+      border-radius: 0 0 14px 14px;
+    }
 
     /* ── Form Fields ── */
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
-    .field { margin-bottom: 14px; }
-    .field:last-child { margin-bottom: 0; }
-    .field label { display: flex; align-items: center; gap: 5px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px; color: var(--clr-text-sub); }
-    .field label .req { color: var(--clr-orange); margin-left: 1px; }
-    .field label svg { width: 12px; height: 12px; stroke: var(--clr-gray); fill: none; stroke-width: 1.8; }
-    .input-wrap { border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-bg); display: flex; align-items: center; transition: border-color var(--transition), box-shadow var(--transition); }
-    .input-wrap:focus-within { border-color: var(--clr-orange); box-shadow: 0 0 0 3px rgba(224,123,32,.08); background: var(--clr-surface); }
-    .input-wrap input, .input-wrap select { flex: 1; border: none; background: none; outline: none; padding: 8px 10px; font-family: 'Times New Roman', Times, serif; font-size: .87rem; color: var(--clr-text); }
-    .input-wrap select { cursor: pointer; }
-    .input-wrap input::placeholder { color: var(--clr-gray); }
-    .toggle-pw { background: none; border: none; cursor: pointer; padding: 0 10px; display: flex; align-items: center; }
-    .toggle-pw svg { width: 15px; height: 15px; stroke: var(--clr-gray); fill: none; stroke-width: 1.8; }
-    .toggle-pw:hover svg { stroke: var(--clr-orange); }
-    .section-sep { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--clr-text-sub); margin: 16px 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--clr-border); }
-    .field-error { font-size: .72rem; color: #c0392b; margin-top: 4px; display: none; }
-    .field.has-error .input-wrap { border-color: #c0392b; }
-    .field.has-error .field-error { display: block; }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 500px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    .field {
+      margin-bottom: 14px;
+    }
+    .field:last-child {
+      margin-bottom: 0;
+    }
+    .field label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 5px;
+      color: var(--clr-text-sub);
+    }
+    .field label .req {
+      color: var(--clr-orange);
+      margin-left: 1px;
+    }
+    .field label svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--clr-gray);
+      fill: none;
+      stroke-width: 1.8;
+    }
+    .input-wrap {
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius);
+      background: var(--clr-bg);
+      display: flex;
+      align-items: center;
+      transition:
+        border-color var(--transition),
+        box-shadow var(--transition);
+    }
+    .input-wrap:focus-within {
+      border-color: var(--clr-orange);
+      box-shadow: 0 0 0 3px rgba(224, 123, 32, 0.08);
+      background: var(--clr-surface);
+    }
+    .input-wrap input,
+    .input-wrap select {
+      flex: 1;
+      border: none;
+      background: none;
+      outline: none;
+      padding: 8px 10px;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 0.87rem;
+      color: var(--clr-text);
+    }
+    .input-wrap select {
+      cursor: pointer;
+    }
+    .input-wrap input::placeholder {
+      color: var(--clr-gray);
+    }
+    .toggle-pw {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+    }
+    .toggle-pw svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--clr-gray);
+      fill: none;
+      stroke-width: 1.8;
+    }
+    .toggle-pw:hover svg {
+      stroke: var(--clr-orange);
+    }
+    .section-sep {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--clr-text-sub);
+      margin: 16px 0 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--clr-border);
+    }
+    .field-error {
+      font-size: 0.72rem;
+      color: #c0392b;
+      margin-top: 4px;
+      display: none;
+    }
+    .field.has-error .input-wrap {
+      border-color: #c0392b;
+    }
+    .field.has-error .field-error {
+      display: block;
+    }
 
     /* Responsive */
-    @media (max-width: 900px) { .page-body { padding: 10px 16px; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 900px) {
+      .page-body {
+        padding: 10px 16px;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
     @media (max-width: 640px) {
-      .page-body { padding: 8px 10px; }
-      .page-header { flex-wrap: wrap; gap: 10px; }
-      .page-header-left { flex: 1; }
-      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-      .kpi-value { font-size: 1.35rem; }
-      .kpi-icon { width: 36px; height: 36px; }
-      .search-wrap { flex: 1 1 0; min-width: 0; }
-      .search-row { flex-wrap: nowrap; }
-      .pagination-bar { flex-wrap: nowrap; justify-content: space-between; align-items: center; }
-      .pg-info { flex-shrink: 0; font-size: .75rem; }
-      .pg-controls { flex-shrink: 0; }
+      .page-body {
+        padding: 8px 10px;
+      }
+      .page-header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .page-header-left {
+        flex: 1;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .kpi-value {
+        font-size: 1.35rem;
+      }
+      .kpi-icon {
+        width: 36px;
+        height: 36px;
+      }
+      .search-wrap {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+      .search-row {
+        flex-wrap: nowrap;
+      }
+      .pagination-bar {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .pg-info {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+      }
+      .pg-controls {
+        flex-shrink: 0;
+      }
     }
   </style>
 
   <div class="page-header">
     <div class="page-header-left">
       <div class="page-icon">
-        <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>
+        <svg viewBox="0 0 24 24">
+          <circle cx="9" cy="7" r="4" />
+          <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          <path d="M21 21v-2a4 4 0 0 0-3-3.85" />
+        </svg>
       </div>
       <div class="page-title">
         <h1>User Directory</h1>
@@ -237,8 +1170,15 @@
       </div>
     </div>
     {% if request.user|can:'admin.users.create' %}
-    <a href="{% url 'accounts:user_create' %}" class="btn-primary" id="openCreateBtn">
-      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <a
+      href="{% url 'accounts:user_create' %}"
+      class="btn-primary"
+      id="openCreateBtn"
+    >
+      <svg viewBox="0 0 24 24">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
       <span class="btn-label">Create New User</span>
     </a>
     {% endif %}
@@ -247,34 +1187,63 @@
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-icon orange">
-        <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+        <svg viewBox="0 0 24 24">
+          <circle cx="9" cy="7" r="4" />
+          <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+        </svg>
       </div>
-      <div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Users</div></div>
+      <div>
+        <div class="kpi-value" id="kpiTotal">—</div>
+        <div class="kpi-label">Total Users</div>
+      </div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon green">
-        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
       </div>
-      <div><div class="kpi-value" id="kpiActive">—</div><div class="kpi-label">Active Users</div></div>
+      <div>
+        <div class="kpi-value" id="kpiActive">—</div>
+        <div class="kpi-label">Active Users</div>
+      </div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon red">
-        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </div>
-      <div><div class="kpi-value" id="kpiInactive">—</div><div class="kpi-label">Inactive Users</div></div>
+      <div>
+        <div class="kpi-value" id="kpiInactive">—</div>
+        <div class="kpi-label">Inactive Users</div>
+      </div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon blue">
-        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
       </div>
-      <div><div class="kpi-value" id="kpiOverrides">—</div><div class="kpi-label">With Overrides</div></div>
+      <div>
+        <div class="kpi-value" id="kpiOverrides">—</div>
+        <div class="kpi-label">With Overrides</div>
+      </div>
     </div>
   </div>
 
   <div class="search-row">
     <div class="search-wrap">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" class="search-input" id="searchInput" placeholder="Search users…" autocomplete="off">
+      <svg viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <input
+        type="text"
+        class="search-input"
+        id="searchInput"
+        placeholder="Search users…"
+        autocomplete="off"
+      />
     </div>
     <span class="search-results-hint" id="searchHint"></span>
   </div>
@@ -284,32 +1253,111 @@
       <table>
         <thead>
           <tr>
-            <th style="text-align:left">
-              <div class="th-inner">User Info
-                <button class="th-icon-btn" id="sortNameBtn" title="Sort by name"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
-                <button class="th-icon-btn" id="filterNameBtn" title="Filter by name"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            <th style="text-align: left">
+              <div class="th-inner">
+                User Info
+                <button
+                  class="th-icon-btn"
+                  id="sortNameBtn"
+                  title="Sort by name"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3 6h18M7 12h10M11 18h2" />
+                  </svg>
+                </button>
+                <button
+                  class="th-icon-btn"
+                  id="filterNameBtn"
+                  title="Filter by name"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <polygon
+                      points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                    />
+                  </svg>
+                </button>
               </div>
             </th>
             <th>
-              <div class="th-inner">Default Role
-                <button class="th-icon-btn" id="sortRoleBtn" title="Sort by role"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
-                <button class="th-icon-btn" id="filterRoleBtn" title="Filter by role"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              <div class="th-inner">
+                Default Role
+                <button
+                  class="th-icon-btn"
+                  id="sortRoleBtn"
+                  title="Sort by role"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3 6h18M7 12h10M11 18h2" />
+                  </svg>
+                </button>
+                <button
+                  class="th-icon-btn"
+                  id="filterRoleBtn"
+                  title="Filter by role"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <polygon
+                      points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                    />
+                  </svg>
+                </button>
               </div>
             </th>
             <th>
-              <div class="th-inner">Team Membership
-                <button class="th-icon-btn" id="filterTeamBtn" title="Filter by team"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              <div class="th-inner">
+                Team Membership
+                <button
+                  class="th-icon-btn"
+                  id="filterTeamBtn"
+                  title="Filter by team"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <polygon
+                      points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                    />
+                  </svg>
+                </button>
               </div>
             </th>
             <th>
-              <div class="th-inner">Custom Overrides
-                <button class="th-icon-btn" id="sortOverridesBtn" title="Sort by overrides"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
-                <button class="th-icon-btn" id="filterOverridesBtn" title="Filter by overrides"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              <div class="th-inner">
+                Custom Overrides
+                <button
+                  class="th-icon-btn"
+                  id="sortOverridesBtn"
+                  title="Sort by overrides"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3 6h18M7 12h10M11 18h2" />
+                  </svg>
+                </button>
+                <button
+                  class="th-icon-btn"
+                  id="filterOverridesBtn"
+                  title="Filter by overrides"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <polygon
+                      points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                    />
+                  </svg>
+                </button>
               </div>
             </th>
             <th>
-              <div class="th-inner">Status
-                <button class="th-icon-btn" id="filterStatusBtn" title="Filter by status"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              <div class="th-inner">
+                Status
+                <button
+                  class="th-icon-btn"
+                  id="filterStatusBtn"
+                  title="Filter by status"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <polygon
+                      points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+                    />
+                  </svg>
+                </button>
               </div>
             </th>
             <th>Actions</th>
@@ -329,12 +1377,33 @@
     </div>
   </div>
 
-  <div class="pagination-bar" id="paginationBar" style="display:none;">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <div class="pagination-bar" id="paginationBar" style="display: none">
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
       <span class="pg-info" id="pgInfo"></span>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <label style="font-size:.75rem;color:var(--clr-text-sub);white-space:nowrap;">Rows per page:</label>
-        <select id="perPageSelect" onchange="changePerPage(this.value)" style="padding:5px 8px;border:1px solid var(--clr-border);border-radius:var(--radius-sm);background:var(--clr-surface);font-family:'Times New Roman',Times,serif;font-size:.82rem;color:var(--clr-text);outline:none;cursor:pointer;">
+      <div style="display: flex; align-items: center; gap: 6px">
+        <label
+          style="
+            font-size: 0.75rem;
+            color: var(--clr-text-sub);
+            white-space: nowrap;
+          "
+          >Rows per page:</label
+        >
+        <select
+          id="perPageSelect"
+          onchange="changePerPage(this.value)"
+          style="
+            padding: 5px 8px;
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-sm);
+            background: var(--clr-surface);
+            font-family: &quot;Times New Roman&quot;, Times, serif;
+            font-size: 0.82rem;
+            color: var(--clr-text);
+            outline: none;
+            cursor: pointer;
+          "
+        >
           <option value="10" selected>10</option>
           <option value="50">50</option>
           <option value="100">100</option>
@@ -343,52 +1412,105 @@
     </div>
     <div class="pg-controls">
       <button class="pg-btn" id="pgFirst" onclick="goPage(1)">«</button>
-      <button class="pg-btn" id="pgPrev"  onclick="goPage(currentPage-1)">‹</button>
+      <button class="pg-btn" id="pgPrev" onclick="goPage(currentPage - 1)">
+        ‹
+      </button>
       <div class="pg-numbers" id="pgNumbers"></div>
-      <button class="pg-btn" id="pgNext"  onclick="goPage(currentPage+1)">›</button>
-      <button class="pg-btn" id="pgLast"  onclick="goPage(totalPages)">»</button>
+      <button class="pg-btn" id="pgNext" onclick="goPage(currentPage + 1)">
+        ›
+      </button>
+      <button class="pg-btn" id="pgLast" onclick="goPage(totalPages)">»</button>
     </div>
   </div>
 </main>
 
-<div class="filter-dropdown" id="filterNameDropdown" onclick="event.stopPropagation()">
-  <div class="filter-dd-head"><p>Filter by Name</p><input type="text" class="filter-search" id="filterNameSearch" placeholder="Search…"></div>
+<div
+  class="filter-dropdown"
+  id="filterNameDropdown"
+  onclick="event.stopPropagation()"
+>
+  <div class="filter-dd-head">
+    <p>Filter by Name</p>
+    <input
+      type="text"
+      class="filter-search"
+      id="filterNameSearch"
+      placeholder="Search…"
+    />
+  </div>
   <div class="filter-list" id="filterNameList"></div>
   <div class="filter-actions">
-    <button class="filter-btn select-all" id="filterNameSelectAll">Select All</button>
-    <button class="filter-btn clear-all"  id="filterNameClearAll">Clear All</button>
+    <button class="filter-btn select-all" id="filterNameSelectAll">
+      Select All
+    </button>
+    <button class="filter-btn clear-all" id="filterNameClearAll">
+      Clear All
+    </button>
   </div>
 </div>
-<div class="filter-dropdown" id="filterRoleDropdown" onclick="event.stopPropagation()">
+<div
+  class="filter-dropdown"
+  id="filterRoleDropdown"
+  onclick="event.stopPropagation()"
+>
   <div class="filter-dd-head"><p>Filter by Role</p></div>
   <div class="filter-list" id="filterRoleList"></div>
   <div class="filter-actions">
-    <button class="filter-btn select-all" id="filterRoleSelectAll">Select All</button>
-    <button class="filter-btn clear-all"  id="filterRoleClearAll">Clear All</button>
+    <button class="filter-btn select-all" id="filterRoleSelectAll">
+      Select All
+    </button>
+    <button class="filter-btn clear-all" id="filterRoleClearAll">
+      Clear All
+    </button>
   </div>
 </div>
-<div class="filter-dropdown" id="filterTeamDropdown" onclick="event.stopPropagation()">
+<div
+  class="filter-dropdown"
+  id="filterTeamDropdown"
+  onclick="event.stopPropagation()"
+>
   <div class="filter-dd-head"><p>Filter by Team</p></div>
   <div class="filter-list" id="filterTeamList"></div>
   <div class="filter-actions">
-    <button class="filter-btn select-all" id="filterTeamSelectAll">Select All</button>
-    <button class="filter-btn clear-all"  id="filterTeamClearAll">Clear All</button>
+    <button class="filter-btn select-all" id="filterTeamSelectAll">
+      Select All
+    </button>
+    <button class="filter-btn clear-all" id="filterTeamClearAll">
+      Clear All
+    </button>
   </div>
 </div>
-<div class="filter-dropdown" id="filterOverridesDropdown" onclick="event.stopPropagation()" style="width:220px">
+<div
+  class="filter-dropdown"
+  id="filterOverridesDropdown"
+  onclick="event.stopPropagation()"
+  style="width: 220px"
+>
   <div class="filter-dd-head"><p>Filter by Overrides</p></div>
   <div class="filter-list" id="filterOverridesList"></div>
   <div class="filter-actions">
-    <button class="filter-btn select-all" id="filterOverridesSelectAll">Select All</button>
-    <button class="filter-btn clear-all"  id="filterOverridesClearAll">Clear All</button>
+    <button class="filter-btn select-all" id="filterOverridesSelectAll">
+      Select All
+    </button>
+    <button class="filter-btn clear-all" id="filterOverridesClearAll">
+      Clear All
+    </button>
   </div>
 </div>
-<div class="filter-dropdown" id="filterStatusDropdown" onclick="event.stopPropagation()">
+<div
+  class="filter-dropdown"
+  id="filterStatusDropdown"
+  onclick="event.stopPropagation()"
+>
   <div class="filter-dd-head"><p>Filter by Status</p></div>
   <div class="filter-list" id="filterStatusList"></div>
   <div class="filter-actions">
-    <button class="filter-btn select-all" id="filterStatusSelectAll">Select All</button>
-    <button class="filter-btn clear-all"  id="filterStatusClearAll">Clear All</button>
+    <button class="filter-btn select-all" id="filterStatusSelectAll">
+      Select All
+    </button>
+    <button class="filter-btn clear-all" id="filterStatusClearAll">
+      Clear All
+    </button>
   </div>
 </div>
 
@@ -398,63 +1520,196 @@
   <div class="modal-panel">
     <div class="modal-header">
       <h2 id="modalTitle">Edit User</h2>
-      <button class="modal-close" id="closeModalBtn" onclick="closeModal('userModal')">
-        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button
+        class="modal-close"
+        id="closeModalBtn"
+        onclick="closeModal('userModal')"
+      >
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
     </div>
     <div class="modal-body">
       <div class="form-row">
         <div class="field" id="field-first_name">
-          <label><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> First Name <span class="req">*</span></label>
-          <div class="input-wrap"><input type="text" id="inp-first_name" placeholder="John" autocomplete="off" /></div>
+          <label
+            ><svg viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            First Name <span class="req">*</span></label
+          >
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="inp-first_name"
+              placeholder="John"
+              autocomplete="off"
+            />
+          </div>
           <div class="field-error" id="err-first_name">Required</div>
         </div>
         <div class="field" id="field-last_name">
-          <label><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Last Name <span class="req">*</span></label>
-          <div class="input-wrap"><input type="text" id="inp-last_name" placeholder="Doe" autocomplete="off" /></div>
+          <label
+            ><svg viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Last Name <span class="req">*</span></label
+          >
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="inp-last_name"
+              placeholder="Doe"
+              autocomplete="off"
+            />
+          </div>
           <div class="field-error" id="err-last_name">Required</div>
         </div>
       </div>
       <div class="field" id="field-email">
-        <label><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg> Email Address <span class="req">*</span></label>
-        <div class="input-wrap"><input type="email" id="inp-email" placeholder="user@company.com" autocomplete="off" /></div>
+        <label
+          ><svg viewBox="0 0 24 24">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="m2 7 10 7 10-7" />
+          </svg>
+          Email Address <span class="req">*</span></label
+        >
+        <div class="input-wrap">
+          <input
+            type="email"
+            id="inp-email"
+            placeholder="user@company.com"
+            autocomplete="off"
+          />
+        </div>
         <div class="field-error" id="err-email">Valid email required</div>
       </div>
       <div class="field" id="field-password">
-        <label><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Password</label>
+        <label
+          ><svg viewBox="0 0 24 24">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          Password</label
+        >
         <div class="input-wrap">
-          <input type="password" id="inp-password" placeholder="Minimum 8 characters" autocomplete="new-password" />
+          <input
+            type="password"
+            id="inp-password"
+            placeholder="Minimum 8 characters"
+            autocomplete="new-password"
+          />
           <button type="button" class="toggle-pw" id="togglePw">
-            <svg viewBox="0 0 24 24" id="eyeIcon"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg viewBox="0 0 24 24" id="eyeIcon">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </button>
         </div>
         <div class="field-error" id="err-password">Minimum 8 characters</div>
       </div>
       <div class="form-row">
         <div class="field">
-          <label><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.55a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/></svg> Phone</label>
-          <div class="input-wrap"><input type="tel" id="inp-phone" placeholder="+1 234 567 890" autocomplete="off" /></div>
+          <label
+            ><svg viewBox="0 0 24 24">
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.55a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"
+              />
+            </svg>
+            Phone</label
+          >
+          <div class="input-wrap">
+            <input
+              type="tel"
+              id="inp-phone"
+              placeholder="+1 234 567 890"
+              autocomplete="off"
+            />
+          </div>
         </div>
         <div class="field">
-          <label><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg> Job Title</label>
-          <div class="input-wrap"><input type="text" id="inp-job_title" placeholder="e.g. Sales Manager" autocomplete="off" /></div>
+          <label
+            ><svg viewBox="0 0 24 24">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+            </svg>
+            Job Title</label
+          >
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="inp-job_title"
+              placeholder="e.g. Sales Manager"
+              autocomplete="off"
+            />
+          </div>
         </div>
       </div>
       <div class="field" id="field-default_role">
-        <label><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Default Role <span class="req">*</span></label>
+        <label
+          ><svg viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          Default Role <span class="req">*</span></label
+        >
         <div class="input-wrap">
-          <select id="inp-default_role"><option value="">— Select a role —</option></select>
+          <select id="inp-default_role">
+            <option value="">— Select a role —</option>
+          </select>
         </div>
-        <div class="field-error" id="err-default_role">Please select a role</div>
+        <div class="field-error" id="err-default_role">
+          Please select a role
+        </div>
       </div>
 
-      <div id="edit-matrix-hint" style="text-align:center; padding:18px; background:rgba(224,123,32,0.06); border:1px solid rgba(224,123,32,0.15); border-radius:var(--radius); margin-top:16px;">
-        <p style="font-size:.85rem; color:var(--clr-text-sub); margin-bottom:10px; font-family:'Times New Roman',serif">Direct overrides and overrides checklist are managed via the matrix page.</p>
-        <a id="editMatrixBtn" href="#" class="action-btn matrix" style="display:inline-flex; align-items:center; gap:5px;"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Manage Permission Overrides</a>
+      <div
+        id="edit-matrix-hint"
+        style="
+          text-align: center;
+          padding: 18px;
+          background: rgba(224, 123, 32, 0.06);
+          border: 1px solid rgba(224, 123, 32, 0.15);
+          border-radius: var(--radius);
+          margin-top: 16px;
+        "
+      >
+        <p
+          style="
+            font-size: 0.85rem;
+            color: var(--clr-text-sub);
+            margin-bottom: 10px;
+            font-family: &quot;Times New Roman&quot;, serif;
+          "
+        >
+          Direct overrides and overrides checklist are managed via the matrix
+          page.
+        </p>
+        <a
+          id="editMatrixBtn"
+          href="#"
+          class="action-btn matrix"
+          style="display: inline-flex; align-items: center; gap: 5px"
+          ><svg viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" /></svg
+          >Manage Permission Overrides</a
+        >
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-modal-cancel" id="cancelModalBtn" onclick="closeModal('userModal')">Cancel</button>
+      <button
+        class="btn-modal-cancel"
+        id="cancelModalBtn"
+        onclick="closeModal('userModal')"
+      >
+        Cancel
+      </button>
       <button class="btn-modal-save" id="submitUserBtn" onclick="submitUser()">
         <span class="spinner"></span>
         <span class="btn-label" id="submitLabel">Save Changes</span>
@@ -462,9 +1717,7 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
+{% endblock %} {% block extra_js %}
 <script>
   /* ════════════════════════════════════════
      DATA STORE (Dynamic Context Mapping)
@@ -589,7 +1842,7 @@
   function showFieldErrors(errors) {
     document.querySelectorAll('.field').forEach(f => f.classList.remove('has-error'));
     document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
-    
+
     for (const [field, messages] of Object.entries(errors)) {
       const fieldEl = document.getElementById(`field-${field}`);
       const errEl = document.getElementById(`err-${field}`);
@@ -663,19 +1916,19 @@
       const statusLabel = u.is_active ? 'Active' : 'Inactive';
       const overrideCls = u.permission_overrides_count > 0 ? 'has' : 'none';
       const overrideLabel = u.permission_overrides_count > 0 ? `⚡ ${u.permission_overrides_count} custom` : '0 overrides';
-      
+
       const teamHtml = u.team_memberships?.length
         ? u.team_memberships.map(m => `<span class="team-badge">${m.team.name}</span>`).join('')
         : `<span style="color:var(--clr-gray);font-size:.82rem">No Active Teams</span>`;
-      
+
       let actionsHtml = '';
       if (USER_PERMS.canUpdate) {
         actionsHtml += `<button class="action-btn edit" onclick="openEdit(${u.id})"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>`;
       }
-      
+
       actionsHtml += `<button class="action-btn matrix" onclick="goMatrix(${u.id})"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Matrix</button>`;
       actionsHtml += `<button class="action-btn preview" onclick="goPreview(${u.id})"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button>`;
-      
+
       if (u.id !== {{ request.user.id }}) {
         if (u.is_active && USER_PERMS.canDelete) {
           actionsHtml += `<button class="action-btn deactivate" onclick="openConfirm(${u.id},'deactivate')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Deactivate</button>`;
@@ -800,33 +2053,60 @@
     dd.style.left = Math.min(r.left + window.scrollX, window.innerWidth - dd.offsetWidth - 8) + 'px';
   }
 
+  function getFilteredUsers(excludeField) {
+    return USERS.filter(u => {
+      if (excludeField !== 'name' && activeNameFilters.size && !activeNameFilters.has(`${u.first_name} ${u.last_name}`)) return false;
+      if (excludeField !== 'role' && activeRoleFilters.size && !activeRoleFilters.has(u.profile?.default_role?.name || 'None')) return false;
+      if (excludeField !== 'team' && activeTeamFilters.size && !u.team_memberships?.some(m => activeTeamFilters.has(m.team.name))) return false;
+      if (excludeField !== 'overrides' && activeOverridesFilters.size) {
+        const key = u.permission_overrides_count > 0 ? 'has' : 'none';
+        if (!activeOverridesFilters.has(key)) return false;
+      }
+      if (excludeField !== 'status' && activeStatusFilters.size && !activeStatusFilters.has(u.is_active ? 'active' : 'inactive')) return false;
+      return true;
+    });
+  }
+
   function renderNameFilterList() {
     const q = (document.getElementById('filterNameSearch')?.value || '').toLowerCase();
-    const names = [...new Set(USERS.map(u => `${u.first_name} ${u.last_name}`))].sort().filter(n => n.toLowerCase().includes(q));
+    const source = getFilteredUsers('name');
+    const names = [...new Set(source.map(u => `${u.first_name} ${u.last_name}`))].sort().filter(n => n.toLowerCase().includes(q));
     document.getElementById('filterNameList').innerHTML = names.map(n =>
       `<label class="filter-item"><input type="checkbox" value="${n}" ${activeNameFilters.has(n)?'checked':''} onchange="if(this.checked)activeNameFilters.add(this.value);else activeNameFilters.delete(this.value);currentPage=1;renderUsers()"><span style="font-size:.83rem;color:var(--clr-text)">${n}</span></label>`).join('');
   }
 
   function renderRoleFilterList() {
-    const roles = [...new Set(USERS.map(u => u.profile?.default_role?.name || 'None'))].sort();
+    const source = getFilteredUsers('role');
+    const roles = [...new Set(source.map(u => u.profile?.default_role?.name || 'None'))].sort();
     document.getElementById('filterRoleList').innerHTML = roles.map(r =>
       `<label class="filter-item"><input type="checkbox" value="${r}" ${activeRoleFilters.has(r)?'checked':''} onchange="if(this.checked)activeRoleFilters.add(this.value);else activeRoleFilters.delete(this.value);currentPage=1;renderUsers()"><span style="font-size:.83rem;color:var(--clr-text)">${r}</span></label>`).join('');
   }
 
   function renderTeamFilterList() {
-    const teams = [...new Set(USERS.flatMap(u => u.team_memberships?.map(m => m.team.name) || []))].sort();
+    const source = getFilteredUsers('team');
+    const teams = [...new Set(source.flatMap(u => u.team_memberships?.map(m => m.team.name) || []))].sort();
     document.getElementById('filterTeamList').innerHTML = teams.map(t =>
       `<label class="filter-item"><input type="checkbox" value="${t}" ${activeTeamFilters.has(t)?'checked':''} onchange="if(this.checked)activeTeamFilters.add(this.value);else activeTeamFilters.delete(this.value);currentPage=1;renderUsers()"><span style="font-size:.83rem;color:var(--clr-text)">${t}</span></label>`).join('');
   }
 
   function renderOverridesFilterList() {
-    const opts = [{val:'has',label:'Has Overrides'},{val:'none',label:'No Overrides'}];
+    const source = getFilteredUsers('overrides');
+    const hasAny = source.some(u => u.permission_overrides_count > 0);
+    const hasNone = source.some(u => u.permission_overrides_count === 0);
+    const opts = [];
+    if (hasAny) opts.push({val:'has',label:'Has Overrides'});
+    if (hasNone) opts.push({val:'none',label:'No Overrides'});
     document.getElementById('filterOverridesList').innerHTML = opts.map(o =>
       `<label class="filter-item"><input type="checkbox" value="${o.val}" ${activeOverridesFilters.has(o.val)?'checked':''} onchange="if(this.checked)activeOverridesFilters.add(this.value);else activeOverridesFilters.delete(this.value);currentPage=1;renderUsers()"><span style="font-size:.83rem;color:var(--clr-text)">${o.label}</span></label>`).join('');
   }
 
   function renderStatusFilterList() {
-    const opts = [{val:'active',label:'Active'},{val:'inactive',label:'Inactive'}];
+    const source = getFilteredUsers('status');
+    const hasActive = source.some(u => u.is_active);
+    const hasInactive = source.some(u => !u.is_active);
+    const opts = [];
+    if (hasActive) opts.push({val:'active',label:'Active'});
+    if (hasInactive) opts.push({val:'inactive',label:'Inactive'});
     document.getElementById('filterStatusList').innerHTML = opts.map(o =>
       `<label class="filter-item"><input type="checkbox" value="${o.val}" ${activeStatusFilters.has(o.val)?'checked':''} onchange="if(this.checked)activeStatusFilters.add(this.value);else activeStatusFilters.delete(this.value);currentPage=1;renderUsers()"><span style="font-size:.83rem;color:var(--clr-text)">${o.label}</span></label>`).join('');
   }
@@ -834,23 +2114,68 @@
   // Wire filter buttons
   document.getElementById('filterNameBtn').addEventListener('click', e => { e.stopPropagation(); const c=filterNameOpen; closeAllFilters(); if(c)return; filterNameOpen=true; positionDropdown('filterNameDropdown','filterNameBtn'); renderNameFilterList(); });
   document.getElementById('filterNameSearch').addEventListener('input', () => renderNameFilterList());
-  document.getElementById('filterNameSelectAll').addEventListener('click', e => { e.stopPropagation(); USERS.forEach(u=>activeNameFilters.add(`${u.first_name} ${u.last_name}`)); renderNameFilterList(); currentPage=1; renderUsers(); });
+  document.getElementById('filterNameSelectAll').addEventListener('click', e => {
+    e.stopPropagation();
+    const q = (document.getElementById('filterNameSearch')?.value || '').toLowerCase();
+    const source = getFilteredUsers('name');
+    const names = [...new Set(source.map(u => `${u.first_name} ${u.last_name}`))].filter(n => n.toLowerCase().includes(q));
+    names.forEach(n => activeNameFilters.add(n));
+    renderNameFilterList();
+    currentPage = 1;
+    renderUsers();
+  });
   document.getElementById('filterNameClearAll').addEventListener('click', e => { e.stopPropagation(); activeNameFilters.clear(); renderNameFilterList(); currentPage=1; renderUsers(); });
 
   document.getElementById('filterRoleBtn').addEventListener('click', e => { e.stopPropagation(); const c=filterRoleOpen; closeAllFilters(); if(c)return; filterRoleOpen=true; positionDropdown('filterRoleDropdown','filterRoleBtn'); renderRoleFilterList(); });
-  document.getElementById('filterRoleSelectAll').addEventListener('click', e => { e.stopPropagation(); [...new Set(USERS.map(u=>u.profile?.default_role?.name||'None'))].forEach(r=>activeRoleFilters.add(r)); renderRoleFilterList(); currentPage=1; renderUsers(); });
+  document.getElementById('filterRoleSelectAll').addEventListener('click', e => {
+    e.stopPropagation();
+    const source = getFilteredUsers('role');
+    const roles = [...new Set(source.map(u => u.profile?.default_role?.name || 'None'))];
+    roles.forEach(r => activeRoleFilters.add(r));
+    renderRoleFilterList();
+    currentPage = 1;
+    renderUsers();
+  });
   document.getElementById('filterRoleClearAll').addEventListener('click', e => { e.stopPropagation(); activeRoleFilters.clear(); renderRoleFilterList(); currentPage=1; renderUsers(); });
 
   document.getElementById('filterTeamBtn').addEventListener('click', e => { e.stopPropagation(); const c=filterTeamOpen; closeAllFilters(); if(c)return; filterTeamOpen=true; positionDropdown('filterTeamDropdown','filterTeamBtn'); renderTeamFilterList(); });
-  document.getElementById('filterTeamSelectAll').addEventListener('click', e => { e.stopPropagation(); USERS.flatMap(u=>u.team_memberships?.map(m=>m.team.name)||[]).forEach(t=>activeTeamFilters.add(t)); renderTeamFilterList(); currentPage=1; renderUsers(); });
+  document.getElementById('filterTeamSelectAll').addEventListener('click', e => {
+    e.stopPropagation();
+    const source = getFilteredUsers('team');
+    const teams = [...new Set(source.flatMap(u => u.team_memberships?.map(m => m.team.name) || []))];
+    teams.forEach(t => activeTeamFilters.add(t));
+    renderTeamFilterList();
+    currentPage = 1;
+    renderUsers();
+  });
   document.getElementById('filterTeamClearAll').addEventListener('click', e => { e.stopPropagation(); activeTeamFilters.clear(); renderTeamFilterList(); currentPage=1; renderUsers(); });
 
   document.getElementById('filterOverridesBtn').addEventListener('click', e => { e.stopPropagation(); const c=filterOverridesOpen; closeAllFilters(); if(c)return; filterOverridesOpen=true; positionDropdown('filterOverridesDropdown','filterOverridesBtn'); renderOverridesFilterList(); });
-  document.getElementById('filterOverridesSelectAll').addEventListener('click', e => { e.stopPropagation(); ['has','none'].forEach(v=>activeOverridesFilters.add(v)); renderOverridesFilterList(); currentPage=1; renderUsers(); });
+  document.getElementById('filterOverridesSelectAll').addEventListener('click', e => {
+    e.stopPropagation();
+    const source = getFilteredUsers('overrides');
+    const hasAny = source.some(u => u.permission_overrides_count > 0);
+    const hasNone = source.some(u => u.permission_overrides_count === 0);
+    if (hasAny) activeOverridesFilters.add('has');
+    if (hasNone) activeOverridesFilters.add('none');
+    renderOverridesFilterList();
+    currentPage = 1;
+    renderUsers();
+  });
   document.getElementById('filterOverridesClearAll').addEventListener('click', e => { e.stopPropagation(); activeOverridesFilters.clear(); renderOverridesFilterList(); currentPage=1; renderUsers(); });
 
   document.getElementById('filterStatusBtn').addEventListener('click', e => { e.stopPropagation(); const c=filterStatusOpen; closeAllFilters(); if(c)return; filterStatusOpen=true; positionDropdown('filterStatusDropdown','filterStatusBtn'); renderStatusFilterList(); });
-  document.getElementById('filterStatusSelectAll').addEventListener('click', e => { e.stopPropagation(); ['active','inactive'].forEach(v=>activeStatusFilters.add(v)); renderStatusFilterList(); currentPage=1; renderUsers(); });
+  document.getElementById('filterStatusSelectAll').addEventListener('click', e => {
+    e.stopPropagation();
+    const source = getFilteredUsers('status');
+    const hasActive = source.some(u => u.is_active);
+    const hasInactive = source.some(u => !u.is_active);
+    if (hasActive) activeStatusFilters.add('active');
+    if (hasInactive) activeStatusFilters.add('inactive');
+    renderStatusFilterList();
+    currentPage = 1;
+    renderUsers();
+  });
   document.getElementById('filterStatusClearAll').addEventListener('click', e => { e.stopPropagation(); activeStatusFilters.clear(); renderStatusFilterList(); currentPage=1; renderUsers(); });
 
   document.addEventListener('click', e => {
@@ -886,17 +2211,17 @@
     document.getElementById('modalTitle').textContent = 'Edit User';
     document.getElementById('submitLabel').textContent = 'Save Changes';
     document.getElementById('field-password').style.display = '';
-    
+
     const matrixHint = document.getElementById('edit-matrix-hint');
     const matrixBtn = document.getElementById('editMatrixBtn');
     if (matrixHint && matrixBtn) {
       matrixHint.style.display = 'block';
       matrixBtn.href = `{% url 'authorization:user_matrix' 0 %}`.replace('0', id);
     }
-    
+
     clearForm();
     populateRoleSelect();
-    
+
     // Fill the fields
     document.getElementById('inp-first_name').value = u.first_name || '';
     document.getElementById('inp-last_name').value = u.last_name || '';
@@ -904,7 +2229,7 @@
     document.getElementById('inp-phone').value = u.phone || '';
     document.getElementById('inp-job_title').value = u.profile?.job_title || '';
     document.getElementById('inp-default_role').value = u.profile?.default_role?.id || '';
-    
+
     openModal('userModal');
   }
 
@@ -932,7 +2257,7 @@
       if (f.check(inp.value)) { field.classList.remove('has-error'); if (err) err.style.display = 'none'; }
       else { field.classList.add('has-error'); if (err) { err.textContent = f.msg; err.style.display = 'block'; } ok = false; }
     });
-    
+
     const roleVal   = document.getElementById('inp-default_role').value;
     const roleField = document.getElementById('field-default_role');
     const roleErr   = document.getElementById('err-default_role');
@@ -943,10 +2268,10 @@
 
   async function submitUser() {
     if (!validate()) return;
-    
+
     const btn = document.getElementById('submitUserBtn');
     btn.classList.add('loading');
-    
+
     const payload = {
       email: document.getElementById('inp-email').value.trim(),
       first_name: document.getElementById('inp-first_name').value.trim(),
@@ -955,10 +2280,10 @@
       job_title: document.getElementById('inp-job_title').value.trim(),
       default_role: document.getElementById('inp-default_role').value,
     };
-    
+
     const pwVal = document.getElementById('inp-password').value;
     if (pwVal) payload.password = pwVal;
-    
+
     try {
       await apiEditUser(editUserId, payload);
       closeModal('userModal');
@@ -979,7 +2304,7 @@
   async function openConfirm(id, action) {
     const u = USERS.find(u => u.id === id);
     if (!u) return;
-    
+
     let title, text, icon, confirmText, confirmColor;
     if (action === 'deactivate') {
       title = `Deactivate ${escapeHtml(u.first_name)}?`;

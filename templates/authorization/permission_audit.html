@@ -1,584 +1,152 @@
 {% extends "base.html" %}
-{% load crm_permissions %}
+{% load static %}
 
 {% block title %}Permission Audit · Argoz CRM{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'audit/audit_list.css' %}">
+{% endblock %}
+
 {% block content %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-<style>
-  :root {
-    --bg-color: #0c0d12;
-    --card-bg: rgba(20, 21, 31, 0.6);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent: #6366f1;
-    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #3b82f6;
-  }
-
-  body {
-    background-color: var(--bg-color);
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
-    color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
-    margin: 0;
-    min-height: 100vh;
-  }
-
-  h1, h2, h3, h4 {
-    font-family: 'Outfit', sans-serif;
-    color: #ffffff;
-    font-weight: 600;
-  }
-
-  .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem;
-    animation: fadeIn 0.6s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 2rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .page-header h1 {
-    font-size: 2.2rem;
-    margin: 0;
-    background: linear-gradient(to right, #ffffff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .page-header p {
-    color: var(--text-secondary);
-    margin: 0.25rem 0 0 0;
-    font-size: 0.95rem;
-  }
-
-  .back-link {
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-size: 0.95rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: color 0.2s;
-  }
-
-  .back-link:hover {
-    color: #ffffff;
-  }
-
-  .glass-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    margin-bottom: 2rem;
-  }
-
-  /* Filters toolbar */
-  .filter-bar {
-    display: flex;
-    gap: 1.5rem;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
-  }
-
-  .filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .filter-group label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .filter-group input {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: #ffffff;
-    font-family: inherit;
-    font-size: 0.9rem;
-    min-width: 250px;
-    box-sizing: border-box;
-    transition: all 0.25s;
-  }
-
-  .filter-group input:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  .btn-submit {
-    background: var(--accent-gradient);
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.25s;
-    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
-  }
-
-  .btn-submit:hover {
-    filter: brightness(1.1);
-    transform: translateY(-1px);
-  }
-
-  .btn-reset {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--text-primary);
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    text-align: center;
-    box-sizing: border-box;
-    transition: all 0.2s;
-  }
-
-  .btn-reset:hover {
-    background: rgba(255, 255, 255, 0.07);
-  }
-
-  /* Table styling */
-  .table-responsive {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  table.audit-table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-  }
-
-  table.audit-table th {
-    padding: 1rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  table.audit-table td {
-    padding: 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    vertical-align: top;
-    font-size: 0.9rem;
-  }
-
-  table.audit-table tr:hover td {
-    background: rgba(255, 255, 255, 0.01);
-  }
-
-  /* Action Badges */
-  .action-badge {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    display: inline-block;
-  }
-
-  .action-badge.create {
-    background: rgba(16, 185, 129, 0.12);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.2);
-  }
-
-  .action-badge.update {
-    background: rgba(59, 130, 246, 0.12);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.2);
-  }
-
-  .action-badge.delete {
-    background: rgba(239, 68, 68, 0.12);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-  }
-
-  .action-badge.default {
-    background: rgba(156, 163, 175, 0.12);
-    color: #d1d5db;
-    border: 1px solid rgba(156, 163, 175, 0.2);
-  }
-
-  /* Diff Formatter Box */
-  .diff-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    max-width: 450px;
-  }
-
-  .diff-line {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .diff-field {
-    font-weight: 600;
-    color: #ffffff;
-    font-family: monospace;
-  }
-
-  .diff-old {
-    color: #f87171;
-    text-decoration: line-through;
-    opacity: 0.8;
-  }
-
-  .diff-arrow {
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-  }
-
-  .diff-new {
-    color: #34d399;
-    font-weight: 500;
-  }
-
-  /* Metadata Box */
-  .metadata-box {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-    padding: 8px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    max-width: 250px;
-  }
-
-  .metadata-item {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .metadata-val {
-    color: #ffffff;
-    font-family: monospace;
-  }
-
-  /* Pagination */
-  .pagination-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
-    padding-top: 1.25rem;
-  }
-
-  .pagination-info {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-  }
-
-  .pagination-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .btn-page {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    text-decoration: none;
-    transition: all 0.2s;
-  }
-
-  .btn-page:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-
-  .timestamp-text {
-    color: #ffffff;
-    font-weight: 500;
-  }
-
-  .timestamp-sub {
-    font-size: 0.72rem;
-    color: #64748b;
-    margin-top: 0.15rem;
-  }
-</style>
-
-<div class="container">
+<main class="page-body">
+  <!-- Header -->
   <div class="page-header">
-    <div>
-      <h1>Permission Audit Log</h1>
-      <p>Audit records detailing roles, user overrides, and system access baseline changes.</p>
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-4"/><path d="m9 14 2 2 4-4"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Permission Audit Log</h1>
+        <p>Audit records detailing roles, user overrides, and system access baseline changes</p>
+      </div>
     </div>
-    <a href="{% url 'authorization:role_list' %}" class="back-link">
-      ← Roles & Permissions
+    <a href="{% url 'authorization:role_list' %}" class="back-link" style="display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--clr-text-sub); font-size: 0.9rem; font-weight: 500;">
+      <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2;"><polyline points="15 18 9 12 15 6"/></svg>
+      Roles &amp; Permissions
     </a>
   </div>
 
-  <!-- Filters Panel -->
-  <form method="get" class="glass-card">
-    <div class="filter-bar">
-      <div class="filter-group">
-        <label for="id_user_id">Filter by target user ID</label>
-        <input type="text" name="user_id" id="id_user_id" placeholder="e.g. 2" value="{{ request.GET.user_id|default:'' }}">
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       </div>
-
-      <button type="submit" class="btn-submit">Filter Log</button>
-      <a href="?" class="btn-reset">Reset</a>
+      <div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-label">Total Entries</div></div>
     </div>
-  </form>
-
-  <!-- Logs Table -->
-  <div class="glass-card">
-    <div class="table-responsive">
-      <table class="audit-table">
-        <thead>
-          <tr>
-            <th style="width: 180px;">Timestamp</th>
-            <th style="width: 130px;">Action</th>
-            <th style="width: 250px;">Target Config/Entity</th>
-            <th style="width: 180px;">Authorized Actor</th>
-            <th>Details & Reasons</th>
-            <th style="width: 260px;">Request Context</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for log in page %}
-            <tr>
-              <td>
-                <div class="timestamp-text">{{ log.created_at|date:"Y-m-d H:i" }}</div>
-                <div class="timestamp-sub">{{ log.created_at|timesince }} ago</div>
-              </td>
-              
-              <td>
-                <span class="action-badge {% if log.action == 'CREATE' %}create{% elif log.action == 'UPDATE' %}update{% elif log.action == 'DELETE' %}delete{% else %}default{% endif %}">
-                  {{ log.action }}
-                </span>
-              </td>
-              
-              <td>
-                {% if log.entity_type == 'UserPermissionOverride' or log.entity_type == 'UserRole' %}
-                  <div style="font-weight: 600; color: #ffffff;">
-                    {% if log.after_json and log.after_json.user %}{{ log.after_json.user }}{% elif log.before_json and log.before_json.user %}{{ log.before_json.user }}{% else %}{{ log.entity_display }}{% endif %}
-                  </div>
-                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem; display: flex; align-items: center; gap: 0.4rem;">
-                    <span style="font-family: monospace;">{{ log.entity_type }}</span>
-                    {% if log.entity_type == 'UserPermissionOverride' %}
-                      <span class="action-badge default" style="font-size: 0.65rem; padding: 2px 5px;">Override</span>
-                    {% else %}
-                      <span class="action-badge default" style="font-size: 0.65rem; padding: 2px 5px;">Role</span>
-                    {% endif %}
-                  </div>
-                {% elif log.entity_type == 'User' %}
-                  <div style="font-weight: 600; color: #ffffff;">
-                    {% if log.after_json and log.after_json.email %}{{ log.after_json.email }}{% elif log.before_json and log.before_json.email %}{{ log.before_json.email }}{% else %}{{ log.entity_display }}{% endif %}
-                  </div>
-                  <div style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">
-                    {{ log.entity_type }} #{{ log.entity_id }}
-                  </div>
-                {% else %}
-                  <div style="font-weight: 600; color: #ffffff;">{{ log.entity_display|default:log.entity_type }}</div>
-                  <div style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">
-                    {{ log.entity_type }} #{{ log.entity_id }}
-                  </div>
-                {% endif %}
-              </td>
-              
-              <td>
-                <div style="font-weight: 500;">
-                  {{ log.actor.get_full_name|default:log.actor.email|default:"System" }}
-                </div>
-                {% if log.actor %}
-                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem;">
-                    {{ log.actor.email }}
-                  </div>
-                {% endif %}
-              </td>
-              
-              <td>
-                {% if log.entity_type == 'UserPermissionOverride' %}
-                  {% if log.after_json and log.after_json.user or log.before_json and log.before_json.user %}
-                    <!-- Old format: individual override log entry -->
-                    <div style="margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem;">
-                      {% if not log.after_json %}
-                        <span class="action-badge delete" style="font-size: 0.75rem; padding: 3px 6px;">Override Removed</span>
-                      {% elif log.after_json.effect == 'ALLOW' %}
-                        <span class="action-badge create" style="font-size: 0.75rem; padding: 3px 6px;">Gained</span>
-                      {% else %}
-                        <span class="action-badge delete" style="font-size: 0.75rem; padding: 3px 6px;">Taken</span>
-                      {% endif %}
-                      <span style="font-family: monospace; font-weight: 600; color: #ffffff;">
-                        {% if log.after_json %}{{ log.after_json.permission }}{% elif log.before_json %}{{ log.before_json.permission }}{% endif %}
-                      </span>
-                    </div>
-                  {% else %}
-                    <!-- New format: consolidated overrides log entry -->
-                    <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem;">
-                      {% for field, val in log.changed_fields.items %}
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                          {% if val.new == 'ALLOW' %}
-                            <span class="action-badge create" style="font-size: 0.72rem; padding: 2px 5px;">Gained</span>
-                          {% elif val.new == 'DENY' %}
-                            <span class="action-badge delete" style="font-size: 0.72rem; padding: 2px 5px;">Blocked</span>
-                          {% else %}
-                            <span class="action-badge default" style="font-size: 0.72rem; padding: 2px 5px;">Cleared</span>
-                          {% endif %}
-                          <span style="font-family: monospace; font-weight: 600; color: #ffffff;">
-                            {{ field }}
-                          </span>
-                        </div>
-                      {% empty %}
-                        <span style="color: var(--text-secondary); font-size: 0.85rem;">No overrides changed</span>
-                      {% endfor %}
-                    </div>
-                  {% endif %}
-                {% elif log.entity_type == 'UserRole' %}
-                  <div style="margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem;">
-                    {% if not log.after_json or not log.after_json.is_active %}
-                      <span class="action-badge delete" style="font-size: 0.75rem; padding: 3px 6px;">Role Removed</span>
-                    {% else %}
-                      <span class="action-badge create" style="font-size: 0.75rem; padding: 3px 6px;">Role Assigned</span>
-                    {% endif %}
-                    <span style="font-weight: 600; color: #ffffff;">
-                      {% if log.after_json %}{{ log.after_json.role }}{% elif log.before_json %}{{ log.before_json.role }}{% endif %}
-                    </span>
-                  </div>
-                {% endif %}
-
-                {% if log.changed_fields and log.entity_type != 'UserPermissionOverride' %}
-                  <div class="diff-wrapper">
-                    {% for field, val in log.changed_fields.items %}
-                      {% if field != 'user' and field != 'permission' and field != 'role' and field != 'user_id' %}
-                        <div class="diff-line">
-                          <span class="diff-field">{{ field }}:</span>
-                          <span class="diff-old">{{ val.old|default:"None" }}</span>
-                          <span class="diff-arrow">→</span>
-                          <span class="diff-new">{{ val.new|default:"None" }}</span>
-                        </div>
-                      {% endif %}
-                    {% endfor %}
-                  </div>
-                {% endif %}
-                {% if log.reason %}
-                  <div style="color: var(--text-primary); font-size: 0.85rem; line-height: 1.4; margin-top: 0.4rem; border-left: 2px solid var(--warning); padding-left: 8px;">
-                    <strong>Reason:</strong> {{ log.reason }}
-                  </div>
-                {% endif %}
-                {% if not log.changed_fields and not log.reason and not log.entity_type == 'UserPermissionOverride' and not log.entity_type == 'UserRole' %}
-                  <span style="color: #64748b; font-size: 0.85rem;">-</span>
-                {% endif %}
-              </td>
-              
-              <td>
-                {% if log.request_meta %}
-                  <div class="metadata-box">
-                    <div class="metadata-item">
-                      <span>IP Address</span>
-                      <span class="metadata-val">{{ log.request_meta.ip|default:"-" }}</span>
-                    </div>
-                    <div class="metadata-item">
-                      <span>Method/Path</span>
-                      <span class="metadata-val">{{ log.request_meta.method|default:"-" }} {{ log.request_meta.path|default:"-" }}</span>
-                    </div>
-                  </div>
-                {% else %}
-                  <span style="color: #64748b; font-size: 0.85rem;">-</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 3rem 0; color: var(--text-secondary);">
-                No matching permission audit entries found.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiCreate">—</div><div class="kpi-label">Records Created</div></div>
     </div>
+    <div class="kpi-card">
+      <div class="kpi-icon red">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiDelete">—</div><div class="kpi-label">Records Deleted</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon blue">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div><div class="kpi-value" id="kpiSecurity">—</div><div class="kpi-label">Security Events</div></div>
+    </div>
+  </div>
 
-    <!-- Pagination -->
-    {% if page.has_other_pages %}
-      <div class="pagination-container">
-        <span class="pagination-info">
-          Page {{ page.number }} of {{ page.paginator.num_pages }} (Total entries: {{ page.paginator.count }})
-        </span>
-        <div class="pagination-actions">
-          {% if page.has_previous %}
-            <a href="?page={{ page.previous_page_number }}{% if request.GET.user_id %}&user_id={{ request.GET.user_id }}{% endif %}" class="btn-page">
-              &larr; Previous
-            </a>
-          {% endif %}
-          {% if page.has_next %}
-            <a href="?page={{ page.next_page_number }}{% if request.GET.user_id %}&user_id={{ request.GET.user_id }}{% endif %}" class="btn-page">
-              Next &rarr;
-            </a>
-          {% endif %}
+  <!-- Filters -->
+  <div class="filter-card">
+    <form id="filter-form" onsubmit="return false;">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Action Type</label>
+          <div class="input-wrap">
+            <select id="id_action">
+              <option value="">— All Actions —</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+              <option value="PERMISSION_CHANGE">PERMISSION_CHANGE</option>
+              <option value="POLICY_CHANGE">POLICY_CHANGE</option>
+            </select>
+          </div>
+        </div>
+        <div class="filter-field">
+          <label><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Entity Type</label>
+          <div class="input-wrap">
+            <input type="text" id="id_entity_type" placeholder="e.g. UserPermissionOverride, UserRole">
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button type="button" class="btn-primary" id="apply-filters">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span class="btn-label">Apply Filters</span>
+          </button>
+          <button type="button" class="btn-ghost" id="reset-filters">Reset</button>
+          <span class="search-results-hint" id="searchHint"></span>
         </div>
       </div>
-    {% endif %}
+    </form>
   </div>
-</div>
+
+  <!-- Table (laptop / desktop) -->
+  <div class="table-card" id="tableCard">
+    <div class="table-scroll-wrap">
+      <table>
+        <colgroup>
+          <col class="col-timestamp">
+          <col class="col-action">
+          <col class="col-entity">
+          <col class="col-actor">
+          <col class="col-details">
+          <col class="col-meta">
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="text-align:left">Timestamp</th>
+            <th>Action</th>
+            <th style="text-align:left">Target Entity</th>
+            <th style="text-align:left">Actor</th>
+            <th style="text-align:left">Details / Value Changes</th>
+            <th style="text-align:left">Request Meta</th>
+          </tr>
+        </thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cards (mobile) -->
+  <div class="audit-cards" id="audit-cards"></div>
+
+  <div class="pagination-bar" id="paginationBar">
+    <div class="pg-left">
+      <span class="pg-info" id="pgInfo"></span>
+      <div class="pg-perpage">
+        <label for="perPageSelect">Rows per page:</label>
+        <select id="perPageSelect" onchange="changePerPage(this.value)">
+          <option value="100" selected>100</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+          <option value="2000">2000</option>
+        </select>
+      </div>
+    </div>
+    <div class="pg-controls" id="pgControlsWrap">
+      <button class="pg-btn" id="pgFirst" onclick="goPage(1)">«</button>
+      <button class="pg-btn" id="pgPrev"  onclick="goPage(currentPage-1)">‹</button>
+      <div class="pg-numbers" id="pgNumbers"></div>
+      <button class="pg-btn" id="pgNext"  onclick="goPage(currentPage+1)">›</button>
+      <button class="pg-btn" id="pgLast"  onclick="goPage(totalPages)">»</button>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.API_DATA_URL = "{% url 'authorization:permission_audit_api' %}";
+  window.TARGET_USER_ID = null;
+</script>
+<script src="{% static 'audit/audit_list.js' %}"></script>
 {% endblock %}

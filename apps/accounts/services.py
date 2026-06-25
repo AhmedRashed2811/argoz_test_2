@@ -236,8 +236,109 @@ class UserService:
             "role_permissions_json": role_permissions_json,
         }
 
+    @staticmethod
+    def login_user(*, request, email, password, remember=False):
+        from django.contrib.auth import authenticate, login as auth_login
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+        
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            if user.is_active:
+                auth_login(request, user)
+                if remember:
+                    request.session.set_expiry(2592000)  # 30 days
+                else:
+                    request.session.set_expiry(0)  # Expires when browser closes
+                profile = getattr(user, "profile", None)
+                company = profile.company if profile else None
+                AuditService.log(
+                    action=AuditAction.LOGIN,
+                    instance=user,
+                    actor=user,
+                    company=company,
+                    module="accounts",
+                    request_meta=getattr(request, "request_meta", None),
+                    entity_display=user.email,
+                    reason="User logged in successfully via web interface",
+                )
+                return user, None
+            else:
+                return None, "This account is deactivated."
+        else:
+            # Audit failed attempt if a user with this email exists
+            target_user = User.objects.filter(email=email).first()
+            profile = getattr(target_user, "profile", None) if target_user else None
+            company = profile.company if profile else None
+            AuditService.log(
+                action=AuditAction.LOGIN,
+                actor=target_user,
+                company=company,
+                module="accounts",
+                request_meta=getattr(request, "request_meta", None),
+                entity_display=email,
+                reason=f"Failed login attempt for email: {email}",
+            )
+            return None, "Incorrect email or password."
+
+    @staticmethod
+    @transaction.atomic
+    def change_password(*, user, current_password, new_password, request_meta=None) -> tuple[bool, str | None]:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        if not user.check_password(current_password):
+            return False, "Incorrect current password."
+
+        user.set_password(new_password)
+        user.save()
+
+        # Log password change audit entry
+        profile = getattr(user, "profile", None)
+        company = profile.company if profile else None
+        AuditService.log(
+            action=AuditAction.UPDATE,
+            instance=user,
+            actor=user,
+            company=company,
+            module="accounts",
+            request_meta=request_meta,
+            reason="User updated their own password via change password screen",
+            entity_display=user.email,
+        )
+        return True, None
+
 
 class TeamService:
+    @staticmethod
+    def list_payload(*, company):
+        from .selectors import teams_for_company
+        teams = []
+        for team in teams_for_company(company):
+            heads = []
+            members = []
+            for m in team.members.all():
+                user_data = {
+                    "id": m.user.id,
+                    "email": m.user.email,
+                    "full_name": m.user.get_full_name(),
+                }
+                if m.position == "HEAD":
+                    heads.append(user_data)
+                else:
+                    members.append(user_data)
+            
+            teams.append({
+                "id": str(team.id),
+                "name": team.name,
+                "region": team.region,
+                "order_index": team.order_index,
+                "is_active": team.is_active,
+                "heads": heads,
+                "members": members,
+            })
+        return {"teams": teams}
+
     @staticmethod
     @transaction.atomic
     def add_member(*, team: Team, user: User, **kwargs) -> TeamMember:

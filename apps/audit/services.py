@@ -94,6 +94,74 @@ class AuditService:
             **kwargs,
         )
 
+    @staticmethod
+    def get_audit_logs_payload(*, company, filters: dict, is_permission_audit: bool = False) -> dict:
+        from django.core.paginator import Paginator
+        from .models import AuditLog
+        
+        if is_permission_audit:
+            qs = AuditLog.objects.filter(
+                company=company,
+                entity_type__in=["UserPermissionOverride", "UserRole", "RolePermission"],
+            )
+        else:
+            qs = AuditLog.objects.filter(company=company)
+            
+        qs = qs.select_related("actor").order_by("-created_at")
+        
+        user_filter = filters.get("user_id")
+        if user_filter:
+            qs = qs.filter(after_json__icontains=user_filter)
+            
+        action = filters.get("action")
+        if action:
+            qs = qs.filter(action=action)
+            
+        entity = filters.get("entity_type")
+        if entity:
+            qs = qs.filter(entity_type__icontains=entity)
+            
+        limit = int(filters.get("limit", 100))
+        page_num = int(filters.get("page", 1))
+        
+        paginator = Paginator(qs, limit)
+        page = paginator.get_page(page_num)
+        
+        logs_data = []
+        for log in page:
+            logs_data.append({
+                "id": log.id,
+                "created_at": log.created_at.isoformat(),
+                "action": log.action,
+                "entity_type": log.entity_type,
+                "entity_id": log.entity_id,
+                "entity_display": log.entity_display,
+                "actor": {
+                    "email": log.actor.email if log.actor else "System",
+                    "full_name": log.actor.get_full_name() if log.actor else "System",
+                },
+                "before_json": log.before_json,
+                "after_json": log.after_json,
+                "changed_fields": log.changed_fields,
+                "request_meta": log.request_meta,
+                "reason": log.reason or "",
+            })
+            
+        kpis = {
+            "total": qs.count(),
+            "create": qs.filter(action="CREATE").count(),
+            "delete": qs.filter(action="DELETE").count(),
+            "security": qs.filter(action__in=["PERMISSION_CHANGE", "POLICY_CHANGE"]).count(),
+        }
+        
+        return {
+            "logs": logs_data,
+            "kpis": kpis,
+            "total": paginator.count,
+            "num_pages": paginator.num_pages,
+            "current_page": page.number,
+        }
+
 
 def _meta_dict(request_meta):
     if request_meta is None:

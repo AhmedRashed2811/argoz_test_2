@@ -7,8 +7,7 @@ from . import views
 app_name = "accounts"
 
 urlpatterns = [
-    path("login/", auth_views.LoginView.as_view(
-        template_name="accounts/login.html"), name="login"),
+    path("login/", views.login_view, name="login"),
     path("logout/", auth_views.LogoutView.as_view(next_page="accounts:login"),
          name="logout"),
     path("users/", views.user_list, name="user_list"),
@@ -26,8 +25,17 @@ urlpatterns = [
     path("users/<int:user_id>/delete/", views.user_delete, name="user_delete"),
     path("users/<int:user_id>/activate/", views.user_activate, name="user_activate"),
     path("teams/", views.team_list, name="team_list"),
+    path("teams/api/", views.team_api_list, name="team_api_list"),
+    path("teams/api/create/", views.team_api_create, name="team_api_create"),
+    path("teams/<uuid:team_id>/api/edit/", views.team_api_edit, name="team_api_edit"),
+    path("teams/<uuid:team_id>/api/delete/", views.team_api_delete, name="team_api_delete"),
+    path("teams/<uuid:team_id>/api/activate/", views.team_api_activate, name="team_api_activate"),
     path("teams/create/", views.team_create, name="team_create"),
     path("teams/<uuid:team_id>/edit/", views.team_edit, name="team_edit"),
     path("teams/<uuid:team_id>/delete/", views.team_delete, name="team_delete"),
     path("teams/<uuid:team_id>/activate/", views.team_activate, name="team_activate"),
+    path("profile/", views.profile_view, name="profile"),
+    path("profile/api/", views.profile_api, name="profile_api"),
+    path("change-password/", views.change_password_view, name="change_password"),
+    path("change-password/api/", views.change_password_api, name="change_password_api"),
 ]

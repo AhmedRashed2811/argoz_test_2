@@ -1,0 +1,23 @@
+@import url("/static/accounts/user_form.css");
+@import url("/static/authorization/permission_preview.css");
+
+/* Readonly fields styling overrides */
+.form-card input[readonly], .form-card select[disabled] {
+  background: var(--clr-bg);
+  color: var(--clr-text-sub);
+  cursor: not-allowed;
+  border-color: var(--clr-border);
+}
+
+.profile-container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .profile-container {
+    grid-template-columns: 1fr;
+  }
+}

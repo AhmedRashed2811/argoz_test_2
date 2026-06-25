@@ -3,9 +3,11 @@ the per-user permission matrix showing role defaults, allows, denies, and the
 effective result. Writes go through PermissionManagementService."""
 from __future__ import annotations
 
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
 
 from apps.accounts.models import User
 
@@ -18,32 +20,16 @@ from .services import EffectivePermissionResolver, PermissionManagementService, 
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def role_list(request):
-    roles = RoleService.get_roles_for_company(request.company)
-    return render(request, "authorization/role_list.html", {"roles": roles})
+    return render(request, "authorization/role_list.html")
 
 
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def role_create(request):
-    form = RoleForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        RoleService.create_role(
-            company=request.company,
-            code=form.cleaned_data["code"],
-            name=form.cleaned_data["name"],
-            description=form.cleaned_data["description"],
-            is_active=form.cleaned_data["is_active"],
-            permission_ids=request.POST.getlist("permissions"),
-            actor=request.user,
-            request_meta=request.request_meta,
-        )
-        messages.success(request, "Role created.")
-        return redirect("authorization:role_list")
-    
     context = {
-        "form": form,
         "permissions": PermissionManagementService.get_active_permissions(),
-        "selected_permission_ids": set(),
+        "is_edit_mode": False,
+        "selected_permission_ids": [],
     }
     return render(request, "authorization/role_form.html", context)
 
@@ -52,26 +38,10 @@ def role_create(request):
 @crm_permission_required("authorization.roles.manage")
 def role_edit(request, role_id):
     role = get_object_or_404(RoleGroup, id=role_id, company=request.company)
-    form = RoleForm(request.POST or None, instance=role)
-    if request.method == "POST" and form.is_valid():
-        RoleService.update_role(
-            role=role,
-            code=form.cleaned_data["code"],
-            name=form.cleaned_data["name"],
-            description=form.cleaned_data["description"],
-            is_active=form.cleaned_data["is_active"],
-            permission_ids=request.POST.getlist("permissions"),
-            actor=request.user,
-            request_meta=request.request_meta,
-        )
-        messages.success(request, "Role updated.")
-        return redirect("authorization:role_list")
-    
-    current_permission_ids = set(
+    current_permission_ids = list(
         str(pid) for pid in role.permissions.values_list("permission_id", flat=True)
     )
     context = {
-        "form": form,
         "role_instance": role,
         "is_edit_mode": True,
         "permissions": PermissionManagementService.get_active_permissions(),
@@ -93,6 +63,95 @@ def role_toggle(request, role_id):
 
 
 @login_required
+@crm_permission_required("authorization.roles.manage")
+def role_api_list(request):
+    roles = RoleService.get_roles_for_company(request.company)
+    data = []
+    for r in roles:
+        data.append({
+            "id": str(r.id),
+            "name": r.name,
+            "code": r.code,
+            "description": r.description or "",
+            "is_system_default": r.is_system_default,
+            "member_count": getattr(r, "member_count", 0),
+            "is_active": r.is_active,
+        })
+    return JsonResponse({"roles": data})
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+@require_POST
+def role_api_create(request):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    form = RoleForm(data)
+    if form.is_valid():
+        RoleService.create_role(
+            company=request.company,
+            code=form.cleaned_data["code"],
+            name=form.cleaned_data["name"],
+            description=form.cleaned_data["description"],
+            is_active=form.cleaned_data["is_active"],
+            permission_ids=data.get("permissions", []),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+@require_POST
+def role_api_edit(request, role_id):
+    import json
+    role = get_object_or_404(RoleGroup, id=role_id, company=request.company)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    form = RoleForm(data, instance=role)
+    if form.is_valid():
+        RoleService.update_role(
+            role=role,
+            code=form.cleaned_data["code"],
+            name=form.cleaned_data["name"],
+            description=form.cleaned_data["description"],
+            is_active=form.cleaned_data["is_active"],
+            permission_ids=data.get("permissions", []),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    else:
+        errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
+        return JsonResponse({"errors": errors}, status=400)
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+@require_POST
+def role_api_toggle(request, role_id):
+    role = get_object_or_404(RoleGroup, id=role_id, company=request.company)
+    try:
+        is_active = RoleService.toggle_role(
+            role=role, actor=request.user, request_meta=request.request_meta
+        )
+        return JsonResponse({"ok": True, "is_active": is_active})
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
 @crm_permission_required("authorization.permissions.manage")
 def permission_catalog(request):
     return render(request, "authorization/permission_catalog.html", {
@@ -103,66 +162,77 @@ def permission_catalog(request):
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def user_permission_matrix(request, user_id):
-    """Show effective result + apply direct ALLOW/DENY overrides (docs §4.4)."""
+    """Show matrix layout page, override saves via AJAX JSON POST."""
     target = get_object_or_404(User, id=user_id, profile__company=request.company)
     
     if request.method == "POST":
-        permission_codes = request.POST.getlist("permissions")
+        import json
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({"error": "Invalid JSON"}, status=400)
+            permission_codes = data.get("permissions", [])
+        else:
+            permission_codes = request.POST.getlist("permissions")
+            
         PermissionManagementService.update_user_overrides(
             user=target,
             permission_codes=permission_codes,
             created_by=request.user,
             request_meta=request.request_meta,
         )
+        if request.content_type == "application/json":
+            return JsonResponse({"ok": True})
         messages.success(request, "Permission overrides updated successfully.")
         return redirect("authorization:user_matrix", user_id=target.id)
         
-    from apps.accounts.services import UserService
-    from apps.authorization.services import EffectivePermissionResolver
-    
-    context = UserService.get_user_creation_context(company=request.company)
-    context["target"] = target
-    context["user_active_permissions"] = EffectivePermissionResolver.get_codes(target)
-    return render(request, "authorization/user_matrix.html", context)
+    return render(request, "authorization/user_matrix.html", {"target": target})
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+def user_permission_matrix_api(request, user_id):
+    target = get_object_or_404(User, id=user_id, profile__company=request.company)
+    payload = PermissionManagementService.get_user_permission_matrix_payload(target, request.company)
+    return JsonResponse(payload)
 
 
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def permission_preview(request, user_id):
-    """Simulate what a user can see/do before account activation (docs §4.4).
-    Shows all pages they can access and all actions available to them."""
-    from apps.authorization.models import PageDefinition
-
     target = get_object_or_404(User, id=user_id, profile__company=request.company)
-    effective_codes = EffectivePermissionResolver.get_codes(target)
-    all_perms = PermissionDefinition.objects.filter(
-        code__in=effective_codes
-    ).order_by("module", "code")
-    accessible_pages = PageDefinition.objects.filter(
-        code__in={p.code.rsplit(".", 1)[0] for p in all_perms}
-    ).order_by("menu_order")
-    return render(request, "authorization/permission_preview.html", {
-        "target": target,
-        "effective_codes": sorted(effective_codes),
-        "permissions": all_perms,
-        "accessible_pages": accessible_pages,
-    })
+    return render(request, "authorization/permission_preview.html", {"target": target})
+
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+def permission_preview_api(request, user_id):
+    target = get_object_or_404(User, id=user_id, profile__company=request.company)
+    payload = PermissionManagementService.get_permission_preview_payload(target)
+    return JsonResponse(payload)
 
 
 @login_required
 @crm_permission_required("authorization.roles.manage")
 def permission_audit(request):
-    """Trace who changed permissions/roles, when, and why (docs §4.4)."""
-    from apps.audit.models import AuditLog
-    from apps.core.constants import AuditAction
+    return render(request, "authorization/permission_audit.html")
 
-    qs = AuditLog.objects.filter(
+
+@login_required
+@crm_permission_required("authorization.roles.manage")
+def permission_audit_api(request):
+    from apps.audit.services import AuditService
+    filters = {
+        "user_id": request.GET.get("user_id"),
+        "action": request.GET.get("action"),
+        "entity_type": request.GET.get("entity_type"),
+        "limit": request.GET.get("limit", 100),
+        "page": request.GET.get("page", 1),
+    }
+    payload = AuditService.get_audit_logs_payload(
         company=request.company,
-        entity_type__in=["UserPermissionOverride", "UserRole", "RolePermission"],
-    ).select_related("actor").order_by("-created_at")
-    user_filter = request.GET.get("user_id")
-    if user_filter:
-        qs = qs.filter(after_json__icontains=user_filter)
-    from django.core.paginator import Paginator
-    page = Paginator(qs, 50).get_page(request.GET.get("page"))
-    return render(request, "authorization/permission_audit.html", {"page": page})
+        filters=filters,
+        is_permission_audit=True
+    )
+    return JsonResponse(payload)

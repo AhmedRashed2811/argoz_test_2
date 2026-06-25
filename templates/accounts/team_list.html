@@ -1,360 +1,133 @@
 {% extends "base.html" %}
-{% load crm_permissions %}
+{% load static crm_permissions %}
 
 {% block title %}Sales Teams · Argoz CRM{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'accounts/team_list.css' %}">
+{% endblock %}
+
 {% block content %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<main class="page-body">
 
-<style>
-  :root {
-    --bg-color: #0c0d12;
-    --card-bg: rgba(20, 21, 31, 0.6);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent: #6366f1;
-    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
-    --success: #10b981;
-    --danger: #ef4444;
-  }
-
-  body {
-    background-color: var(--bg-color);
-    background-image:
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
-    color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
-    margin: 0;
-    min-height: 100vh;
-  }
-
-  .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem;
-    animation: fadeIn 0.6s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-  }
-
-  .page-header h1 {
-    font-size: 2.2rem;
-    margin: 0;
-    background: linear-gradient(to right, #ffffff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .page-header p {
-    color: var(--text-secondary);
-    margin: 0.25rem 0 0 0;
-    font-size: 0.95rem;
-  }
-
-  .btn-create {
-    background: var(--accent-gradient);
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    padding: 12px 24px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  }
-
-  .btn-create:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
-    filter: brightness(1.1);
-  }
-
-  .glass-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  }
-
-  .table-responsive { width: 100%; overflow-x: auto; }
-
-  table.team-table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-  }
-
-  table.team-table th {
-    padding: 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  table.team-table td {
-    padding: 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    vertical-align: middle;
-  }
-
-  table.team-table tr:hover td {
-    background: rgba(255, 255, 255, 0.015);
-  }
-
-  .team-name {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #ffffff;
-  }
-
-  .team-region {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    margin-top: 0.1rem;
-  }
-
-  .head-badge {
-    background: rgba(99, 102, 241, 0.12);
-    color: #a5b4fc;
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 0.82rem;
-    font-weight: 500;
-    display: inline-block;
-  }
-
-  .member-pill {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    display: inline-block;
-    margin: 2px;
-  }
-
-  .member-count {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: #a5b4fc;
-  }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: 6px;
-  }
-
-  .status-pill.active { color: #34d399; background: rgba(16, 185, 129, 0.1); }
-  .status-pill.inactive { color: #f87171; background: rgba(239, 68, 68, 0.1); }
-
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-
-  .status-pill.active .status-dot {
-    background-color: var(--success);
-    box-shadow: 0 0 8px var(--success);
-    animation: pulse 2s infinite;
-  }
-
-  .status-pill.inactive .status-dot { background-color: var(--danger); }
-
-  @keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-  }
-
-  .actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-  .btn-action {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 8px;
-    color: var(--text-primary);
-    padding: 6px 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .btn-action:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15); }
-
-  .btn-action.btn-edit { border-color: rgba(99, 102, 241, 0.25); color: #a5b4fc; }
-  .btn-action.btn-edit:hover { background: rgba(99, 102, 241, 0.1); border-color: var(--accent); }
-
-  .btn-action.btn-danger { border-color: rgba(239, 68, 68, 0.25); color: #fca5a5; }
-  .btn-action.btn-danger:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); }
-
-  .empty-state {
-    text-align: center;
-    padding: 3rem 0;
-    color: var(--text-secondary);
-  }
-</style>
-
-<div class="container">
+  <!-- Page Header -->
   <div class="page-header">
-    <div>
-      <h1>Sales Teams</h1>
-      <p>Manage team structure, heads, and member assignments for lead distribution.</p>
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Sales Teams</h1>
+        <p>Manage team structure, heads, and member assignments for lead distribution</p>
+      </div>
     </div>
     {% if request.user|can:'admin.teams.create' %}
-      <a href="{% url 'accounts:team_create' %}" class="btn-create">
-        <span>+</span> Create New Team
+      <a href="{% url 'accounts:team_create' %}" class="btn-primary">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Create New Team
       </a>
     {% endif %}
   </div>
 
-  <div class="glass-card">
-    <div class="table-responsive">
-      <table class="team-table">
+  <!-- Table Card -->
+  <div class="table-card">
+    <div class="table-scroll-wrap">
+      <table>
         <thead>
           <tr>
-            <th>Team</th>
-            <th>Sales Head</th>
-            <th>Members</th>
-            <th>Order</th>
-            <th>Status</th>
+            <th>
+              <div class="th-inner">Team Name
+                <button class="th-icon-btn" id="sortNameBtn" title="Sort by name"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterNameBtn" title="Filter by name"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Sales Head
+                <button class="th-icon-btn" id="sortHeadBtn" title="Sort by head"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+                <button class="th-icon-btn" id="filterHeadBtn" title="Filter by head"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Members
+                <button class="th-icon-btn" id="filterMemberBtn" title="Filter by member"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Sort Order
+                <button class="th-icon-btn" id="sortOrderBtn" title="Sort by order"><svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg></button>
+              </div>
+            </th>
+            <th>
+              <div class="th-inner">Status
+                <button class="th-icon-btn" id="filterStatusBtn" title="Filter by status"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+              </div>
+            </th>
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          {% for team in teams %}
-            <tr>
-              <td>
-                <div class="team-name">{{ team.name }}</div>
-                {% if team.region %}
-                  <div class="team-region">{{ team.region }}</div>
-                {% endif %}
-              </td>
-
-              <td>
-                {% with heads=team.members.all %}
-                  {% for m in heads %}
-                    {% if m.position == "HEAD" %}
-                      <span class="head-badge">{{ m.user.get_full_name|default:m.user.email }}</span>
-                    {% endif %}
-                  {% empty %}
-                  {% endfor %}
-                  {% if not heads %}
-                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Unassigned</span>
-                  {% endif %}
-                {% endwith %}
-              </td>
-
-              <td>
-                {% with members=team.members.all %}
-                  {% if members %}
-                    <span class="member-count">{{ members|length }} member{{ members|length|pluralize }}</span>
-                    <div style="margin-top: 0.4rem;">
-                      {% for m in members|slice:":4" %}
-                        <span class="member-pill">{{ m.user.get_full_name|default:m.user.email }}</span>
-                      {% endfor %}
-                      {% if members|length > 4 %}
-                        <span class="member-pill" style="color: var(--text-secondary);">+{{ members|length|add:"-4" }} more</span>
-                      {% endif %}
-                    </div>
-                  {% else %}
-                    <span style="color: #64748b; font-size: 0.85rem;">No Members</span>
-                  {% endif %}
-                {% endwith %}
-              </td>
-
-              <td>
-                <span style="font-size: 0.9rem; color: var(--text-secondary);">{{ team.order_index }}</span>
-              </td>
-
-              <td>
-                {% if team.is_active %}
-                  <span class="status-pill active"><span class="status-dot"></span> Active</span>
-                {% else %}
-                  <span class="status-pill inactive"><span class="status-dot"></span> Inactive</span>
-                {% endif %}
-              </td>
-
-              <td>
-                <div class="actions-cell">
-                  {% if request.user|can:'admin.teams.update' %}
-                    <a href="{% url 'accounts:team_edit' team.id %}" class="btn-action btn-edit">Edit</a>
-                  {% endif %}
-
-                  {% if team.is_active %}
-                    {% if request.user|can:'admin.teams.delete' %}
-                      <a href="{% url 'accounts:team_delete' team.id %}" class="btn-action btn-danger"
-                         onclick="return confirm('Delete team &quot;{{ team.name }}&quot;?');">
-                        Delete
-                      </a>
-                    {% endif %}
-                  {% else %}
-                    {% if request.user|can:'admin.teams.update' %}
-                      <a href="{% url 'accounts:team_activate' team.id %}" class="btn-action"
-                         style="border-color: rgba(16, 185, 129, 0.25); color: #34d399;"
-                         onclick="return confirm('Activate team &quot;{{ team.name }}&quot;?');">
-                        Activate
-                      </a>
-                    {% endif %}
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="6">
-                <div class="empty-state">
-                  <h3>No Teams Found</h3>
-                  <p>No sales teams have been created yet for this company.</p>
-                </div>
-              </td>
-            </tr>
-          {% endfor %}
+        <tbody id="team-table-body">
+          <tr>
+            <td colspan="6">
+              <div class="spinner-wrap">
+                <div class="spinner"></div>
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
-</div>
+
+  <div class="filter-dropdown" id="filterNameDropdown" onclick="event.stopPropagation()">
+    <div class="filter-dd-head"><p>Filter by Team Name</p><input type="text" class="filter-search" id="filterNameSearch" placeholder="Search…"></div>
+    <div class="filter-list" id="filterNameList"></div>
+    <div class="filter-actions">
+      <button class="filter-btn select-all" id="filterNameSelectAll">Select All</button>
+      <button class="filter-btn clear-all"  id="filterNameClearAll">Clear All</button>
+    </div>
+  </div>
+  <div class="filter-dropdown" id="filterHeadDropdown" onclick="event.stopPropagation()">
+    <div class="filter-dd-head"><p>Filter by Sales Head</p><input type="text" class="filter-search" id="filterHeadSearch" placeholder="Search…"></div>
+    <div class="filter-list" id="filterHeadList"></div>
+    <div class="filter-actions">
+      <button class="filter-btn select-all" id="filterHeadSelectAll">Select All</button>
+      <button class="filter-btn clear-all"  id="filterHeadClearAll">Clear All</button>
+    </div>
+  </div>
+  <div class="filter-dropdown" id="filterMemberDropdown" onclick="event.stopPropagation()">
+    <div class="filter-dd-head"><p>Filter by Member</p><input type="text" class="filter-search" id="filterMemberSearch" placeholder="Search…"></div>
+    <div class="filter-list" id="filterMemberList"></div>
+    <div class="filter-actions">
+      <button class="filter-btn select-all" id="filterMemberSelectAll">Select All</button>
+      <button class="filter-btn clear-all"  id="filterMemberClearAll">Clear All</button>
+    </div>
+  </div>
+  <div class="filter-dropdown" id="filterStatusDropdown" onclick="event.stopPropagation()">
+    <div class="filter-dd-head"><p>Filter by Status</p></div>
+    <div class="filter-list" id="filterStatusList"></div>
+    <div class="filter-actions">
+      <button class="filter-btn select-all" id="filterStatusSelectAll">Select All</button>
+      <button class="filter-btn clear-all"  id="filterStatusClearAll">Clear All</button>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.API_LIST_URL = "{% url 'accounts:team_api_list' %}";
+  window.URLS = {
+    edit: "{% url 'accounts:team_edit' '00000000-0000-0000-0000-000000000000' %}",
+    api_delete: "{% url 'accounts:team_api_delete' '00000000-0000-0000-0000-000000000000' %}",
+    api_activate: "{% url 'accounts:team_api_activate' '00000000-0000-0000-0000-000000000000' %}"
+  };
+  window.PERMS = {
+    can_update: {% if request.user|can:'admin.teams.update' %}true{% else %}false{% endif %},
+    can_delete: {% if request.user|can:'admin.teams.delete' %}true{% else %}false{% endif %}
+  };
+</script>
+<script src="{% static 'accounts/team_list.js' %}"></script>
 {% endblock %}

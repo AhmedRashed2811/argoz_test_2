@@ -1,254 +1,33 @@
 {% extends "base.html" %}
-{% load crm_permissions %}
+{% load static crm_permissions %}
 
 {% block title %}Policies · Argoz CRM{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'policies/policy_list.css' %}">
+{% endblock %}
+
 {% block content %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<main class="page-body">
 
-<style>
-  :root {
-    --bg-color: #0c0d12;
-    --card-bg: rgba(20, 21, 31, 0.6);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent: #6366f1;
-    --accent-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-  }
-
-  body {
-    background-color: var(--bg-color);
-    background-image:
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.12) 0px, transparent 50%);
-    color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
-    margin: 0;
-    min-height: 100vh;
-  }
-
-  .container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem;
-    animation: fadeIn 0.6s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .page-header h1 {
-    font-size: 2.2rem;
-    margin: 0;
-    background: linear-gradient(to right, #ffffff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .page-header p { color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.95rem; }
-
-  /* Search */
-  .search-wrapper { position: relative; width: 320px; }
-  .search-wrapper input {
-    width: 100%;
-    padding: 10px 16px 10px 40px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    color: #fff;
-    font-family: inherit;
-    font-size: 0.9rem;
-    box-sizing: border-box;
-    transition: all 0.2s;
-  }
-  .search-wrapper input:focus {
-    outline: none; border-color: var(--accent);
-    background: rgba(255,255,255,0.06);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-  }
-  .search-wrapper input::placeholder { color: #475569; }
-  .search-wrapper::before {
-    content: "🔍";
-    position: absolute; left: 14px; top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.85rem; opacity: 0.5; pointer-events: none;
-  }
-
-  /* Module section */
-  .module-section { margin-bottom: 1.5rem; }
-
-  .module-heading {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-    padding: 0 0.25rem;
-  }
-
-  .module-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-  }
-
-  .module-divider {
-    flex: 1;
-    height: 1px;
-    background: var(--border-color);
-  }
-
-  .module-count {
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.04);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-  }
-
-  /* Policy cards grid */
-  .policy-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 0.875rem;
-  }
-
-  .policy-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 1.25rem 1.4rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-  }
-
-  .policy-card:hover {
-    border-color: rgba(99,102,241,0.25);
-    background: rgba(20,21,31,0.8);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
-  }
-
-  .policy-card.is-set { border-left: 3px solid rgba(99,102,241,0.5); }
-  .policy-card.not-set { border-left: 3px solid rgba(239,68,68,0.3); }
-
-  .policy-info { flex: 1; min-width: 0; }
-
-  .policy-name {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #ffffff;
-    margin-bottom: 0.25rem;
-  }
-
-  .policy-code {
-    font-size: 0.72rem;
-    font-family: monospace;
-    color: var(--text-secondary);
-    word-break: break-all;
-    margin-bottom: 0.6rem;
-  }
-
-  .policy-value {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    font-weight: 500;
-  }
-
-  .value-set {
-    background: rgba(99,102,241,0.1);
-    color: #a5b4fc;
-    border: 1px solid rgba(99,102,241,0.2);
-    padding: 3px 10px;
-    border-radius: 6px;
-  }
-
-  .value-unset {
-    background: rgba(239,68,68,0.08);
-    color: #f87171;
-    border: 1px solid rgba(239,68,68,0.15);
-    padding: 3px 10px;
-    border-radius: 6px;
-  }
-
-  .type-badge {
-    font-size: 0.68rem;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.04);
-    color: #64748b;
-    border: 1px solid rgba(255,255,255,0.06);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-left: 0.4rem;
-    vertical-align: middle;
-  }
-
-  .edit-btn {
-    background: rgba(99,102,241,0.08);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 8px;
-    color: #a5b4fc;
-    padding: 7px 14px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    flex-shrink: 0;
-    font-family: inherit;
-  }
-  .edit-btn:hover {
-    background: rgba(99,102,241,0.18);
-    border-color: var(--accent);
-    color: #c4b5fd;
-  }
-
-  .empty-state { text-align: center; padding: 3rem; color: var(--text-secondary); }
-</style>
-
-<div class="container">
+  <!-- Page Header -->
   <div class="page-header">
-    <div>
-      <h1>Company Policies</h1>
-      <p>Configure system-wide rules for distribution, SLA, marketing, and more.</p>
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Company Policies</h1>
+        <p>Configure company-wide rules for distribution SLA, round robin parameters, and marketing budgets</p>
+      </div>
     </div>
     <div class="search-wrapper">
-      <input type="text" id="policy-search" placeholder="Search policies…" oninput="filterPolicies()">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="policy-search" placeholder="Search policies…" oninput="filterPolicies()" autocomplete="off">
     </div>
   </div>
 
+  <!-- Policies Content -->
   {% for module, rows in by_module.items %}
     <div class="module-section" data-module="{{ module }}">
       <div class="module-heading">
@@ -256,6 +35,7 @@
         <div class="module-divider"></div>
         <span class="module-count">{{ rows|length }}</span>
       </div>
+      
       <div class="policy-grid">
         {% for row in rows %}
           <div class="policy-card {% if row.is_set %}is-set{% else %}not-set{% endif %}"
@@ -282,21 +62,13 @@
   {% empty %}
     <div class="empty-state">
       <h3>No Policies Found</h3>
-      <p>Run <code>python manage.py seed_crm</code> to populate policy definitions.</p>
+      <p>Database table is empty. Please run seeds to populate policy definitions.</p>
     </div>
   {% endfor %}
-</div>
 
-<script>
-  function filterPolicies() {
-    const q = document.getElementById('policy-search').value.toLowerCase();
-    document.querySelectorAll('.policy-card').forEach(card => {
-      card.style.display = (card.dataset.search || '').includes(q) ? '' : 'none';
-    });
-    document.querySelectorAll('.module-section').forEach(section => {
-      const visible = section.querySelectorAll('.policy-card:not([style*="display: none"])').length;
-      section.style.display = visible > 0 ? '' : 'none';
-    });
-  }
-</script>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'policies/policy_list.js' %}"></script>
 {% endblock %}

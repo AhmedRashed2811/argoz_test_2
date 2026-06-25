@@ -131,9 +131,8 @@ class PermissionManagementService:
             "reason": reason,
         }
         
-        company = None
-        if hasattr(user, "profile") and user.profile:
-            company = user.profile.company
+        profile = getattr(user, "profile", None)
+        company = profile.company if profile else None
 
         if audit:
             AuditService.log(
@@ -175,9 +174,8 @@ class PermissionManagementService:
             "is_active": True,
         }
 
-        company = None
-        if hasattr(user, "profile") and user.profile:
-            company = user.profile.company
+        profile = getattr(user, "profile", None)
+        company = profile.company if profile else None
 
         if audit:
             AuditService.log(
@@ -261,7 +259,8 @@ class PermissionManagementService:
         }
 
         if audit and existing_overrides_dict != new_overrides_dict:
-            company = user.profile.company if hasattr(user, "profile") and user.profile else None
+            profile = getattr(user, "profile", None)
+            company = profile.company if profile else None
             AuditService.log(
                 action=AuditAction.PERMISSION_CHANGE,
                 entity_type="UserPermissionOverride",
@@ -274,6 +273,104 @@ class PermissionManagementService:
                 request_meta=request_meta,
                 entity_display=user.email,
             )
+
+    @staticmethod
+    def get_permission_preview_payload(user):
+        from .services import EffectivePermissionResolver
+        from .models import PermissionDefinition, PageDefinition
+        
+        effective_codes = EffectivePermissionResolver.get_codes(user)
+        all_perms = PermissionDefinition.objects.filter(
+            code__in=effective_codes
+        ).order_by("module", "code")
+        
+        accessible_pages = PageDefinition.objects.filter(
+            code__in={p.code.rsplit(".", 1)[0] for p in all_perms}
+        ).order_by("menu_order")
+        
+        profile = getattr(user, "profile", None)
+        return {
+            "target": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "full_name": user.get_full_name(),
+                "profile": {
+                    "job_title": profile.job_title if profile else "",
+                    "department": profile.department if profile else "",
+                    "default_role": {
+                        "id": str(profile.default_role.id) if profile and profile.default_role else None,
+                        "name": profile.default_role.name if profile and profile.default_role else None,
+                    }
+                }
+            },
+            "effective_codes": list(effective_codes),
+            "permissions": [
+                {
+                    "code": p.code,
+                    "name": p.name,
+                    "module": p.module,
+                    "description": p.description,
+                }
+                for p in all_perms
+            ],
+            "accessible_pages": [
+                {
+                    "code": pg.code,
+                    "name": pg.name,
+                    "icon": pg.icon,
+                    "url_name": pg.url_name,
+                    "menu_order": pg.menu_order,
+                }
+                for pg in accessible_pages
+            ]
+        }
+
+    @staticmethod
+    def get_user_permission_matrix_payload(target_user, company) -> dict:
+        from apps.accounts.services import UserService
+        from .services import EffectivePermissionResolver
+        import json
+        
+        context = UserService.get_user_creation_context(company=company)
+        
+        roles_data = [
+            {"id": str(r.id), "name": r.name, "code": r.code}
+            for r in context["roles"]
+        ]
+        permissions_data = [
+            {"code": p.code, "name": p.name, "module": p.module, "description": p.description}
+            for p in context["permissions"]
+        ]
+        role_permissions_map = json.loads(context["role_permissions_json"])
+        
+        user_active_permissions = list(EffectivePermissionResolver.get_codes(target_user))
+        
+        profile = getattr(target_user, "profile", None)
+        return {
+            "target": {
+                "id": target_user.id,
+                "email": target_user.email,
+                "first_name": target_user.first_name,
+                "last_name": target_user.last_name,
+                "full_name": target_user.get_full_name(),
+                "is_active": target_user.is_active,
+                "profile": {
+                    "job_title": profile.job_title if profile else "",
+                    "department": profile.department if profile else "",
+                    "default_role": {
+                        "id": str(profile.default_role.id) if profile and profile.default_role else None,
+                        "name": profile.default_role.name if profile and profile.default_role else None,
+                    }
+                }
+            },
+            "roles": roles_data,
+            "permissions": permissions_data,
+            "role_permissions": role_permissions_map,
+            "user_active_permissions": user_active_permissions,
+        }
+
 
 
 class RoleService:
