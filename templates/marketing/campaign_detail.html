@@ -17,6 +17,51 @@
   <h3>Selected types</h3>
   <ul>{% for t in campaign.selected_types.all %}<li>{{ t.type_code }} {% if t.is_completed %}✓{% endif %}</li>{% endfor %}</ul>
 
+  {% if campaign.events.all %}
+    <h3>Events</h3>
+    <ul>
+      {% for event in campaign.events.all %}
+        <li><strong>{{ event.name }}</strong> (Venue: {{ event.venue|default:"—" }}, Date: {{ event.event_date|default:"—" }}, Budget: {{ event.budget }} EGP, Target Attendees: {{ event.target_attendees }}) · Leads: <strong>{{ event.lead_count }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if campaign.tv_ads.all %}
+    <h3>TV Ads</h3>
+    <ul>
+      {% for tv in campaign.tv_ads.all %}
+        <li><strong>{{ tv.name }}</strong> (Period: {{ tv.start_date|default:"—" }} → {{ tv.end_date|default:"—" }}, Budget: {{ tv.budget }} EGP) · Leads: <strong>{{ tv.lead_count }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if campaign.street_ads.all %}
+    <h3>Street Ads</h3>
+    <ul>
+      {% for street in campaign.street_ads.all %}
+        <li><strong>{{ street.name }}</strong> (Period: {{ street.start_date|default:"—" }} → {{ street.end_date|default:"—" }}, Budget: {{ street.budget }} EGP) · Leads: <strong>{{ street.lead_count }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if campaign.social_ads.all %}
+    <h3>Social Media Ads</h3>
+    <ul>
+      {% for social in campaign.social_ads.all %}
+        <li><strong>{{ social.name }}</strong> (Period: {{ social.start_date|default:"—" }} → {{ social.end_date|default:"—" }}, Target KPI: {{ social.target_kpi|default:"—" }}) · Leads: <strong>{{ social.lead_count }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if campaign.exhibitions.all %}
+    <h3>Exhibitions</h3>
+    <ul>
+      {% for exhibition in campaign.exhibitions.all %}
+        <li><strong>{{ exhibition.name }}</strong> (Place: {{ exhibition.place|default:"—" }}, Period: {{ exhibition.start_date|default:"—" }} → {{ exhibition.end_date|default:"—" }}, Budget: {{ exhibition.budget }} EGP) · Leads: <strong>{{ exhibition.lead_count }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
   {% if request.user|can:'marketing.budget.manage' %}
     <h3>Add other cost & recalc budget</h3>
     <form method="post" action="{% url 'marketing:campaign_budget' campaign.id %}">

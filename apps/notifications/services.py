@@ -59,13 +59,11 @@ class NotificationService:
 
     @staticmethod
     def _dispatch(notification_id) -> None:
-        # Lazy import: tasks module wires Celery in Phase 12; degrade to no-op
-        # if the worker stack isn't importable in a given environment.
         try:
             from .tasks import fanout_notification
 
-            fanout_notification.delay(str(notification_id))
-        except Exception:  # ponytail: never let notify failure break the business txn
+            fanout_notification(notification_id)
+        except Exception:
             pass
 
     # --- Typed convenience wrappers used across domains (docs §12.3) ---
@@ -86,8 +84,57 @@ class NotificationService:
         immediately without cross-process channel-layer timing issues.
         """
         import asyncio
+        import json
         import redis.asyncio as aioredis
         from django.conf import settings
+        from asgiref.sync import sync_to_async
+
+        @sync_to_async
+        def get_notification_payload(notif_id):
+            import uuid
+            notif_id = (notif_id or "").strip()
+            if notif_id.startswith("{") and notif_id.endswith("}"):
+                try:
+                    import json
+                    parsed = json.loads(notif_id)
+                    if isinstance(parsed, dict) and "id" in parsed:
+                        notif_id = parsed["id"]
+                except Exception:
+                    pass
+
+            try:
+                uuid.UUID(notif_id)
+            except ValueError:
+                return None
+
+            from django.utils import timezone
+            from apps.leads.models import Lead
+            from .models import Notification
+            n = Notification.objects.filter(id=notif_id).select_related("notification_type").first()
+            if not n:
+                return None
+            lead_name = ""
+            lead_phone = ""
+            if n.related_type == "Lead" and n.related_id:
+                lead = Lead.objects.filter(pk=n.related_id).first()
+                if lead:
+                    lead_name = lead.name
+                    lead_phone = lead.phone
+
+            return {
+                "id": str(n.id),
+                "title": n.title,
+                "body": n.body,
+                "type": n.notification_type.name if n.notification_type else "",
+                "code": n.notification_type.code if n.notification_type else "",
+                "priority": n.priority,
+                "related_type": n.related_type,
+                "related_id": n.related_id,
+                "lead_name": lead_name,
+                "lead_phone": lead_phone,
+                "created_at": timezone.localtime(n.created_at).isoformat(),
+                "is_read": n.is_read,
+            }
 
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         pubsub = r.pubsub()
@@ -108,8 +155,10 @@ class NotificationService:
         try:
             while True:
                 try:
-                    data = await asyncio.wait_for(queue.get(), timeout=25)
-                    yield f"data: {data}\n\n"
+                    notif_id = await asyncio.wait_for(queue.get(), timeout=25)
+                    payload = await get_notification_payload(notif_id)
+                    if payload:
+                        yield f"data: {json.dumps(payload)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": heartbeat\n\n"
         finally:
@@ -127,7 +176,56 @@ class NotificationService:
             notification.save(update_fields=["is_read", "updated_at"])
 
     @staticmethod
+    def delete(*, notification: Notification) -> None:
+        notification.delete()
+
+    @staticmethod
     def mark_all_read(*, recipient) -> int:
         return Notification.objects.filter(
             recipient=recipient, is_read=False
         ).update(is_read=True)
+
+    @staticmethod
+    def get_api_list(user) -> dict:
+        from django.utils import timezone
+        from apps.leads.models import Lead
+
+        qs = Notification.objects.filter(
+            recipient=user
+        ).select_related("notification_type").order_by("-created_at")[:50]
+
+        lead_ids = [n.related_id for n in qs if n.related_type == "Lead" and n.related_id]
+        leads_map = {}
+        if lead_ids:
+            leads_map = {str(l.id): l for l in Lead.objects.filter(id__in=lead_ids)}
+
+        items = []
+        for n in qs:
+            lead_name = ""
+            lead_phone = ""
+            if n.related_type == "Lead" and n.related_id:
+                lead = leads_map.get(n.related_id)
+                if not lead:
+                    lead = Lead.objects.filter(pk=n.related_id).first()
+                if lead:
+                    lead_name = lead.name
+                    lead_phone = lead.phone
+
+            items.append({
+                "id": str(n.id),
+                "title": n.title,
+                "body": n.body,
+                "type": n.notification_type.name if n.notification_type else "",
+                "code": n.notification_type.code if n.notification_type else "",
+                "priority": n.priority,
+                "related_type": n.related_type,
+                "related_id": n.related_id,
+                "lead_name": lead_name,
+                "lead_phone": lead_phone,
+                "created_at": timezone.localtime(n.created_at).isoformat(),
+                "is_read": n.is_read,
+            })
+
+        unread = sum(1 for item in items if not item["is_read"])
+        return {"items": items, "unread": unread}
+

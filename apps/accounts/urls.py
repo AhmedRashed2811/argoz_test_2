@@ -38,4 +38,9 @@ urlpatterns = [
     path("profile/api/", views.profile_api, name="profile_api"),
     path("change-password/", views.change_password_view, name="change_password"),
     path("change-password/api/", views.change_password_api, name="change_password_api"),
+    path("brokers/", views.broker_list, name="broker_list"),
+    path("brokers/api/", views.broker_api_list, name="broker_api_list"),
+    path("brokers/api/create/", views.broker_api_create, name="broker_api_create"),
+    path("brokers/<uuid:broker_id>/api/edit/", views.broker_api_edit, name="broker_api_edit"),
+    path("brokers/<uuid:broker_id>/api/delete/", views.broker_api_delete, name="broker_api_delete"),
 ]

@@ -54,6 +54,7 @@ class Campaign(BaseModel, CompanyOwnedModel):
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     archived_at = models.DateTimeField(null=True, blank=True)
+    rejected_budgets = models.JSONField(default=list, blank=True)
 
     class Meta:
         constraints = [

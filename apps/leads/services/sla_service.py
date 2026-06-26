@@ -9,17 +9,16 @@ from django.utils import timezone
 from apps.policies.constants import PolicyCode
 from apps.policies.services import PolicyResolver
 
-from ..constants import Origin, SLAStatus, StageCode
+from ..constants import Origin, SLAStatus, StageCode, SourceCode
 from ..models import Lead, LeadStageDefinition, SLAInstance
 
 
 def _duration_to_timedelta(value, default_minutes: int = 60) -> timedelta:
     """Policy duration may be {'minutes': n} / {'hours': n} / int minutes."""
     if isinstance(value, dict):
-        if "minutes" in value:
-            return timedelta(minutes=int(value["minutes"]))
-        if "hours" in value:
-            return timedelta(hours=int(value["hours"]))
+        h = int(value.get("hours") or 0)
+        m = int(value.get("minutes") or 0)
+        return timedelta(hours=h, minutes=m)
     if isinstance(value, (int, float)):
         return timedelta(minutes=int(value))
     return timedelta(minutes=default_minutes)
@@ -44,15 +43,29 @@ class SLAService:
         return _duration_to_timedelta(PolicyResolver.value(company, code, default=None))
 
     @staticmethod
-    def calculate_deadline(company, *, stage_code: str, origin: str | None = None):
+    def calculate_deadline(company, *, stage_code: str, origin: str | None = None, source_code: str | None = None, frozen_days: int = 0, scheduled_time=None):
         now = timezone.now()
         delta = None
-        if stage_code == StageCode.FRESH and origin is not None:
-            delta = SLAService.origin_duration(company, origin)
+        if stage_code == StageCode.FRESH:
+            if source_code == SourceCode.WALK_IN:
+                delta = _duration_to_timedelta(PolicyResolver.value(company, PolicyCode.WALKIN_SLA, default=None))
+            elif origin is not None:
+                delta = SLAService.origin_duration(company, origin)
         if delta is None:
             delta = SLAService.stage_duration(company, stage_code)
-        if delta is None and origin is not None:
-            delta = SLAService.origin_duration(company, origin)
+        if delta is None:
+            if source_code == SourceCode.WALK_IN:
+                delta = _duration_to_timedelta(PolicyResolver.value(company, PolicyCode.WALKIN_SLA, default=None))
+            elif origin is not None:
+                delta = SLAService.origin_duration(company, origin)
+        if stage_code == StageCode.FROZEN and frozen_days > 0:
+            if delta is None:
+                delta = timedelta(0)
+            delta += timedelta(days=frozen_days)
+        if stage_code in (StageCode.MEETING, StageCode.FOLLOW_UP) and scheduled_time:
+            if delta is None:
+                delta = timedelta(0)
+            delta += (scheduled_time - now)
         return (now + delta) if delta else None
 
     @staticmethod
@@ -67,21 +80,26 @@ class SLAService:
         MAX_LOOKAHEAD = timedelta(hours=1)
         near_expiry = (
             SLAInstance.objects
-            .select_related("lead", "lead__company", "lead__assigned_salesman")
+            .select_related("lead", "lead__company", "lead__assigned_salesman", "stage")
             .filter(status=SLAStatus.ACTIVE, deadline_at__gt=now, deadline_at__lte=now + MAX_LOOKAHEAD)
         )
         count = 0
         for sla in near_expiry:
             if not sla.lead.assigned_salesman_id:
                 continue
-            threshold_val = PolicyResolver.value(
-                sla.lead.company, "lead.sla_warning_threshold", default={"minutes": 30}
-            )
+            if sla.stage.code == StageCode.FRESH:
+                threshold_val = PolicyResolver.value(
+                    sla.lead.company, PolicyCode.FRESH_REMINDER_SCHEDULE, default={"minutes": 2}
+                )
+            else:
+                threshold_val = PolicyResolver.value(
+                    sla.lead.company, "lead.sla_warning_threshold", default={"minutes": 30}
+                )
             threshold = _duration_to_timedelta(threshold_val, default_minutes=30)
             if sla.deadline_at - threshold > now:
                 continue  # too early
             already = Reminder.objects.filter(
-                lead=sla.lead, reminder_type="SLA_WARNING",
+                lead=sla.lead, user=sla.lead.assigned_salesman, reminder_type="SLA_WARNING",
                 status__in=("PENDING", "SENT"),
             ).exists()
             if already:

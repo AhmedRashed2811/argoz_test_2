@@ -28,5 +28,5 @@ class ByTurnStrategy(AssignmentStrategyInterface):
             pointer.save(update_fields=["current_index", "updated_at"])
         return AssignmentDecision(
             team=member.team, salesman=member.user,
-            reason=f"By Turn index {idx}", snapshot={"index": idx, "scope": scope},
+            reason="By Turn Rotation", snapshot={"index": idx, "scope": scope},
         )

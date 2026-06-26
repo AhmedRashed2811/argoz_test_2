@@ -251,7 +251,7 @@ class SourceRouterService:
         from apps.distribution.services import ManualDistributionEscalation
         from apps.leads.models import WalkInQueueEntry
         from apps.leads.services.walkin_service import (
-            FULL_ROTATION, ROT_FULL, WalkInService,
+            FULL_ROTATION, ROT_FULL, ROT_TEAM, TEAM_TURN, WalkInService,
         )
 
         policy = PolicyResolver.option_code(
@@ -278,6 +278,11 @@ class SourceRouterService:
             # Served from the company-wide rotation -> cursor moves past this person.
             WalkInService.advance_pointer(
                 company, ROT_FULL, len(WalkInService.available_members(company)))
+        elif policy == TEAM_TURN:
+            from apps.accounts.models import Team
+            WalkInService.advance_pointer(
+                company, ROT_TEAM,
+                Team.objects.filter(company=company, is_active=True).count())
         return lead
 
     @staticmethod

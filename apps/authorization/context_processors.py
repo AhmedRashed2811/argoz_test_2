@@ -20,6 +20,8 @@ def nav_menu(request):
         is_menu_item=True, is_active=True, parent__isnull=True
     ).order_by("module", "menu_order")
     for page in pages:
+        if page.module == "notifications":
+            continue
         access_code = f"{page.code}.access"
         if user.is_superuser or access_code in codes or _page_allowed(page, codes):
             items.append(page)

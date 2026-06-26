@@ -107,6 +107,28 @@ class Lead(BaseModel, CompanyOwnedModel):
     )
     metadata = models.JSONField(null=True, blank=True)
 
+    @property
+    def lead_timezone(self) -> str:
+        COUNTRY_TIMEZONES = {
+            "+20": "Africa/Cairo",      # Egypt
+            "+971": "Asia/Dubai",        # UAE
+            "+966": "Asia/Riyadh",       # Saudi Arabia
+            "+974": "Asia/Qatar",        # Qatar
+            "+965": "Asia/Kuwait",       # Kuwait
+            "+973": "Asia/Bahrain",      # Bahrain
+            "+968": "Asia/Muscat",       # Oman
+            "+962": "Asia/Amman",        # Jordan
+            "+961": "Asia/Beirut",       # Lebanon
+            "+963": "Asia/Damascus",     # Syria
+            "+44": "Europe/London",      # UK
+            "+1": "America/New_York",    # US
+            "+33": "Europe/Paris",       # France
+            "+49": "Europe/Berlin",      # Germany
+            "+90": "Europe/Istanbul",    # Turkey
+            "+91": "Asia/Kolkata",       # India
+        }
+        return COUNTRY_TIMEZONES.get(self.country_code, "UTC")
+
     class Meta:
         indexes = [
             models.Index(fields=["company", "active_status", "assigned_salesman"]),

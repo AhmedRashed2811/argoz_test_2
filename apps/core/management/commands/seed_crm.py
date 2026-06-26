@@ -188,8 +188,10 @@ class Command(BaseCommand):
         defs = [
             (PolicyCode.DIRECT_SLA, "Direct Lead SLA", "leads", ValueType.DURATION, []),
             (PolicyCode.BROKER_SLA, "Broker Lead SLA", "leads", ValueType.DURATION, []),
+            (PolicyCode.WALKIN_SLA, "Walk-in Lead SLA", "leads", ValueType.DURATION, []),
             (PolicyCode.SLA_EXPIRY_METHOD, "SLA Expiry Method", "leads", ValueType.OPTION,
              [(SLAExpiryMethod.ROUND_ROBIN, "Round Robin", "ROUND_ROBIN"),
+              (SLAExpiryMethod.BY_TURN, "By Turn", "BY_TURN"),
               (SLAExpiryMethod.RETRY_TEAM_ESCALATION, "Retry + Team Escalation", ""),
               (SLAExpiryMethod.MANUAL, "Manual", "")]),
             (PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD, "Auto Distribution Method",
@@ -228,7 +230,7 @@ class Command(BaseCommand):
             (PolicyCode.NOT_REACHED_REMINDER_MODE, "Not Reached Reminder Mode", "leads",
              ValueType.OPTION, [("AUTOMATIC", "Automatic", ""), ("MANUAL", "Manual", "")]),
             (PolicyCode.FRESH_REMINDER_SCHEDULE, "Fresh Reminder Schedule", "leads",
-             ValueType.JSON, []),
+             ValueType.DURATION, []),
             (PolicyCode.CAMPAIGN_TYPE_REPEATABILITY, "Campaign Type Repeatability",
              "marketing", ValueType.BOOLEAN, []),
             (PolicyCode.TYPE_DATE_POLICY, "Campaign Type Date Policy", "marketing",
@@ -237,6 +239,8 @@ class Command(BaseCommand):
               ("WARN_ONLY", "Warn only", "")]),
             (PolicyCode.FINANCE_REASON_REQUIRED, "Finance Reason Required", "marketing",
              ValueType.JSON, []),
+            (PolicyCode.CAMPAIGN_RESTRICT_EDITING, "Restrict Approved Campaign Editing", "marketing",
+             ValueType.BOOLEAN, []),
             (PolicyCode.WEBHOOK_MAPPING_POLICY, "Webhook Mapping Policy", "integration",
              ValueType.JSON, []),
             (PolicyCode.NOTIFICATION_DELIVERY_POLICY, "Notification Delivery Policy",
@@ -259,20 +263,23 @@ class Command(BaseCommand):
                 )
 
         # Sensible default selections + durations so the engine runs out of the box.
-        self._select(company, PolicyCode.SLA_EXPIRY_METHOD, SLAExpiryMethod.ROUND_ROBIN)
-        self._select(company, PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD, "ROUND_ROBIN")
+        self._select(company, PolicyCode.SLA_EXPIRY_METHOD, SLAExpiryMethod.BY_TURN)
+        self._select(company, PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD, "BY_TURN")
         self._select(company, PolicyCode.DISTRIBUTION_SCOPE_MODE, ScopeMode.ALL_SALESMEN)
-        self._select(company, PolicyCode.WALKIN_RECEPTION_POLICY, "OPEN_FLOOR")
+        self._select(company, PolicyCode.WALKIN_RECEPTION_POLICY, "FULL_ROTATION")
         self._select(company, PolicyCode.EXISTING_CLIENT_POLICY,
                      "PRESERVE_PRIOR_RELATIONSHIP")
         self._set_value(company, PolicyCode.LANGUAGE_DEFAULT, {"code": "ar"})
-        self._set_value(company, PolicyCode.DIRECT_SLA, {"hours": 2})
-        self._set_value(company, PolicyCode.BROKER_SLA, {"hours": 4})
+        self._set_value(company, PolicyCode.DIRECT_SLA, {"minutes": 5})
+        self._set_value(company, PolicyCode.BROKER_SLA, {"minutes": 5})
+        self._set_value(company, PolicyCode.WALKIN_SLA, {"hours": 24})
         self._set_value(company, f"{PolicyCode.STAGE_SLA}.fresh", {"hours": 2})
         self._select(company, PolicyCode.SELF_GENERATED_SALESMAN_POLICY, "KEEP_WITH_OWNER")
         self._select(company, PolicyCode.SELF_GENERATED_HEAD_ASSIGNMENT,
                      "SELF_OR_MANUAL_TEAM")
         self._set_value(company, PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN, True)
+        self._set_value(company, PolicyCode.FRESH_REMINDER_SCHEDULE, {"minutes": 2})
+        self._set_value(company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, True)
         self.stdout.write(f"  policies: {len(defs)}")
 
     def _select(self, company, code, option_code):
@@ -305,11 +312,15 @@ class Command(BaseCommand):
         pages = [
             ("dashboard", "main", "Dashboard", "dashboard:index", 0),
             ("leads", "dashboard", "Leads", "leads:list", 1),
+            ("leads", "create", "Add Lead", "leads:create", 2),
+            ("leads", "manual_distribution", "Manual Distribution",
+             "leads:manual_distribution", 2),
             ("marketing", "campaigns", "Campaigns", "marketing:campaign_list", 2),
             ("finance", "dashboard", "Finance Approvals", "finance:campaign_approval", 3),
             ("notifications", "view_own", "Notifications", "notifications:list", 4),
             ("admin", "users", "Users", "accounts:user_list", 10),
             ("admin", "teams", "Sales Teams", "accounts:team_list", 11),
+            ("admin", "brokers", "Brokers", "accounts:broker_list", 12),
             ("authorization", "roles", "Roles & Permissions",
              "authorization:role_list", 11),
             ("policies", "company", "Policies", "policies:list", 12),
@@ -320,7 +331,7 @@ class Command(BaseCommand):
             PageDefinition.objects.update_or_create(
                 code=f"{module}.{code}",
                 defaults=dict(module=module, name=name, url_name=url_name,
-                              menu_order=order, is_menu_item=True),
+                              menu_order=order, is_menu_item=(module != "notifications")),
             )
         self.stdout.write(f"  pages: {len(pages)}")
 
@@ -338,7 +349,10 @@ class Command(BaseCommand):
             ("admin.teams.create", "Create sales teams", RiskLevel.MEDIUM),
             ("admin.teams.update", "Update sales teams", RiskLevel.MEDIUM),
             ("admin.teams.delete", "Deactivate sales teams", RiskLevel.HIGH),
+            ("admin.brokers.access", "Open brokers page", RiskLevel.LOW),
+            ("admin.brokers.create", "Create brokers", RiskLevel.MEDIUM),
             ("leads.dashboard.access", "Open leads", RiskLevel.LOW),
+            ("leads.lead.create", "Create lead", RiskLevel.LOW),
             ("leads.lead.create_self_generated", "Create self-generated lead", RiskLevel.LOW),
             ("leads.lead.create_any_source", "Create lead from any source", RiskLevel.MEDIUM),
             ("leads.lead.create_from_self_generated", "Create lead: Self-Generated", RiskLevel.LOW),
@@ -352,6 +366,8 @@ class Command(BaseCommand):
             ("leads.lead.view_own", "View own leads", RiskLevel.LOW),
             ("leads.lead.view_team", "View team leads", RiskLevel.MEDIUM),
             ("leads.lead.view_all", "View all leads", RiskLevel.HIGH),
+            ("leads.lead.edit_all", "Edit any lead", RiskLevel.HIGH),
+            ("leads.lead.deactivate", "Activate/deactivate lead", RiskLevel.HIGH),
             ("leads.distribution.manual_all", "Manual distribution (all)", RiskLevel.HIGH),
             ("leads.distribution.team_manual", "Manual distribution (team)", RiskLevel.MEDIUM),
             ("leads.stage.change_own", "Change stage (own)", RiskLevel.LOW),
@@ -388,6 +404,24 @@ class Command(BaseCommand):
                 defaults=dict(module=module, action=code.rsplit(".", 1)[-1],
                               name=name, page=page, risk_level=risk),
             )
+        # Nav gate for the Manual Distribution page: link both distribution
+        # permissions to it so _page_allowed() shows the menu item for either
+        # manual_all (any salesman) or team_manual (own team) holders.
+        md_page = PageDefinition.objects.filter(
+            code="leads.manual_distribution"
+        ).first()
+        if md_page:
+            PermissionDefinition.objects.filter(
+                code__in=["leads.distribution.manual_all",
+                          "leads.distribution.team_manual"]
+            ).update(page=md_page)
+        create_page = PageDefinition.objects.filter(
+            code="leads.create"
+        ).first()
+        if create_page:
+            PermissionDefinition.objects.filter(
+                code="leads.lead.create"
+            ).update(page=create_page)
         self.stdout.write(f"  permissions: {len(codes)}")
 
     def _role_defaults(self, company):
@@ -407,36 +441,42 @@ class Command(BaseCommand):
         bundles = {
             "SYSTEM_ADMINS": all_codes,
             "DIRECTORS": ["dashboard.main.access", "leads.dashboard.access",
-                          "leads.lead.view_all", "leads.distribution.manual_all",
-                          "notifications.view_own", *all_source_creates],
+                          "leads.lead.create", "leads.lead.view_all", "leads.lead.edit_all",
+                          "leads.lead.deactivate", "leads.stage.change_own",
+                          "leads.distribution.manual_all",
+                          "notifications.view_own", *all_source_creates,
+                          "admin.brokers.access", "admin.brokers.create"],
             "SALES": ["dashboard.main.access", "leads.dashboard.access",
-                      "leads.lead.create_self_generated",
+                      "leads.lead.create", "leads.lead.create_self_generated",
                       "leads.lead.create_from_self_generated", "leads.lead.view_own",
                       "leads.stage.change_own", "leads.followup.create_own",
                       "leads.meeting.create_own", "notifications.view_own"],
             "SALES_HEAD": ["dashboard.main.access", "leads.dashboard.access",
-                           "leads.lead.create_self_generated",
+                           "leads.lead.create", "leads.lead.create_self_generated",
                            "leads.lead.create_from_self_generated", "leads.lead.view_own",
                            "leads.lead.view_team", "leads.distribution.team_manual",
                            "leads.stage.change_own", "leads.followup.create_own",
                            "leads.meeting.create_own", "notifications.view_own"],
             "SALES_OPERATION": ["dashboard.main.access", "leads.dashboard.access",
-                                "leads.lead.view_all", "leads.lead.create_any_source",
+                                "leads.lead.create", "leads.lead.view_all", "leads.lead.edit_all",
+                                "leads.lead.deactivate", "leads.stage.change_own",
+                                "leads.lead.create_any_source",
                                 "leads.distribution.manual_all", "notifications.view_own",
                                 "admin.teams.access", "admin.teams.create",
                                 "admin.teams.update", "admin.teams.delete",
+                                "admin.brokers.access", "admin.brokers.create",
                                 # All sources except self-generated (§4.2b).
                                 *[c for c in all_source_creates
                                   if c != "leads.lead.create_from_self_generated"]],
             "CALL_CENTER": ["dashboard.main.access", "leads.dashboard.access",
-                            "leads.lead.create_from_call_center",
+                            "leads.lead.create", "leads.lead.create_from_call_center",
                             "leads.lead.create_from_existing_client",
                             "leads.lead.view_own", "notifications.view_own"],
             "BROKERS": ["dashboard.main.access", "leads.dashboard.access",
-                        "leads.lead.create_from_broker", "leads.lead.view_own",
+                        "leads.lead.create", "leads.lead.create_from_broker", "leads.lead.view_own",
                         "notifications.view_own"],
             "RECEPTIONISTS": ["dashboard.main.access", "leads.dashboard.access",
-                              "leads.lead.create_from_walk_in", "notifications.view_own"],
+                              "leads.lead.create", "leads.lead.create_from_walk_in", "notifications.view_own"],
             "FINANCE_MANAGERS": ["finance.dashboard.access", "finance.campaign.review",
                                  "finance.campaign.approve",
                                  "marketing.campaign.view_all", "notifications.view_own"],

@@ -6,15 +6,15 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from apps.authorization.decorators import crm_permission_required
 
 from .forms import TeamForm, UserCreateForm, UserEditForm
-from .models import Team, User
-from .selectors import teams_for_company, users_for_company
+from .models import Team, User, Broker
+from .selectors import teams_for_company, users_for_company, brokers_for_company, broker_detail
 from django.views.decorators.csrf import ensure_csrf_cookie
-from .services import TeamService, UserService
+from .services import TeamService, UserService, BrokerService
 
 
 @ensure_csrf_cookie
@@ -453,4 +453,124 @@ def change_password_api(request):
         update_session_auth_hash(request, request.user)
         return JsonResponse({"ok": True})
     return JsonResponse({"error": error}, status=400)
+
+
+# ── Brokers ─────────────────────────────────────────────────────────────────
+
+@login_required
+@crm_permission_required("admin.brokers.access")
+def broker_list(request):
+    return render(request, "accounts/brokers.html")
+
+
+@login_required
+@crm_permission_required("admin.brokers.access")
+def broker_api_list(request):
+    brokers = brokers_for_company(request.company)
+    data = []
+    for b in brokers:
+        data.append({
+            "id": str(b.id),
+            "name": b.name,
+            "agency": b.company_name,
+            "phone": b.phone,
+            "location": b.location,
+            "commission": float(b.commission_rate) if b.commission_rate is not None else None,
+            "startDate": b.contract_start_date.isoformat() if b.contract_start_date else None,
+            "endDate": b.contract_end_date.isoformat() if b.contract_end_date else None,
+            "leads": b.leads_count,
+            "notes": b.notes,
+        })
+    return JsonResponse({"brokers": data})
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def broker_api_create(request):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    name = data.get("name", "").strip()
+    if not name:
+        return JsonResponse({"error": "Broker Name is required."}, status=400)
+
+    commission = data.get("commission")
+    if commission == "":
+        commission = None
+
+    try:
+        broker = BrokerService.create_broker(
+            company=request.company,
+            name=name,
+            company_name=data.get("agency", ""),
+            phone=data.get("phone", ""),
+            location=data.get("location", ""),
+            commission_rate=commission,
+            contract_start_date=data.get("startDate") or None,
+            contract_end_date=data.get("endDate") or None,
+            notes=data.get("notes", ""),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True, "broker_id": str(broker.id)})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def broker_api_edit(request, broker_id):
+    import json
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    name = data.get("name", "").strip()
+    if not name:
+        return JsonResponse({"error": "Broker Name is required."}, status=400)
+
+    commission = data.get("commission")
+    if commission == "":
+        commission = None
+
+    try:
+        BrokerService.update_broker(
+            broker_id=broker_id,
+            name=name,
+            company_name=data.get("agency", ""),
+            phone=data.get("phone", ""),
+            location=data.get("location", ""),
+            commission_rate=commission,
+            contract_start_date=data.get("startDate") or None,
+            contract_end_date=data.get("endDate") or None,
+            leads_count=int(data.get("leads") or 0),
+            notes=data.get("notes", ""),
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def broker_api_delete(request, broker_id):
+    try:
+        BrokerService.delete_broker(
+            broker_id=broker_id,
+            actor=request.user,
+            request_meta=request.request_meta,
+        )
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
 

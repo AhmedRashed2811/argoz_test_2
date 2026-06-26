@@ -91,9 +91,9 @@ const ddConfig = {
               onSelect: () => loadCampaignChannels() },
   camp_platform: { load: () => campChildrenURL('social_media_ad'), onSelect: () => loadCampChild() },
   camp_child: { load: () => Promise.resolve(DD.camp_child.items) },
-  camp_assign: { load: () => getJSON(CFG.urls.teams).then(d => (d.teams || []).map(t => ({ id: 'team:' + t.id, name: 'Team — ' + t.name }))) },
+  camp_assign: { load: salesmenLoader },
   broker: { load: () => getJSON(CFG.urls.brokers).then(d => d.brokers),
-            onSelect: () => { $('broker-salesman-section').style.display = 'flex'; } },
+            onSelect: () => { if (state.brokerAlsoAssignSalesman) $('broker-salesman-section').style.display = 'flex'; } },
   broker_salesman: { load: salesmenLoader },
   sg_member: { load: () => getJSON(CFG.urls.teamMembers).then(d => d.members) },
   cc_agent: { load: () => getJSON(CFG.urls.ccAgents).then(d => d.agents) },
@@ -330,7 +330,7 @@ function selectSource(code) {
   if (code === 'broker') {
     $('broker-self-panel').style.display = state.isBroker ? 'flex' : 'none';
     $('broker-staff-panel').style.display = state.isBroker ? 'none' : 'flex';
-    if (state.isBroker) $('broker-salesman-section').style.display = 'flex';
+    if (state.isBroker && state.brokerAlsoAssignSalesman) $('broker-salesman-section').style.display = 'flex';
   }
   if (code === 'call_center') $('cc-agent-group').style.display = '';
   if (code === 'walk_in') loadWalkin();
@@ -530,6 +530,7 @@ function init() {
     state.isHead = d.is_head; state.isSalesman = d.is_salesman;
     state.isBroker = d.is_broker; state.canManual = d.can_manual;
     state.headAssignment = d.head_assignment || 'SELF_OR_MANUAL_TEAM';
+    state.brokerAlsoAssignSalesman = d.broker_also_assign_salesman;
     renderSources(d.sources);
     if (d.sources.length) selectSource(d.sources[0].code);
   });

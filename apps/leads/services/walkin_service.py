@@ -54,6 +54,9 @@ class WalkInService:
             DistributionEngine.distribute(
                 lead=lead, actor=actor, request_meta=request_meta, strategy_code="BY_TURN"
             )
+            WalkInService.advance_pointer(
+                lead.company, ROT_FULL, len(WalkInService.available_members(lead.company))
+            )
         elif policy == TEAM_TURN:
             # Next team in rotation; that team's head picks the salesman.
             team = WalkInService._next_team(lead.company)
@@ -147,21 +150,31 @@ class WalkInService:
             Team.objects.filter(company=company, is_active=True).order_by("order_index")
         )
         if not teams:
+            print("[WALKIN TEAM TURN] No active teams found.")
             return None
-        pointer, _ = RotationPointer.objects.select_for_update().get_or_create(
+        pointer, created = RotationPointer.objects.select_for_update().get_or_create(
             company=company, pointer_code="WALKIN_TEAM_TURN", scope="GLOBAL",
             defaults={"current_index": 0},
         )
-        for _ in range(len(teams)):
+        print(f"[WALKIN TEAM TURN START] Loaded Pointer ID: {pointer.id} | Current Index in DB: {pointer.current_index} (Created: {created})")
+        print(f"   Active Teams: {[t.name for t in teams]}")
+
+        for i in range(len(teams)):
             idx = pointer.current_index % len(teams)
             team = teams[idx]
+            print(f"   - Checking team index {idx}: '{team.name}' (Pointer before advance: {pointer.current_index})")
+            
             pointer.current_index = (idx + 1) % len(teams)
             pointer.save(update_fields=["current_index", "updated_at"])
+            print(f"     Advanced pointer to: {pointer.current_index} and saved to DB.")
 
             # Check if this team has available salesmen
             pool = eligible_pool(
                 company=company, team=team, scope_mode=ScopeMode.TEAM_THEN_SALESMAN
             )
+            print(f"     Team '{team.name}' eligible pool size: {len(pool)} (Members: {[m.user.email for m in pool]})")
             if pool:
+                print(f"[WALKIN TEAM TURN SELECTED] Selected Team: '{team.name}'")
                 return team
+        print("❌ [WALKIN TEAM TURN FAILED] No teams with available candidates.")
         return None

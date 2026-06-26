@@ -64,10 +64,11 @@ def _assign(*, lead: Lead, team, salesman, method: str, strategy_code: str = "",
         if method in (AssignmentMethod.SLA_ROTATION, AssignmentMethod.ESCALATION)
         else NotificationCode.LEAD_ASSIGNED
     )
-    NotificationService.create_for_users(
-        company=lead.company, recipients=[salesman, from_salesman],
-        code=code, title="Lead assigned", related_type="Lead", related_id=lead.pk,
-    )
+    if salesman:
+        NotificationService.create_for_users(
+            company=lead.company, recipients=[salesman],
+            code=code, title="Lead assigned", related_type="Lead", related_id=lead.pk,
+        )
     return lead
 
 
@@ -114,6 +115,15 @@ class DistributionEngine:
             company, PolicyCode.DISTRIBUTION_SCOPE_MODE,
             default=ScopeMode.ALL_SALESMEN,
         )
+
+        print(f"\n==================================================")
+        print(f"[DISTRIBUTION START] Lead: {lead.id} | Name: '{lead.name}' | Company: {company.id}")
+        print(f"   Origin: {lead.origin} | Language: {lead.language} | Stage: {getattr(lead.current_stage, 'code', None)}")
+        print(f"   Current Assigned Salesman: {lead.assigned_salesman} (ID: {lead.assigned_salesman_id})")
+        print(f"   Requested Team Filter: {team} | Strategy Code Override: {strategy_code}")
+        print(f"   Resolved Strategy: {method} | Scope Mode: {scope_mode}")
+        print(f"==================================================")
+
         run = DistributionRun.objects.create(
             company=company, lead=lead, method_code=method, scope_mode=scope_mode,
             language=lead.language, actor=actor,
@@ -121,7 +131,17 @@ class DistributionEngine:
         pool = eligible_pool(
             company=company, language=lead.language, scope_mode=scope_mode, team=team
         )
+        print(f"[POOL ELIGIBLE] Initial Pool Size: {len(pool)}")
+        print(f"   Candidates: {[(m.user.email, m.team.name) for m in pool]}")
+
+        if lead.assigned_salesman_id:
+            pool = [m for m in pool if m.user_id != lead.assigned_salesman_id] or pool
+            print(f"[POOL FILTERED] Current salesman excluded. Final Pool Size: {len(pool)}")
+            print(f"   Final Candidates: {[(m.user.email, m.team.name) for m in pool]}")
+
         if not pool:
+            print(f"[DISTRIBUTION FAILED] Pool is empty! Escalate to manual.")
+            print(f"==================================================\n")
             run.status = "NO_CANDIDATE"
             run.error = "Empty eligible pool after language/scope filter"
             run.finished_at = timezone.now()
@@ -137,9 +157,15 @@ class DistributionEngine:
             context=DistributionContext(company=company, scope_mode=scope_mode,
                                         language=lead.language, actor=actor),
         )
+        print(f"[STRATEGY SELECTION] Strategy '{method}' evaluated.")
+        print(f"   Decision - Salesman: {decision.salesman} (ID: {getattr(decision.salesman, 'id', None)}) | Team: {decision.team}")
+        print(f"   Reason: '{decision.reason}'")
+
         DistributionEngine._record_candidates(run, pool, decision)
 
         if decision.salesman is None and decision.team is None:
+            print(f"[DISTRIBUTION FAILED] Strategy returned no candidate! Escalate to manual.")
+            print(f"==================================================\n")
             run.status = "NO_CANDIDATE"
             run.finished_at = timezone.now()
             run.save(update_fields=["status", "finished_at"])
@@ -148,16 +174,21 @@ class DistributionEngine:
 
         # Scope mode 2: engine picks team, Sales Head decides salesman (§8.4).
         if scope_mode == ScopeMode.TEAM_HEAD_DECIDES:
+            print(f"[ASSIGNMENT] Scope Mode: TEAM_HEAD_DECIDES -> Assigning to team: {decision.team}")
             lead = ManualAssignmentService.assign_to_team(
                 lead_id=lead.id, team=decision.team, actor=actor,
                 reason="Auto: team selected, head decides", request_meta=request_meta,
             )
         else:
+            print(f"[ASSIGNMENT] Assigning to salesman: {decision.salesman} | Team: {decision.team}")
             lead = _assign(
                 lead=lead, team=decision.team, salesman=decision.salesman,
                 method=AssignmentMethod.AUTO, strategy_code=method, actor=actor,
                 reason=decision.reason, request_meta=request_meta,
             )
+        print(f"[DISTRIBUTION DONE] Lead {lead.id} assignment completed successfully.")
+        print(f"==================================================\n")
+
         run.status = "DONE"
         run.selected_team = decision.team
         run.selected_salesman = decision.salesman
@@ -323,6 +354,8 @@ class SLAExpiryService:
 
         if method == SLAExpiryMethod.ROUND_ROBIN:
             DistributionEngine.distribute(lead=lead, actor=actor)
+        elif method == SLAExpiryMethod.BY_TURN:
+            DistributionEngine.distribute(lead=lead, actor=actor, strategy_code="BY_TURN")
         elif method == SLAExpiryMethod.RETRY_TEAM_ESCALATION:
             RetryEscalationService.handle_expiry(lead=lead, actor=actor)
         else:  # MANUAL (broker leads default here, docs §7.2)

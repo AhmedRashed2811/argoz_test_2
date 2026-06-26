@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% load static crm_permissions %}
+
+{% block title %}Brokers — Prometheus CRM{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'accounts/brokers.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="toast-container" id="toastContainer"></div>
+
+<main class="page-body" style="margin-left: 0; width: 100%;">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Brokers</h1>
+        <p>Manage your broker network and partnership contracts</p>
+      </div>
+    </div>
+    {% if request.user|can:"admin.brokers.create" %}
+    <button class="btn-create" id="btnCreate">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span class="btn-label">Create a Broker</span>
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpiTotal">0</div>
+        <div class="kpi-label">Total Brokers</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpiActive">0</div>
+        <div class="kpi-label">Active Contracts</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon purple">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpiAvgCommission">0%</div>
+        <div class="kpi-label">Avg. Commission</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpiTotalLeads">0</div>
+        <div class="kpi-label">Total Leads</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search brokers…">
+    </div>
+    <span class="search-results-hint" id="searchHint"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>
+            <div class="th-inner">
+              Name
+              <button class="th-icon-btn" id="sortNameBtn" title="Sort by Name">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterNameBtn" title="Filter by Name">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Agency
+              <button class="th-icon-btn" id="sortAgencyBtn" title="Sort by Agency">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterAgencyBtn" title="Filter by Agency">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Contract Start
+              <button class="th-icon-btn" id="sortStartBtn" title="Sort by Start">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterStartBtn" title="Filter by Start Date">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Contract End
+              <button class="th-icon-btn" id="sortEndBtn" title="Sort by End">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterEndBtn" title="Filter by End Date">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Commission
+              <button class="th-icon-btn" id="sortCommBtn" title="Sort by Commission">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterCommBtn" title="Filter by Commission Range">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Leads
+              <button class="th-icon-btn" id="sortLeadsBtn" title="Sort by Leads">
+                <svg viewBox="0 0 24 24"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+              </button>
+              <button class="th-icon-btn" id="filterLeadsBtn" title="Filter by Leads Range">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th>
+            <div class="th-inner">
+              Status
+              <button class="th-icon-btn" id="filterStatusBtn" title="Filter by Status">
+                <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+            </div>
+          </th>
+          <th style="width:120px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<!-- ═══════ FILTER: NAME ═══════ -->
+<div class="filter-dropdown" id="filterNameDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head">
+    <p>Filter by Name</p>
+    <input type="text" class="filter-search" id="filterNameSearch" placeholder="Search…">
+  </div>
+  <div class="filter-list" id="filterNameList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterNameSelectAll">Select All</button>
+    <button class="filter-btn clear-all" id="filterNameClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: AGENCY ═══════ -->
+<div class="filter-dropdown" id="filterAgencyDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head">
+    <p>Filter by Agency</p>
+    <input type="text" class="filter-search" id="filterAgencySearch" placeholder="Search…">
+  </div>
+  <div class="filter-list" id="filterAgencyList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterAgencySelectAll">Select All</button>
+    <button class="filter-btn clear-all" id="filterAgencyClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: START DATE ═══════ -->
+<div class="filter-dropdown" id="filterStartDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Start Date</p></div>
+  <div class="filter-list" id="filterStartList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterStartSelectAll">Select All</button>
+    <button class="filter-btn clear-all" id="filterStartClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: END DATE ═══════ -->
+<div class="filter-dropdown" id="filterEndDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by End Date</p></div>
+  <div class="filter-list" id="filterEndList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterEndSelectAll">Select All</button>
+    <button class="filter-btn clear-all" id="filterEndClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: COMMISSION ═══════ -->
+<div class="filter-dropdown" id="filterCommDropdown" onclick="event.stopPropagation()" style="width:220px">
+  <div class="filter-dd-head"><p>Filter by Commission Range</p></div>
+  <div style="padding:10px 14px 4px">
+    <div style="margin-bottom:10px">
+      <label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Min %</label>
+      <input type="number" id="commMin" class="budget-dd-input" placeholder="e.g. 0" min="0" oninput="renderTable()">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Max %</label>
+      <input type="number" id="commMax" class="budget-dd-input" placeholder="e.g. 10" min="0" oninput="renderTable()">
+    </div>
+  </div>
+  <div class="filter-actions">
+    <button class="filter-btn clear-all" id="filterCommClear" style="flex:1">Clear</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: LEADS ═══════ -->
+<div class="filter-dropdown" id="filterLeadsDropdown" onclick="event.stopPropagation()" style="width:220px">
+  <div class="filter-dd-head"><p>Filter by Leads Range</p></div>
+  <div style="padding:10px 14px 4px">
+    <div style="margin-bottom:10px">
+      <label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Min Leads</label>
+      <input type="number" id="leadsMin" class="budget-dd-input" placeholder="e.g. 0" min="0" oninput="renderTable()">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clr-text-sub);display:block;margin-bottom:5px">Max Leads</label>
+      <input type="number" id="leadsMax" class="budget-dd-input" placeholder="e.g. 500" min="0" oninput="renderTable()">
+    </div>
+  </div>
+  <div class="filter-actions">
+    <button class="filter-btn clear-all" id="filterLeadsClear" style="flex:1">Clear</button>
+  </div>
+</div>
+
+<!-- ═══════ FILTER: STATUS ═══════ -->
+<div class="filter-dropdown" id="filterStatusDropdown" onclick="event.stopPropagation()">
+  <div class="filter-dd-head"><p>Filter by Status</p></div>
+  <div class="filter-list" id="filterStatusList"></div>
+  <div class="filter-actions">
+    <button class="filter-btn select-all" id="filterStatusSelectAll">Select All</button>
+    <button class="filter-btn clear-all" id="filterStatusClearAll">Clear All</button>
+  </div>
+</div>
+
+<!-- ═══════ MODAL: CREATE ═══════ -->
+<div class="modal-backdrop" id="createModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Create Broker</div>
+          <div class="modal-sub">Add a new broker or agency to your network</div>
+        </div>
+      </div>
+      <button class="modal-close-btn" id="createModalClose">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Broker Name *</label>
+        <input type="text" class="form-input" id="c_name" placeholder="e.g. Ahmed Hassan Real Estate">
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Agency / Company</label>
+          <input type="text" class="form-input" id="c_agency" placeholder="Agency or independent">
+        </div>
+        <div>
+          <label class="form-label">Phone</label>
+          <input type="tel" class="form-input" id="c_phone" placeholder="+20 100 000 0000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Location / Area</label>
+          <input type="text" class="form-input" id="c_location" placeholder="e.g. New Cairo, Egypt">
+        </div>
+        <div>
+          <label class="form-label">Commission Rate (%)</label>
+          <input type="number" class="form-input" id="c_commission" placeholder="e.g. 2.5" min="0" max="100" step="0.1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Contract Start Date</label>
+          <input type="date" class="form-input" id="c_startDate">
+        </div>
+        <div>
+          <label class="form-label">Contract End Date</label>
+          <input type="date" class="form-input" id="c_endDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="c_notes" placeholder="Any additional notes about this broker…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="createCancel">Cancel</button>
+      <button class="btn-save" id="createSave">Save Broker</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL: EDIT ═══════ -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Edit Broker</div>
+          <div class="modal-sub" id="editModalSub">Update broker details</div>
+        </div>
+      </div>
+      <button class="modal-close-btn" id="editModalClose">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="editModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="editCancel">Cancel</button>
+      <button class="btn-save" id="editSave">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MODAL: VIEW ═══════ -->
+<div class="modal-backdrop" id="viewModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div>
+          <div class="modal-title" id="viewTitle">Broker Details</div>
+          <div class="modal-sub" id="viewSub"></div>
+        </div>
+      </div>
+      <button class="modal-close-btn" id="viewModalClose">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="viewModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="viewClose">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.BROKERS_CFG = {
+    listUrl: "{% url 'accounts:broker_api_list' %}",
+    createUrl: "{% url 'accounts:broker_api_create' %}",
+    editTmplUrl: "{% url 'accounts:broker_api_edit' '00000000-0000-0000-0000-000000000000' %}",
+    deleteTmplUrl: "{% url 'accounts:broker_api_delete' '00000000-0000-0000-0000-000000000000' %}",
+    csrf: "{{ csrf_token }}",
+    canCreate: {% if request.user|can:"admin.brokers.create" %}true{% else %}false{% endif %}
+  };
+</script>
+<script src="{% static 'accounts/brokers.js' %}"></script>
+{% endblock %}

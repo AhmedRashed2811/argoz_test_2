@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.authorization.decorators import crm_permission_required
-from apps.reports.selectors import leads_for_user
+from apps.authorization.services import EffectivePermissionResolver
 
 from .forms import (
     FollowUpForm,
@@ -28,10 +28,42 @@ from .services import (
 @login_required
 @crm_permission_required("leads.dashboard.access")
 def lead_list(request):
-    # Scope is applied by the selector via the effective permission set (§4.3).
-    return render(request, "leads/lead_list.html", {
-        "leads": leads_for_user(request.user, request.company)[:200],
-    })
+    """Dynamic sales-leads management page (sales team). Users who can view all
+    leads belong on the company-wide database page, so send them there."""
+    if EffectivePermissionResolver.has(request.user, "leads.lead.view_all"):
+        return redirect("leads:all_list")
+    return render(request, "leads/lead_list.html", {})
+
+
+@login_required
+@crm_permission_required("leads.lead.view_all")
+def all_leads(request):
+    """Company-wide lead database (admin/limited access). Thin shell: data,
+    history and the edit/stage/status controls all load via AJAX endpoints in
+    api.py, which enforce permissions and route writes through services."""
+    return render(request, "leads/all_leads.html", {})
+
+
+
+def _can_manual_distribute(user):
+    """True if the user may distribute manually at any scope (docs §8.1)."""
+    return any(
+        EffectivePermissionResolver.has(user, c)
+        for c in ("leads.distribution.manual_all", "leads.distribution.team_manual")
+    )
+
+
+@login_required
+def manual_distribution(request):
+    """Manual lead distribution board (docs §8.1). Thin shell: leads, salesmen,
+    history and the assign action all load via AJAX endpoints in api.py, which
+    enforce manual_all / team_manual scope and route the write through
+    ManualAssignmentService (SLA reset, audit, history, notification)."""
+    from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+
+    if not _can_manual_distribute(request.user):
+        raise DjangoPermissionDenied("Missing manual distribution permission.")
+    return render(request, "leads/manual_distribution.html", {})
 
 
 @login_required

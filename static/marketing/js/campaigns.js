@@ -143,7 +143,7 @@ function getLinkedEventsFromLS(campaignId) {
 
 let campaigns = [];
 let nextId = 1;
-let sortField=null, sortAscMap={}, searchQuery='', editingIndex=null;
+let sortField=null, sortAscMap={}, searchQuery=(new URLSearchParams(window.location.search)).get('search') || '', editingIndex=null;
 const PAGE_SIZE=5; let currentPage=1, totalPages=1;
 let activeNameFilters=new Set(), activeTypeFilters=new Set(), activeStartFilters=new Set(), activeEndFilters=new Set(), activeStatusFilters=new Set(), activeApprovalFilters=new Set();
 let filterNameOpen=false, filterTypeOpen=false, filterStartOpen=false, filterEndOpen=false, filterBudgetOpen=false, filterLeadsOpen=false, filterStatusOpen=false, filterApprovalOpen=false;
@@ -247,7 +247,7 @@ function getDisplayList() {
   const lMin=Number(document.getElementById('leadsMin')?.value||0), lMax=Number(document.getElementById('leadsMax')?.value||0);
   if (lMin>0) list=list.filter(d=>calcLeads(d.c)>=lMin);
   if (lMax>0) list=list.filter(d=>calcLeads(d.c)<=lMax);
-  if (searchQuery.trim()) { const q=searchQuery.trim().toLowerCase(); list=list.filter(d=>d.c.name.toLowerCase().includes(q)); }
+  if (searchQuery.trim()) { const q=searchQuery.trim().toLowerCase(); list=list.filter(d=>d.c.name.toLowerCase().includes(q) || String(d.c.id).toLowerCase() === q); }
   if (sortField&&sortAscMap[sortField]!=null) {
     const asc=sortAscMap[sortField];
     list.sort((a,b)=>{
@@ -311,7 +311,7 @@ function renderTable() {
     const _hasLinkedTv=!_ownTypes.includes('tv')&&!!getLinkedTvAdFromLS(c.id);
     let _allChipTypes=(_hasLinkedEvs&&!_ownTypes.includes('events'))?['events',..._ownTypes]:[..._ownTypes];
     if (_hasLinkedTv) _allChipTypes.push('tv');
-    const chips=_allChipTypes.map(t=>`<span class="type-chip">${_typeLabels[t]||t}</span>`).join('');
+    const chips=_allChipTypes.map(t=>`<span class="type-chip">${_typeLabels[t]||t} (${c.typeLeads ? (c.typeLeads[t] || 0) : 0})</span>`).join('');
     const leadsVal=calcLeads(c).toLocaleString('en-US');
     const appr=c.approval||'pending';
     const apprLabel=APPROVAL_LABELS[appr]||'Pending';
@@ -1375,9 +1375,198 @@ function openEdit(index) {
   _editOcCtr=0;
   (c.otherCosts||[]).forEach(oc=>addEditOtherCost(oc));
   if ((c.otherCosts||[]).length) document.getElementById('edit_otherCostsPanel')?.classList.add('open');
-  setTimeout(()=>recalcTotal('edit'),100);
+  setTimeout(()=>{
+    recalcTotal('edit');
+    applyEditRestrictions(c);
+  },100);
   document.getElementById('editModal').classList.add('open');
   document.body.style.overflow='hidden';
+}
+
+function applyEditRestrictions(c) {
+  if (!_cfg().restrictEditing) return;
+
+  // Reset all disabled states to default enabled first (in case we reuse the modal markup)
+  const body = document.getElementById('editModalBody');
+  if (body) {
+    body.querySelectorAll('input, textarea, select, button').forEach(el => el.disabled = false);
+  }
+  const saveBtn = document.getElementById('editSave');
+  if (saveBtn) {
+    saveBtn.style.display = '';
+    saveBtn.disabled = false;
+  }
+  const otherCostsToggle = document.querySelector('#edit_totalBudgetBar .other-costs-toggle');
+  if (otherCostsToggle) otherCostsToggle.disabled = false;
+  
+  // Re-enable campaign type checkboxes
+  ['events', 'tv', 'street', 'social', 'exhibition'].forEach(ct => {
+    const cb = document.getElementById('edit_ct_' + ct);
+    if (cb) cb.disabled = false;
+  });
+
+  if (c.approval === 'approved') {
+    if (body) {
+      body.querySelectorAll('input, textarea, select, button').forEach(el => el.disabled = true);
+    }
+    if (saveBtn) {
+      saveBtn.style.display = 'none';
+    }
+  } else if (c.approval === 'semi') {
+    // Disable general fields
+    ['edit_c_name', 'edit_c_desc', 'edit_c_start', 'edit_c_end', 'edit_proj_display'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = true;
+    });
+
+    // Disable type checkboxes
+    ['events', 'tv', 'street', 'social', 'exhibition'].forEach(ct => {
+      const cb = document.getElementById('edit_ct_' + ct);
+      if (cb) cb.disabled = true;
+    });
+
+    const rejected = c.rejected_budgets || [];
+
+    // --- Granular Events restriction ---
+    document.querySelectorAll('#edit_cr_events_list > .multi-item-card').forEach((card, evIdx) => {
+      const evApproved = !rejected.includes(`events.${evIdx}.main`);
+      if (evApproved) {
+        card.querySelectorAll('.cr-ev-name, .cr-ev-place, .cr-ev-date, .cr-ev-budget, .cr-ev-attendees, .cr-ev-desc').forEach(el => el.disabled = true);
+        card.querySelectorAll('.img-upload-zone, .btn-remove-item').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = '0.6';
+        });
+      }
+      
+      // Celebrities
+      card.querySelectorAll('.cr-ev-celebs-list > .person-item').forEach((row, celIdx) => {
+        const celApproved = !rejected.includes(`events.${evIdx}.celebrities.${celIdx}`);
+        if (celApproved) {
+          row.querySelectorAll('input, button').forEach(el => el.disabled = true);
+        }
+      });
+      
+      // Giveaways
+      card.querySelectorAll('.cr-ev-giveaways-list > .person-item').forEach((row, gvIdx) => {
+        const gvApproved = !rejected.includes(`events.${evIdx}.giveaways.${gvIdx}`);
+        if (gvApproved) {
+          row.querySelectorAll('input, button').forEach(el => el.disabled = true);
+        }
+      });
+      
+      // Catering
+      card.querySelectorAll('.cr-ev-catering-list > .person-item').forEach((row, ctIdx) => {
+        const ctApproved = !rejected.includes(`events.${evIdx}.catering.${ctIdx}`);
+        if (ctApproved) {
+          row.querySelectorAll('input, button').forEach(el => el.disabled = true);
+        }
+      });
+    });
+
+    // --- Granular TV Ads restriction ---
+    document.querySelectorAll('#edit_cr_tv_list > .multi-item-card').forEach((card, tvIdx) => {
+      const tvApproved = !rejected.includes(`tv_ads.${tvIdx}.main`);
+      if (tvApproved) {
+        card.querySelectorAll('.cr-tv-name, .cr-tv-start, .cr-tv-end, .cr-tv-desc').forEach(el => el.disabled = true);
+        card.querySelectorAll('.btn-remove-item').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = '0.6';
+        });
+      }
+      
+      // Channels
+      card.querySelectorAll('.cr-tv-channels-list > .channel-item').forEach((row, chIdx) => {
+        const chApproved = !rejected.includes(`tv_ads.${tvIdx}.channels.${chIdx}`);
+        if (chApproved) {
+          row.querySelectorAll('input, button, .img-upload-zone').forEach(el => {
+            el.disabled = true;
+            if (el.classList.contains('img-upload-zone') || el.classList.contains('btn-remove-small')) {
+              el.style.pointerEvents = 'none';
+              el.style.opacity = '0.6';
+            }
+          });
+        }
+      });
+    });
+
+    // --- Granular Street Ads restriction ---
+    document.querySelectorAll('#edit_cr_street_list > .multi-item-card').forEach((card, stIdx) => {
+      const stApproved = !rejected.includes(`street_ads.${stIdx}.main`);
+      if (stApproved) {
+        card.querySelectorAll('.cr-st-name, .cr-st-start, .cr-st-end, .cr-st-desc').forEach(el => el.disabled = true);
+        card.querySelectorAll('.btn-remove-item, .img-upload-zone').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = '0.6';
+        });
+      }
+      
+      // Ad Types & Locations
+      card.querySelectorAll('#edit_crst' + card.dataset.cardnum + '_adtype_panels > .ad-type-detail').forEach((panel, lineIdx) => {
+        const lineApproved = !rejected.includes(`street_ads.${stIdx}.type_lines.${lineIdx}`);
+        if (lineApproved) {
+          panel.querySelectorAll('.cr-at-count, .cr-at-budget, button').forEach(el => {
+            el.disabled = true;
+            if (el.classList.contains('btn-remove-small')) {
+              el.style.pointerEvents = 'none';
+              el.style.opacity = '0.6';
+            }
+          });
+        }
+        
+        // Locations
+        panel.querySelectorAll('.location-item').forEach((row, locIdx) => {
+          const locApproved = !rejected.includes(`street_ads.${stIdx}.type_lines.${lineIdx}.locations.${locIdx}`);
+          if (locApproved) {
+            row.querySelectorAll('input, button').forEach(el => el.disabled = true);
+          }
+        });
+      });
+      
+      if (stApproved) {
+        card.querySelectorAll('.cr-st-adtype').forEach(cb => cb.disabled = true);
+      }
+    });
+
+    // --- Granular Social Ads restriction ---
+    document.querySelectorAll('#edit_cr_social_list > .multi-item-card').forEach((card, smIdx) => {
+      const smApproved = !rejected.includes(`social_ads.${smIdx}.main`);
+      if (smApproved) {
+        card.querySelectorAll('.cr-sm-name, .cr-sm-start, .cr-sm-end, .cr-sm-kpi, .cr-sm-event-link').forEach(el => el.disabled = true);
+        card.querySelectorAll('.btn-remove-item, .img-upload-zone').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.style.opacity = '0.6';
+        });
+        card.querySelectorAll('.cr-sm-plat').forEach(cb => cb.disabled = true);
+      }
+      
+      // Platform Budgets
+      card.querySelectorAll('#edit_crsm' + card.dataset.cardnum + '_plat_budgets > .platform-budget-row').forEach((row, pIdx) => {
+        const pApproved = !rejected.includes(`social_ads.${smIdx}.platform_lines.${pIdx}`);
+        if (pApproved) {
+          row.querySelectorAll('input').forEach(el => el.disabled = true);
+        }
+      });
+    });
+
+    // --- Granular Exhibition restriction ---
+    document.querySelectorAll('#edit_cr_exhibition_list > .multi-item-card').forEach((card, exIdx) => {
+      const exApproved = !rejected.includes(`exhibitions.${exIdx}.main`);
+      if (exApproved) {
+        card.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+      }
+    });
+
+    // --- Granular Other Costs restriction ---
+    document.querySelectorAll('#edit_otherCostsList > .cost-item').forEach((row, ocIdx) => {
+      const ocApproved = !rejected.includes(`other_costs.${ocIdx}`);
+      if (ocApproved) {
+        row.querySelectorAll('input, button').forEach(el => el.disabled = true);
+      }
+    });
+    if (!rejected.some(r => r.startsWith('other_costs'))) {
+      if (otherCostsToggle) otherCostsToggle.disabled = true;
+    }
+  }
 }
 
 function recalcEditLeadsTotal() {
@@ -1543,6 +1732,7 @@ function openView(index) {
         <div><div class="view-kv-label">📅 Date</div><div class="view-kv-val date-val">${fmtDate(ev.date)}</div></div>
         <div><div class="view-kv-label">💰 Event Budget</div><div class="view-kv-val accent"> ${fmtBudget(ev.budget)}</div></div>
         <div><div class="view-kv-label">👥 Target Attendees</div><div class="view-kv-val">${ev.targetAttendees||'—'}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${ev.leads||0}</div></div>
         ${evTotal!==Number(ev.budget||0)?`<div style="grid-column:1/-1"><div class="view-kv-label">🏷️ Total Event Cost (incl. extras)</div><div class="view-kv-val" style="color:var(--clr-orange-dk);font-weight:700;font-size:1rem"> ${fmtBudget(evTotal)}</div></div>`:''}
       </div>
       ${ev.description?`<div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:6px;font-size:.83rem;color:var(--clr-text-sub);line-height:1.5">${escHtml(ev.description)}</div>`:''}
@@ -1560,6 +1750,7 @@ function openView(index) {
       <div class="view-kv-grid">
         <div><div class="view-kv-label">📅 Period</div><div class="view-kv-val">${fmtDate(tv.start)} – ${fmtDate(tv.end)}</div></div>
         <div><div class="view-kv-label">💰 Budget</div><div class="view-kv-val accent"> ${fmtBudget(tv.budget)}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${tv.leads||0}</div></div>
       </div>
       ${(tv.channels||[]).map((ch,ci)=>`<div style="margin-top:8px;padding:9px 12px;background:#fff;border:1px solid var(--clr-border);border-radius:7px"><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--clr-orange-dk);margin-bottom:5px">📡 ${escHtml(ch.channelName||'Channel #'+(ci+1))}</div><div style="font-size:.84rem;display:flex;gap:12px;flex-wrap:wrap"><span>Budget: <strong> ${fmtBudget(ch.budget)}</strong></span>${(ch.slots||[]).length?`<span>Slots: ${ch.slots.map(sl=>(sl.count?sl.count+'×':'')+' '+sl.time).join(', ')}</span>`:''}</div>${viewImgBlock('📸 Channel Media',(ch.media||[]))}</div>`).join('')}
     </div>`;
@@ -1571,6 +1762,7 @@ function openView(index) {
       <div class="view-kv-grid">
         <div><div class="view-kv-label">📅 Period</div><div class="view-kv-val">${fmtDate(st.start)} – ${fmtDate(st.end)}</div></div>
         <div><div class="view-kv-label">💰 Budget</div><div class="view-kv-val accent"> ${fmtBudget(st.budget)}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${st.leads||0}</div></div>
       </div>
       ${(st.adTypes||[]).map(at=>`<div style="margin-top:8px;padding:9px 12px;background:#fff;border:1px solid var(--clr-border);border-radius:7px"><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--clr-orange-dk);margin-bottom:5px">📋 ${at.type}</div><div style="font-size:.84rem;display:flex;gap:12px;flex-wrap:wrap"><span>Count: <strong>${at.count||'—'}</strong></span><span>Budget: <strong> ${fmtBudget(at.budget)}</strong></span>${(at.locations||[]).length?`<span>Locations: ${at.locations.filter(l=>l.name).map(l=>escHtml(l.name)).join(', ')}</span>`:''}</div></div>`).join('')}
       ${viewImgBlock('📸 Street Ad Photos',(st.images||[]))}
@@ -1585,6 +1777,7 @@ function openView(index) {
         <div><div class="view-kv-label">🌐 Platforms</div><div class="view-kv-val"><div class="view-chips">${(sm.platforms||[]).map(p=>`<span class="view-chip">${p}</span>`).join('')||'—'}</div></div></div>
         <div><div class="view-kv-label">💰 Total Budget</div><div class="view-kv-val accent"> ${fmtBudget(sm.budget)}</div></div>
         <div><div class="view-kv-label">📅 Period</div><div class="view-kv-val">${fmtDate(sm.start)} – ${fmtDate(sm.end)}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${sm.leads||0}</div></div>
         ${sm.targetKpi?`<div><div class="view-kv-label">🎯 Target KPI</div><div class="view-kv-val">${escHtml(sm.targetKpi)}</div></div>`:''}
       </div>
       ${platBudgets.length?`<div style="margin-top:10px;padding:10px 12px;background:#fff;border:1px solid var(--clr-border);border-radius:7px"><div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--clr-text-sub);margin-bottom:7px">Per-Platform Budget</div>${platBudgets.map(pb=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed var(--clr-border);font-size:.84rem"><span style="font-weight:500">${pb.platform}</span><span style="font-weight:700;color:var(--clr-orange-dk)"> ${fmtBudget(pb.budget)}</span></div>`).join('')}</div>`:''}
@@ -1598,6 +1791,7 @@ function openView(index) {
         <div><div class="view-kv-label">📍 Venue</div><div class="view-kv-val">${escHtml(ex.place||'—')}</div></div>
         <div><div class="view-kv-label">💰 Budget</div><div class="view-kv-val accent"> ${fmtBudget(ex.budget)}</div></div>
         <div><div class="view-kv-label">📅 Period</div><div class="view-kv-val">${fmtDate(ex.start)} – ${fmtDate(ex.end)}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${ex.leads||0}</div></div>
       </div>
     </div>`;
   });
@@ -1723,6 +1917,10 @@ function highlight(id){const el=document.getElementById(id);if(!el)return;el.cla
 /* ═══════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════ */
+if (searchQuery) {
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = searchQuery;
+}
 fetchCampaigns().then(()=>{ renderTable(); });
 
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ fetchCampaigns().then(renderTable); } });

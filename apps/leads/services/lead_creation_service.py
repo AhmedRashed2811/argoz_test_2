@@ -124,6 +124,8 @@ class LeadCreationService:
                 lead=lead, broker=broker_owner, action="CREATED",
                 new_broker=broker_owner, actor=actor,
             )
+            broker_owner.leads_count += 1
+            broker_owner.save(update_fields=["leads_count", "updated_at"])
             NotificationService.create_for_users(
                 company=company, recipients=[broker_owner.linked_user],
                 code=NotificationCode.BROKER_LEAD_CREATED,
@@ -145,7 +147,7 @@ class LeadCreationService:
         # Distribution decision is owned by the distribution engine (docs §8.3).
         if assigned_salesman is not None:
             deadline = SLAService.calculate_deadline(
-                company, stage_code=StageCode.FRESH, origin=origin
+                company, stage_code=StageCode.FRESH, origin=origin, source_code=source_code
             )
             SLAService.open_instance(lead=lead, stage=fresh, deadline=deadline)
             lead.sla_deadline = deadline

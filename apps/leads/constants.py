@@ -69,5 +69,6 @@ class ScopeMode:
 
 class SLAExpiryMethod:
     ROUND_ROBIN = "ROUND_ROBIN"
+    BY_TURN = "BY_TURN"
     RETRY_TEAM_ESCALATION = "RETRY_TEAM_ESCALATION"
     MANUAL = "MANUAL"

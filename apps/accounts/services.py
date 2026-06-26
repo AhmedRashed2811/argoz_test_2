@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from .models import Language, Team, TeamMember, User, UserLanguage, UserProfile
+from .models import Language, Team, TeamMember, User, UserLanguage, UserProfile, Broker
 
 
 class UserService:
@@ -488,3 +488,136 @@ class AvailabilityService:
     @staticmethod
     def set_status(*, user: User, status: str) -> None:
         UserProfile.objects.filter(user=user).update(availability_status=status)
+
+
+class BrokerService:
+    @staticmethod
+    @transaction.atomic
+    def create_broker(
+        *,
+        company,
+        name,
+        company_name="",
+        phone="",
+        location="",
+        commission_rate=None,
+        contract_start_date=None,
+        contract_end_date=None,
+        notes="",
+        actor=None,
+        request_meta=None
+    ) -> Broker:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        broker = Broker.objects.create(
+            company=company,
+            name=name,
+            company_name=company_name,
+            phone=phone,
+            location=location,
+            commission_rate=commission_rate,
+            contract_start_date=contract_start_date,
+            contract_end_date=contract_end_date,
+            notes=notes,
+        )
+
+        from apps.audit.services import DiffService
+        after_data = DiffService.snapshot(broker, fields=["name", "company_name", "phone", "location", "commission_rate", "contract_start_date", "contract_end_date", "status", "notes"])
+
+        AuditService.log(
+            action=AuditAction.CREATE,
+            instance=broker,
+            actor=actor,
+            company=company,
+            module="accounts",
+            request_meta=request_meta,
+            after=after_data,
+            entity_display=broker.name,
+        )
+        return broker
+
+    @staticmethod
+    @transaction.atomic
+    def update_broker(
+        *,
+        broker_id,
+        name,
+        company_name="",
+        phone="",
+        location="",
+        commission_rate=None,
+        contract_start_date=None,
+        contract_end_date=None,
+        leads_count=0,
+        notes="",
+        actor=None,
+        request_meta=None
+    ) -> Broker:
+        from apps.audit.services import AuditService, DiffService
+        from apps.core.constants import AuditAction
+
+        broker = Broker.objects.select_for_update().get(id=broker_id)
+        before_data = DiffService.snapshot(broker, fields=["name", "company_name", "phone", "location", "commission_rate", "contract_start_date", "contract_end_date", "leads_count", "notes"])
+
+        broker.name = name
+        broker.company_name = company_name
+        broker.phone = phone
+        broker.location = location
+        broker.commission_rate = commission_rate
+        broker.contract_start_date = contract_start_date
+        broker.contract_end_date = contract_end_date
+        broker.leads_count = leads_count
+        broker.notes = notes
+        broker.save()
+
+        after_data = DiffService.snapshot(broker, fields=["name", "company_name", "phone", "location", "commission_rate", "contract_start_date", "contract_end_date", "leads_count", "notes"])
+
+        AuditService.log(
+            action=AuditAction.UPDATE,
+            instance=broker,
+            actor=actor,
+            company=broker.company,
+            module="accounts",
+            request_meta=request_meta,
+            before=before_data,
+            after=after_data,
+            entity_display=broker.name,
+        )
+        return broker
+
+    @staticmethod
+    @transaction.atomic
+    def delete_broker(*, broker_id, actor=None, request_meta=None) -> None:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+        from apps.leads.models import Lead, BrokerLeadOwnershipHistory
+
+        broker = Broker.objects.select_for_update().get(id=broker_id)
+        company = broker.company
+
+        # Lead history updates for leads assigned to this broker
+        leads = Lead.objects.filter(broker_owner=broker)
+        for lead in leads:
+            BrokerLeadOwnershipHistory.objects.create(
+                lead=lead,
+                broker=None,
+                action="BROKER_DELETED",
+                old_broker=broker,
+                new_broker=None,
+                actor=actor,
+                reason=f"Broker {broker.name} was deleted.",
+            )
+
+        AuditService.log(
+            action=AuditAction.DELETE,
+            instance=broker,
+            actor=actor,
+            company=company,
+            module="accounts",
+            request_meta=request_meta,
+            reason="Deleted broker and unassigned its leads",
+            entity_display=broker.name,
+        )
+
+        broker.delete()

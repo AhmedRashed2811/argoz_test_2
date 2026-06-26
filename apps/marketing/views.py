@@ -28,7 +28,10 @@ from .services import (
 @login_required
 @crm_permission_required("marketing.campaigns.access")
 def campaign_list(request):
-    return render(request, "marketing/campaign_list.html", {})
+    from apps.policies.constants import PolicyCode
+    from apps.policies.services import PolicyResolver
+    restrict_editing = PolicyResolver.value(request.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+    return render(request, "marketing/campaign_list.html", {"restrict_editing": restrict_editing})
 
 
 # ── AJAX API for the campaigns page (thin: all work in services, §10.3) ──
@@ -108,7 +111,10 @@ def campaign_create(request):
 @login_required
 @crm_permission_required("marketing.campaigns.access")
 def campaign_detail(request, campaign_id):
-    campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
+    qs = campaigns_for_user(request.user, request.company).prefetch_related(
+        "events", "tv_ads", "street_ads", "social_ads", "exhibitions"
+    )
+    campaign = get_object_or_404(qs, id=campaign_id)
     return render(request, "marketing/campaign_detail.html", {
         "campaign": campaign,
         "roi": CampaignROIService.calculate(campaign=campaign),
@@ -120,6 +126,21 @@ def campaign_detail(request, campaign_id):
 @crm_permission_required("marketing.budget.manage")
 def campaign_budget(request, campaign_id):
     campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
+    from apps.policies.constants import PolicyCode
+    from apps.policies.services import PolicyResolver
+    from apps.marketing.constants import ApprovalStatus
+    
+    restrict_editing = PolicyResolver.value(campaign.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+    if restrict_editing:
+        if campaign.approval_status == ApprovalStatus.APPROVED:
+            messages.error(request, "Approved campaigns cannot be edited.")
+            return redirect("marketing:campaign_detail", campaign_id=campaign.id)
+        elif campaign.approval_status == ApprovalStatus.SEMI_APPROVED:
+            rejected = campaign.rejected_budgets or []
+            if "other_costs" not in rejected:
+                messages.error(request, "Cannot modify approved budgets of a semi-approved campaign.")
+                return redirect("marketing:campaign_detail", campaign_id=campaign.id)
+
     if request.method == "POST":
         form = OtherCostForm(request.POST)
         if form.is_valid():
@@ -138,6 +159,19 @@ def campaign_budget(request, campaign_id):
 @crm_permission_required("marketing.campaign.update")
 def campaign_update(request, campaign_id):
     campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
+    from apps.policies.constants import PolicyCode
+    from apps.policies.services import PolicyResolver
+    from apps.marketing.constants import ApprovalStatus
+    
+    restrict_editing = PolicyResolver.value(campaign.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+    if restrict_editing:
+        if campaign.approval_status == ApprovalStatus.APPROVED:
+            messages.error(request, "Approved campaigns cannot be edited.")
+            return redirect("marketing:campaign_detail", campaign_id=campaign.id)
+        elif campaign.approval_status == ApprovalStatus.SEMI_APPROVED:
+            messages.error(request, "Cannot edit a semi-approved campaign through the fallback form.")
+            return redirect("marketing:campaign_detail", campaign_id=campaign.id)
+
     form = CampaignForm(request.POST or None, initial={
         "name": campaign.name, "description": campaign.description,
         "start_date": campaign.start_date, "end_date": campaign.end_date,

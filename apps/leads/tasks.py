@@ -33,25 +33,37 @@ def check_lead_sla_expiry(self, batch_size: int = 100):
     now = timezone.now()
     processed = 0
 
+    print(f"\n⏰ [CELERY SLA TASK START] Task ID: {task_id} | Batch Size Limit: {batch_size}")
+
     with transaction.atomic():
-        for sla in expired_sla_batch(now, limit=batch_size):
+        expired_slas = list(expired_sla_batch(now, limit=batch_size))
+        print(f"📊 Found {len(expired_slas)} expired SLA instances to process.")
+        for sla in expired_slas:
             try:
                 with transaction.atomic():
+                    print(f"👉 Processing SLA instance {sla.id} for Lead {sla.lead_id}...")
                     if SLAExpiryService.process_instance(sla, task_id=task_id):
                         processed += 1
+                        print(f"✅ Successfully processed SLA instance {sla.id}.")
+                    else:
+                        print(f"⚠️ SLA instance {sla.id} was not active or skipped.")
             except Exception as exc:
+                print(f"❌ Error processing SLA instance {sla.id}: {str(exc)}")
                 JobExecutionLog.objects.create(
                     task_name="check_lead_sla_expiry", task_id=task_id,
                     status="ERROR", finished_at=timezone.now(), error=str(exc)[:500],
                 )
 
+    print(f"🕒 Scheduling warnings...")
     warned = SLAService.schedule_warnings(now)
+    print(f"📢 Scheduled {warned} SLA warnings.")
 
     JobExecutionLog.objects.create(
         task_name="check_lead_sla_expiry", task_id=task_id, status="DONE",
         finished_at=timezone.now(), processed_count=processed,
         metadata={"sla_warnings_scheduled": warned},
     )
+    print(f"🏁 [CELERY SLA TASK DONE] Processed: {processed} | Warned: {warned}\n")
     return processed
 
 
@@ -63,17 +75,22 @@ def send_due_reminders():
     from apps.notifications.constants import NotificationCode
     from apps.notifications.services import NotificationService
 
+    print(f"\n⏰ [CELERY REMINDERS TASK START]")
+
     due = Reminder.objects.select_related("lead", "company", "user").filter(
         status="PENDING", due_at__lte=timezone.now()
     )[:500]
+    due_list = list(due)
+    print(f"📊 Found {len(due_list)} pending reminders due.")
 
     count = 0
-    for reminder in due:
+    for reminder in due_list:
         if reminder.user_id:
             code_attr, title = _REMINDER_MAP.get(
                 reminder.reminder_type,
                 ("FOLLOWUP_DUE", f"Reminder: {reminder.reminder_type}"),
             )
+            print(f"👉 Sending reminder {reminder.id} of type {reminder.reminder_type} to user {reminder.user_id}...")
             NotificationService.create(
                 company=reminder.company,
                 recipient=reminder.user,
@@ -88,4 +105,7 @@ def send_due_reminders():
         reminder.sent_at = timezone.now()
         reminder.save(update_fields=["status", "sent_at"])
         count += 1
+        print(f"✅ Reminder {reminder.id} status set to SENT.")
+
+    print(f"🏁 [CELERY REMINDERS TASK DONE] Total sent: {count}\n")
     return count

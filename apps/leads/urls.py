@@ -7,8 +7,24 @@ app_name = "leads"
 
 urlpatterns = [
     path("", views.lead_list, name="list"),
+    path("all/", views.all_leads, name="all_list"),
+    path("manual-distribution/", views.manual_distribution, name="manual_distribution"),
     path("create/", views.lead_create, name="create"),
     path("walkin/", views.walkin_create, name="walkin_create"),
+    # --- AJAX/JSON endpoints for the dynamic management page ---
+    path("api/leads/", api.api_leads, name="api_leads"),
+    path("api/lead-history/", api.api_lead_history, name="api_lead_history"),
+    path("api/stage-update/", api.api_stage_update, name="api_stage_update"),
+    # --- AJAX/JSON endpoints for the All-Leads admin database page ---
+    path("api/all-leads/", api.api_all_leads, name="api_all_leads"),
+    path("api/all-lead-history/", api.api_all_lead_history, name="api_all_lead_history"),
+    path("api/lead-set-active/", api.api_lead_set_active, name="api_lead_set_active"),
+    path("api/lead-edit/", api.api_lead_edit, name="api_lead_edit"),
+    # --- AJAX/JSON endpoints for the manual distribution board ---
+    path("api/manual-dist/leads/", api.api_manual_dist_leads, name="api_manual_dist_leads"),
+    path("api/manual-dist/salesmen/", api.api_manual_dist_salesmen, name="api_manual_dist_salesmen"),
+    path("api/manual-dist/history/", api.api_manual_dist_history, name="api_manual_dist_history"),
+    path("api/manual-dist/assign/", api.api_manual_dist_assign, name="api_manual_dist_assign"),
     # --- AJAX/JSON endpoints for the dynamic create page ---
     path("api/create/", api.api_create, name="api_create"),
     path("api/sources/", api.api_sources, name="api_sources"),

@@ -464,7 +464,8 @@
     deleteTmpl:"{% url 'marketing:campaign_api_delete' '00000000-0000-0000-0000-000000000000' %}",
     csrf: "{{ csrf_token }}",
     canUpdate: {% if request.user|can:'marketing.campaign.update' %}true{% else %}false{% endif %},
-    canDelete: {% if request.user|can:'marketing.campaign.delete' %}true{% else %}false{% endif %}
+    canDelete: {% if request.user|can:'marketing.campaign.delete' %}true{% else %}false{% endif %},
+    restrictEditing: {% if restrict_editing %}true{% else %}false{% endif %}
   };
 </script>
 <script src="{% static 'marketing/js/campaigns.js' %}"></script>

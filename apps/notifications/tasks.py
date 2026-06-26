@@ -25,12 +25,26 @@ def fanout_notification(notification_id: str):
     if notif is None:
         return
 
+    lead_name = ""
+    lead_phone = ""
+    if notif.related_type == "Lead" and notif.related_id:
+        from apps.leads.models import Lead
+        lead = Lead.objects.filter(pk=notif.related_id).first()
+        if lead:
+            lead_name = lead.name
+            lead_phone = lead.phone
+
     payload = {
         "id": str(notif.id),
         "title": notif.title,
         "body": notif.body,
         "code": notif.notification_type.code,
         "type": notif.notification_type.name,
+        "priority": notif.priority,
+        "related_type": notif.related_type,
+        "related_id": notif.related_id,
+        "lead_name": lead_name,
+        "lead_phone": lead_phone,
         "created_at": notif.created_at.isoformat(),
     }
 
@@ -44,7 +58,7 @@ def fanout_notification(notification_id: str):
 
     # SSE delivery via direct Redis pub/sub (more reliable cross-process).
     r = sync_redis.from_url(settings.REDIS_URL)
-    r.publish(f"sse_notif:{notif.recipient_id}", json.dumps(payload))
+    r.publish(f"sse_notif:{notif.recipient_id}", str(notif.id))
     r.close()
     NotificationDelivery.objects.filter(
         notification=notif, channel=Channel.WEBSOCKET

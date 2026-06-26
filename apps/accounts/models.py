@@ -80,7 +80,7 @@ class UserProfile(BaseModel, CompanyOwnedModel):
     availability_status = models.CharField(
         max_length=20,
         choices=AvailabilityStatus.CHOICES,
-        default=AvailabilityStatus.OFFLINE,
+        default=AvailabilityStatus.AVAILABLE,
     )
     timezone = models.CharField(max_length=64, default="UTC")
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
@@ -188,6 +188,11 @@ class Broker(BaseModel, CompanyOwnedModel):
     phone = models.CharField(max_length=32, blank=True)
     email = models.EmailField(blank=True)
     company_name = models.CharField(max_length=150, blank=True)
+    location = models.CharField(max_length=150, blank=True)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    contract_start_date = models.DateField(null=True, blank=True)
+    contract_end_date = models.DateField(null=True, blank=True)
+    leads_count = models.IntegerField(default=0)
     status = models.CharField(
         max_length=20, choices=BrokerStatus.CHOICES, default=BrokerStatus.ACTIVE
     )

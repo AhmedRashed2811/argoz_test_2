@@ -1,6 +1,7 @@
 """Leads service layer (docs §15.1). Import services from here."""
 from .duplicate_service import DuplicateService
 from .existing_client_service import ExistingClientService
+from .lead_admin_service import LeadAdminService
 from .followup_service import FollowUpService
 from .lead_creation_service import LeadCreationService
 from .lead_stage_service import LeadStageService
@@ -15,6 +16,7 @@ __all__ = [
     "DuplicateService",
     "ExistingClientService",
     "FollowUpService",
+    "LeadAdminService",
     "LeadCreationService",
     "LeadStageService",
     "MeetingService",

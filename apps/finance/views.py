@@ -42,6 +42,7 @@ def approval_api_decide(request, campaign_id):
         FinanceApprovalService.decide(
             campaign_id=campaign.id, js_status=data.get("status"),
             actor=request.user, reason=data.get("reason") or "",
+            rejected_budgets=data.get("rejected_budgets"),
             request_meta=getattr(request, "request_meta", None),
         )
     except ValidationError as exc:

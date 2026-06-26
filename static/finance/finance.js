@@ -24,7 +24,7 @@ let currentPage = 1;
 let totalPages = 1;
 const PER_PAGE = 5;
 let activeReviewId = null;
-let searchQuery = '';
+let searchQuery = (new URLSearchParams(window.location.search)).get('search') || '';
 let sortField = null, sortAscMap = {};
 let activeNameFilters = new Set(), activeTypeFilters = new Set(), activeApprovalFilters = new Set(), activeDateFilters = new Set();
 let filterNameOpen=false, filterTypeOpen=false, filterBudgetOpen=false, filterDateOpen=false, filterApprovalOpen=false;
@@ -59,7 +59,7 @@ function renderKPIs(){
 function getFiltered(){
   const q = searchQuery.toLowerCase();
   let list = campaigns.filter(c=>{
-    if(q && !c.name.toLowerCase().includes(q) && !c.submittedBy.toLowerCase().includes(q)) return false;
+    if(q && !c.name.toLowerCase().includes(q) && !c.submittedBy.toLowerCase().includes(q) && String(c.id).toLowerCase() !== q) return false;
     if(activeNameFilters.size && !activeNameFilters.has(c.name)) return false;
     if(activeApprovalFilters.size && !activeApprovalFilters.has(c.approval)) return false;
     if(activeTypeFilters.size && !c.types.some(t=>activeTypeFilters.has(t))) return false;
@@ -285,39 +285,42 @@ function openReview(id){
     <p class="review-section-title">Budget Breakdown</p>
     <div class="breakdown-wrap" style="margin-bottom:8px">
   `;
-  let grandTotal = 0;
-  c.budgetBreakdown.forEach(section=>{
-    html += `<div class="breakdown-section"><div class="breakdown-section-type">${section.type}</div>`;
-    let subListOpen = false;
-    section.items.forEach(item=>{
-      const isSub = item.label.startsWith('↳');
-      if(!isSub){
-        if(subListOpen) html += `</div>`; // close previous item's sub-list
-        html += `<div class="breakdown-item-row">
-          <div class="breakdown-item-name">${item.label}</div>
-          <div class="breakdown-item-amount">${fmtBudget(item.amount)}</div>
-        </div><div class="breakdown-sub-list">`;
-        subListOpen = true;
-      } else {
-        html += `<div class="breakdown-sub-row">
-          <div class="breakdown-sub-name">${item.label}</div>
-          <div class="breakdown-sub-amount">${fmtBudget(item.amount)}</div>
-        </div>`;
-      }
+    const showCheckboxes = (c.approval === 'pending' || c.approval === 'semi') && _cfg().canApprove;
+    let grandTotal = 0;
+    c.budgetBreakdown.forEach(section=>{
+      html += `<div class="breakdown-section"><div class="breakdown-section-type">${section.type}</div>`;
+      let subListOpen = false;
+      section.items.forEach(item=>{
+        const isSub = item.label.startsWith('↳');
+        if(!isSub){
+          if(subListOpen) html += `</div>`; // close previous item's sub-list
+          html += `<div class="breakdown-item-row" style="display:flex;align-items:center;">
+            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;" title="Check to reject/edit this item">` : ''}
+            <div class="breakdown-item-name">${item.label}</div>
+            <div class="breakdown-item-amount">${fmtBudget(item.amount)}</div>
+          </div><div class="breakdown-sub-list">`;
+          subListOpen = true;
+        } else {
+          html += `<div class="breakdown-sub-row" style="display:flex;align-items:center;">
+            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;margin-left:12px;" title="Check to reject/edit this item">` : ''}
+            <div class="breakdown-sub-name">${item.label}</div>
+            <div class="breakdown-sub-amount">${fmtBudget(item.amount)}</div>
+          </div>`;
+        }
+      });
+      if(subListOpen) html += `</div>`; // close last item's sub-list
+      grandTotal += section.subtotal;
+      html += `<div class="breakdown-subtotal-row">
+        <div class="breakdown-subtotal-label">Subtotal</div>
+        <div class="breakdown-subtotal-amount">${fmtBudget(section.subtotal)}</div>
+      </div>`;
+      html += `</div>`; // close breakdown-section
     });
-    if(subListOpen) html += `</div>`; // close last item's sub-list
-    grandTotal += section.subtotal;
-    html += `<div class="breakdown-subtotal-row">
-      <div class="breakdown-subtotal-label">Subtotal</div>
-      <div class="breakdown-subtotal-amount">${fmtBudget(section.subtotal)}</div>
+    html += `<div class="breakdown-grand-total">
+      <div class="breakdown-grand-total-label">💰 Grand Total</div>
+      <div class="breakdown-grand-total-amount">${fmtBudget(grandTotal)}</div>
     </div>`;
-    html += `</div>`; // close breakdown-section
-  });
-  html += `<div class="breakdown-grand-total">
-    <div class="breakdown-grand-total-label">💰 Grand Total</div>
-    <div class="breakdown-grand-total-amount">${fmtBudget(grandTotal)}</div>
-  </div>`;
-  html += `</div>`; // close breakdown-wrap
+    html += `</div>`; // close breakdown-wrap
 
   // History
   html += `<p class="review-section-title">Approval History</p><div class="approval-history">`;
@@ -363,21 +366,38 @@ async function doApproval(id, action){
   const requireNote = action === 'semi' || action === 'not-approved';
 
   if(requireNote){
+    const rejected = [];
+    if (action === 'semi') {
+      document.querySelectorAll('.reject-budget-cb:checked').forEach(cb => {
+        rejected.push(cb.value);
+      });
+      if (rejected.length === 0) {
+        Swal.fire({
+          title: 'Rejected Budget Required',
+          text: 'Please select at least one budget item to reject by checking the checkboxes next to the budget items in the breakdown list before semi-approving.',
+          icon: 'warning',
+          confirmButtonColor: 'var(--clr-orange)'
+        });
+        return;
+      }
+    }
+
     const { value: note, isConfirmed } = await Swal.fire({
       title: `${labels[action]} Campaign`,
-      html: `<textarea id="swal-note" style="width:100%;padding:10px;border:1px solid #e0ddd8;border-radius:6px;font-family:'Times New Roman',serif;font-size:.9rem;min-height:90px;resize:vertical;outline:none" placeholder="Enter reason / note (required)…"></textarea>`,
+      html: `<div style="text-align:left"><label style="font-size:.85rem;font-weight:700;color:var(--clr-text);display:block;margin-bottom:6px">Reason / Note <span style="color:#c0392b">*</span></label>
+      <textarea id="swal-note" style="width:100%;padding:10px;border:1px solid #e0ddd8;border-radius:6px;font-family:inherit;font-size:.9rem;min-height:90px;resize:vertical;outline:none" placeholder="Enter reason / note (required)…"></textarea></div>`,
       showCancelButton: true,
       confirmButtonText: labels[action],
       cancelButtonText: 'Cancel',
       reverseButtons: true,
       preConfirm: ()=>{
-        const v = document.getElementById('swal-note').value.trim();
-        if(!v){ Swal.showValidationMessage('Please enter a reason.'); return false; }
-        return v;
+        const note = document.getElementById('swal-note').value.trim();
+        if(!note){ Swal.showValidationMessage('Please enter a reason.'); return false; }
+        return note;
       }
     });
     if(!isConfirmed) return;
-    applyApproval(id, action, note);
+    applyApproval(id, action, note, rejected);
   } else {
     const result = await Swal.fire({
       title: `${labels[action]} Campaign?`,
@@ -387,14 +407,14 @@ async function doApproval(id, action){
       cancelButtonText: 'Cancel',
       reverseButtons: true,
     });
-    if(result.isConfirmed) applyApproval(id, action, null);
+    if(result.isConfirmed) applyApproval(id, action, null, null);
   }
 }
-async function applyApproval(id, action, note){
+async function applyApproval(id, action, note, rejected_budgets){
   const c = campaigns.find(x=>x.id===id);
   const labels = { approved:'Approved', semi:'Semi-Approved', 'not-approved':'Rejected', pending:'Reset to Pending' };
   try {
-    await apiSend(_decideUrl(id), { status: action, reason: note });
+    await apiSend(_decideUrl(id), { status: action, reason: note, rejected_budgets: rejected_budgets });
     await fetchQueue();
     closeReview();
     renderTable();
@@ -421,6 +441,10 @@ function showToast(type, title, msg){
 }
 
 /* ─── Init ─── */
+if (searchQuery) {
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = searchQuery;
+}
 fetchQueue().then(()=>{ renderKPIs(); renderTable(); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ fetchQueue().then(()=>{ renderKPIs(); renderTable(); }); } });
 window.addEventListener('focus', ()=>{ fetchQueue().then(()=>{ renderKPIs(); renderTable(); }); });

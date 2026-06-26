@@ -1,6 +1,6 @@
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import Team, User
+from .models import Team, User, Broker
 
 
 def users_for_company(company):
@@ -61,3 +61,11 @@ def available_heads(company, team=None):
 
 def available_members(company, team=None):
     return _unassigned_or_in_team(company, "SALES", team)
+
+
+def brokers_for_company(company):
+    return Broker.objects.filter(company=company).order_by("name")
+
+
+def broker_detail(company, broker_id):
+    return Broker.objects.filter(company=company, id=broker_id).first()

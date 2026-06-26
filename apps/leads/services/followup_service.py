@@ -31,6 +31,7 @@ class FollowUpService:
         LeadStageService.change_stage(
             lead_id=lead.id, to_stage_code=StageCode.FOLLOW_UP, actor=actor,
             reason="Follow-up scheduled", request_meta=request_meta,
+            scheduled_time=scheduled_at
         )
         ReminderService.create(
             company=lead.company, user=lead.assigned_salesman, due_at=scheduled_at,
@@ -40,11 +41,6 @@ class FollowUpService:
         AuditService.log(
             action=AuditAction.CREATE, instance=followup, actor=actor,
             company=lead.company, module="leads", request_meta=request_meta,
-        )
-        NotificationService.create(
-            company=lead.company, recipient=lead.assigned_salesman,
-            code=NotificationCode.FOLLOWUP_DUE, title="Follow-up scheduled",
-            related_type="Lead", related_id=lead.pk,
         )
         return followup
 

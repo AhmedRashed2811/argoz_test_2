@@ -43,6 +43,10 @@ class CRMTechnicalAlignmentTests(TestCase):
 
     def test_fresh_lead_sla_prioritization(self):
         # Policy is argoz defaults (Direct SLA is 2 hours, Broker SLA is 4 hours, Fresh SLA is 2 hours)
+        pd_direct = PolicyDefinition.objects.get(code=PolicyCode.DIRECT_SLA)
+        CompanyPolicyValue.objects.update_or_create(company=self.company, policy=pd_direct, defaults={"value_json": {"hours": 2}})
+        pd_broker = PolicyDefinition.objects.get(code=PolicyCode.BROKER_SLA)
+        CompanyPolicyValue.objects.update_or_create(company=self.company, policy=pd_broker, defaults={"value_json": {"hours": 4}})
         # 1. Direct lead
         lead_direct = LeadCreationService.create(
             company=self.company,

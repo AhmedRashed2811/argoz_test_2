@@ -56,7 +56,7 @@ class FinanceApprovalService:
         )
 
     @staticmethod
-    def decide(*, campaign_id, js_status, actor, reason="", request_meta=None):
+    def decide(*, campaign_id, js_status, actor, reason="", rejected_budgets=None, request_meta=None):
         """Map the page's approval token to a persisted status and record it.
         All rules/audit/notify stay in CampaignApprovalService."""
         status = _JS_TO_STATUS.get(js_status)
@@ -65,7 +65,7 @@ class FinanceApprovalService:
             raise ValidationError(f"Unknown approval action: {js_status}")
         return CampaignApprovalService.set_status(
             campaign_id=campaign_id, status=status, actor=actor,
-            reason=reason or "", request_meta=request_meta,
+            reason=reason or "", rejected_budgets=rejected_budgets, request_meta=request_meta,
         )
 
     # ── read side: serialize the queue for the finance page ───────────────
@@ -124,59 +124,59 @@ class FinanceApprovalService:
                 sections.append({"type": label, "items": items, "subtotal": float(subtotal)})
 
         ev_items, ev_total = [], 0
-        for ev in c.events.all():
-            ev_items.append({"label": ev.name or "Event", "amount": float(ev.budget)})
+        for ev_idx, ev in enumerate(c.events.all()):
+            ev_items.append({"label": ev.name or "Event", "amount": float(ev.budget), "key": f"events.{ev_idx}.main"})
             ev_total += float(ev.budget)
-            for cel in ev.celebrities.all():
-                ev_items.append({"label": f"↳ Celebrity: {cel.name}", "amount": float(cel.budget)})
+            for cel_idx, cel in enumerate(ev.celebrities.all()):
+                ev_items.append({"label": f"↳ Celebrity: {cel.name}", "amount": float(cel.budget), "key": f"events.{ev_idx}.celebrities.{cel_idx}"})
                 ev_total += float(cel.budget)
-            for gv in ev.giveaways.all():
-                ev_items.append({"label": f"↳ Giveaway: {gv.name}", "amount": float(gv.budget)})
+            for gv_idx, gv in enumerate(ev.giveaways.all()):
+                ev_items.append({"label": f"↳ Giveaway: {gv.name}", "amount": float(gv.budget), "key": f"events.{ev_idx}.giveaways.{gv_idx}"})
                 ev_total += float(gv.budget)
-            for ct in ev.catering.all():
-                ev_items.append({"label": f"↳ Catering: {ct.name}", "amount": float(ct.budget)})
+            for ct_idx, ct in enumerate(ev.catering.all()):
+                ev_items.append({"label": f"↳ Catering: {ct.name}", "amount": float(ct.budget), "key": f"events.{ev_idx}.catering.{ct_idx}"})
                 ev_total += float(ct.budget)
         section("Events", ev_items, ev_total)
 
         tv_items, tv_total = [], 0
-        for tv in c.tv_ads.all():
-            tv_items.append({"label": tv.name or "TV Ad", "amount": float(tv.budget)})
+        for tv_idx, tv in enumerate(c.tv_ads.all()):
+            tv_items.append({"label": tv.name or "TV Ad", "amount": float(tv.budget), "key": f"tv_ads.{tv_idx}.main"})
             tv_total += float(tv.budget)
-            for ch in tv.channels.all():
-                tv_items.append({"label": f"↳ Channel: {ch.channel_name}", "amount": float(ch.budget)})
+            for ch_idx, ch in enumerate(tv.channels.all()):
+                tv_items.append({"label": f"↳ Channel: {ch.channel_name}", "amount": float(ch.budget), "key": f"tv_ads.{tv_idx}.channels.{ch_idx}"})
                 tv_total += float(ch.budget)
         section("TV Ads", tv_items, tv_total)
 
         st_items, st_total = [], 0
-        for st in c.street_ads.all():
-            st_items.append({"label": st.name or "Street Ad", "amount": float(st.budget)})
+        for st_idx, st in enumerate(c.street_ads.all()):
+            st_items.append({"label": st.name or "Street Ad", "amount": float(st.budget), "key": f"street_ads.{st_idx}.main"})
             st_total += float(st.budget)
-            for line in st.type_lines.all():
-                st_items.append({"label": f"↳ {line.ad_type.name}", "amount": float(line.budget)})
+            for line_idx, line in enumerate(st.type_lines.all()):
+                st_items.append({"label": f"↳ {line.ad_type.name}", "amount": float(line.budget), "key": f"street_ads.{st_idx}.type_lines.{line_idx}"})
                 st_total += float(line.budget)
-                for loc in line.locations.all():
-                    st_items.append({"label": f"↳ {loc.location_text}", "amount": float(loc.budget)})
+                for loc_idx, loc in enumerate(line.locations.all()):
+                    st_items.append({"label": f"↳ {loc.location_text}", "amount": float(loc.budget), "key": f"street_ads.{st_idx}.type_lines.{line_idx}.locations.{loc_idx}"})
                     st_total += float(loc.budget)
         section("Street Ads", st_items, st_total)
 
         sm_items, sm_total = [], 0
-        for sm in c.social_ads.all():
+        for sm_idx, sm in enumerate(c.social_ads.all()):
             ad_total = sum(float(p.budget) for p in sm.platform_lines.all())
-            sm_items.append({"label": sm.name or "Social Ad", "amount": ad_total})
-            for p in sm.platform_lines.all():
-                sm_items.append({"label": f"↳ {p.platform.name}", "amount": float(p.budget)})
+            sm_items.append({"label": sm.name or "Social Ad", "amount": ad_total, "key": f"social_ads.{sm_idx}.main"})
+            for p_idx, p in enumerate(sm.platform_lines.all()):
+                sm_items.append({"label": f"↳ {p.platform.name}", "amount": float(p.budget), "key": f"social_ads.{sm_idx}.platform_lines.{p_idx}"})
             sm_total += ad_total
         section("Social Media", sm_items, sm_total)
 
         ex_items, ex_total = [], 0
-        for ex in c.exhibitions.all():
-            ex_items.append({"label": ex.name or "Exhibition", "amount": float(ex.budget)})
+        for ex_idx, ex in enumerate(c.exhibitions.all()):
+            ex_items.append({"label": ex.name or "Exhibition", "amount": float(ex.budget), "key": f"exhibitions.{ex_idx}.main"})
             ex_total += float(ex.budget)
         section("Exhibition", ex_items, ex_total)
 
         oc_items, oc_total = [], 0
-        for oc in c.other_costs.all():
-            oc_items.append({"label": oc.reason or "Other", "amount": float(oc.value)})
+        for oc_idx, oc in enumerate(c.other_costs.all()):
+            oc_items.append({"label": oc.reason or "Other", "amount": float(oc.value), "key": f"other_costs.{oc_idx}"})
             oc_total += float(oc.value)
         section("Other Costs", oc_items, oc_total)
 

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% load crm_permissions %}
+{% load tz %}
 {% block title %}{{ lead.name }} · Argoz CRM{% endblock %}
 {% block content %}
+{% timezone lead.lead_timezone %}
   <h1>{{ lead.name }} — {{ lead.phone }}</h1>
   <p>Stage: <strong>{{ lead.current_stage.code }}</strong> ·
      Status: {{ lead.active_status }} ·
@@ -35,4 +37,5 @@
       <form method="post" action="{% url 'leads:meeting_create' lead.id %}">{% csrf_token %}{{ meeting_form.as_p }}<button>Schedule</button></form>
     </details>
   {% endif %}
+{% endtimezone %}
 {% endblock %}

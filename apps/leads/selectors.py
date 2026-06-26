@@ -25,6 +25,9 @@ def lead_detail_qs():
         "stage_history__actor",
         "assignment_history__to_salesman",
         "assignment_history__from_salesman",
+        "assignment_history__to_team",
+        "assignment_history__from_team",
+        "assignment_history__actor",
         "broker_ownership_history__broker",
     )
 
@@ -81,3 +84,20 @@ def expired_sla_instances(now, company=None, limit=100):
     if company is not None:
         qs = qs.filter(lead__company=company)
     return qs.order_by("deadline_at")[:limit]
+
+
+def leads_list_for_user(user, company, search_q="") -> list[Lead]:
+    from apps.reports.selectors import leads_for_user
+    import uuid
+    from django.db.models import Q
+
+    qs = leads_for_user(user, company)
+    search_q = (search_q or "").strip()
+    if search_q:
+        try:
+            val = uuid.UUID(search_q)
+            qs = qs.filter(id=val)
+        except ValueError:
+            qs = qs.filter(Q(name__icontains=search_q) | Q(phone__icontains=search_q))
+    return qs[:200]
+

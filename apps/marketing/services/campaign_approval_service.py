@@ -47,7 +47,7 @@ class CampaignApprovalService:
     @staticmethod
     @transaction.atomic
     def set_status(*, campaign_id, status: str, actor=None, reason: str = "",
-                   request_meta=None) -> Campaign:
+                   rejected_budgets=None, request_meta=None) -> Campaign:
         if status not in dict(ApprovalStatus.CHOICES):
             raise ValidationError(f"Unknown approval status: {status}")
         if status in ApprovalStatus.REASON_REQUIRED and not reason.strip():
@@ -60,7 +60,13 @@ class CampaignApprovalService:
 
         campaign.approval_status = status
         campaign.approval_reason = reason
-        campaign.save(update_fields=["approval_status", "approval_reason", "updated_at"])
+        
+        if status == ApprovalStatus.SEMI_APPROVED and rejected_budgets is not None:
+            campaign.rejected_budgets = rejected_budgets
+        elif status in (ApprovalStatus.APPROVED, ApprovalStatus.NOT_APPROVED, ApprovalStatus.PENDING):
+            campaign.rejected_budgets = []
+            
+        campaign.save(update_fields=["approval_status", "approval_reason", "rejected_budgets", "updated_at"])
 
         CampaignApprovalHistory.objects.create(
             campaign=campaign, from_status=from_status, to_status=status,

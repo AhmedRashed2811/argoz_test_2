@@ -35,6 +35,7 @@ class MeetingService:
         LeadStageService.change_stage(
             lead_id=lead.id, to_stage_code=StageCode.MEETING, actor=actor,
             reason="Meeting scheduled", request_meta=request_meta,
+            scheduled_time=scheduled_start
         )
         ReminderService.create(
             company=lead.company, user=lead.assigned_salesman, due_at=scheduled_start,
@@ -44,10 +45,5 @@ class MeetingService:
         AuditService.log(
             action=AuditAction.CREATE, instance=meeting, actor=actor,
             company=lead.company, module="leads", request_meta=request_meta,
-        )
-        NotificationService.create(
-            company=lead.company, recipient=lead.assigned_salesman,
-            code=NotificationCode.MEETING_DUE, title="Meeting scheduled",
-            related_type="Lead", related_id=lead.pk,
         )
         return meeting

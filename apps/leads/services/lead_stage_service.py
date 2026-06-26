@@ -20,7 +20,7 @@ class LeadStageService:
     @staticmethod
     @transaction.atomic
     def change_stage(*, lead_id, to_stage_code: str, actor=None, reason: str = "",
-                     request_meta=None) -> Lead:
+                     request_meta=None, frozen_days: int = 0, scheduled_time=None) -> Lead:
         lead = Lead.objects.select_for_update().select_related(
             "company", "assigned_salesman", "current_stage"
         ).get(id=lead_id)
@@ -30,7 +30,9 @@ class LeadStageService:
 
         lead.current_stage = to_stage
         deadline = SLAService.calculate_deadline(
-            lead.company, stage_code=to_stage_code, origin=lead.origin
+            lead.company, stage_code=to_stage_code, origin=lead.origin,
+            source_code=lead.source.code if lead.source else None, frozen_days=frozen_days,
+            scheduled_time=scheduled_time
         )
         # Not Interested is terminal -> lead becomes Inactive, no SLA (docs §9.1).
         if to_stage.is_terminal or to_stage_code == StageCode.NOT_INTERESTED:
@@ -58,11 +60,36 @@ class LeadStageService:
             before={"stage": getattr(from_stage, "code", None)},
             after={"stage": to_stage_code}, reason=reason,
         )
-        NotificationService.create(
-            company=lead.company, recipient=lead.assigned_salesman,
-            code=NotificationCode.STAGE_CHANGED, title=f"Lead moved to {to_stage.name}",
-            related_type="Lead", related_id=lead.pk,
+        if to_stage_code not in (StageCode.FOLLOW_UP, StageCode.MEETING, StageCode.NOT_REACHED, StageCode.INTERESTED, StageCode.NOT_INTERESTED, StageCode.FROZEN):
+            NotificationService.create(
+                company=lead.company, recipient=lead.assigned_salesman,
+                code=NotificationCode.STAGE_CHANGED, title=f"Lead moved to {to_stage.name}",
+                related_type="Lead", related_id=lead.pk,
+            )
+        return lead
+
+    @staticmethod
+    @transaction.atomic
+    def freeze(*, lead_id, days: int, actor=None, reason: str = "",
+               request_meta=None) -> Lead:
+        """Frozen stage with a lead-defined call-back period (leads spec §9.1).
+        Moves to Frozen via change_stage (audit + history + SLA) and schedules a
+        return reminder `days` from now for the assigned salesman."""
+        from datetime import timedelta
+
+        from .reminder_service import ReminderService
+
+        lead = LeadStageService.change_stage(
+            lead_id=lead_id, to_stage_code=StageCode.FROZEN, actor=actor,
+            reason=reason, request_meta=request_meta, frozen_days=days,
         )
+        if lead.assigned_salesman_id and days > 0:
+            ReminderService.create(
+                company=lead.company, user=lead.assigned_salesman,
+                due_at=timezone.now() + timedelta(days=days),
+                reminder_type="FROZEN_RETURN", lead=lead, related_type="Lead",
+                related_id=lead.pk,
+            )
         return lead
 
     @staticmethod
@@ -75,7 +102,8 @@ class LeadStageService:
         from_stage = lead.current_stage
         sla_before = lead.sla_deadline
         deadline = SLAService.calculate_deadline(
-            lead.company, stage_code=StageCode.FRESH, origin=lead.origin
+            lead.company, stage_code=StageCode.FRESH, origin=lead.origin,
+            source_code=lead.source.code if lead.source else None
         )
         lead.current_stage = fresh
         lead.sla_deadline = deadline

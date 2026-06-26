@@ -5,6 +5,7 @@ behavior by these codes; the business team edits values via UI, no code change."
 class PolicyCode:
     DIRECT_SLA = "lead.origin.direct_sla"
     BROKER_SLA = "lead.origin.broker_sla"
+    WALKIN_SLA = "lead.origin.walkin_sla"
     STAGE_SLA = "lead.stage_sla"  # suffixed with .<stage_code>
     SLA_EXPIRY_METHOD = "lead.sla_expiry_method"
     RETRY_ATTEMPTS_PER_TEAM = "lead.retry_attempts_per_team"
@@ -22,6 +23,7 @@ class PolicyCode:
     TYPE_DATE_POLICY = "marketing.type_date_policy"
     BUDGET_CALCULATION_RULE = "marketing.budget_calculation_rule"
     FINANCE_REASON_REQUIRED = "marketing.finance_reason_required"
+    CAMPAIGN_RESTRICT_EDITING = "marketing.restrict_approved_campaign_editing"
     WEBHOOK_MAPPING_POLICY = "integration.webhook_mapping_policy"
     NOTIFICATION_DELIVERY_POLICY = "notification.delivery_policy"
 

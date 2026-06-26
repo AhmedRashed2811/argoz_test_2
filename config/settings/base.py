@@ -110,7 +110,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = config("TIME_ZONE", default="UTC")
+TIME_ZONE = config("TIME_ZONE", default="Africa/Cairo")
 USE_I18N = True
 USE_TZ = True
 
