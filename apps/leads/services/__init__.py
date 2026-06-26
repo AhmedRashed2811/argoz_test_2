@@ -8,6 +8,7 @@ from .meeting_service import MeetingService
 from .reactivation_service import ReactivationService
 from .reminder_service import ReminderService
 from .sla_service import SLAService
+from .source_router_service import SourceRouterService
 from .walkin_service import WalkInService
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "ReactivationService",
     "ReminderService",
     "SLAService",
+    "SourceRouterService",
     "WalkInService",
 ]

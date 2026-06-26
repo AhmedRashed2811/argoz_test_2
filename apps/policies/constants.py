@@ -12,6 +12,8 @@ class PolicyCode:
     DISTRIBUTION_SCOPE_MODE = "lead.distribution_scope_mode"
     LANGUAGE_DEFAULT = "lead.language_default"
     SELF_GENERATED_SALESMAN_POLICY = "lead.self_generated_salesman_policy"
+    SELF_GENERATED_HEAD_ASSIGNMENT = "lead.self_generated_head_assignment"
+    BROKER_ALSO_ASSIGN_SALESMAN = "lead.broker_also_assign_salesman"
     WALKIN_RECEPTION_POLICY = "lead.walkin_reception_policy"
     EXISTING_CLIENT_POLICY = "lead.existing_client_policy"
     NOT_REACHED_REMINDER_MODE = "lead.not_reached_reminder_mode"

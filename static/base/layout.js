@@ -246,4 +246,4 @@
   } else {
     setInterval(fetchNotifs, 60000);
   }
-})();
+ })();

@@ -11,7 +11,6 @@ from apps.reports.selectors import leads_for_user
 
 from .forms import (
     FollowUpForm,
-    LeadCreateForm,
     ManualAssignmentForm,
     MeetingForm,
     StageChangeForm,
@@ -20,7 +19,6 @@ from .forms import (
 from .models import Lead
 from .services import (
     FollowUpService,
-    LeadCreationService,
     LeadStageService,
     MeetingService,
     WalkInService,
@@ -61,26 +59,12 @@ def lead_detail(request, lead_id):
 
 
 @login_required
-@crm_permission_required("leads.lead.create_self_generated")
+@crm_permission_required("leads.dashboard.access")
 def lead_create(request):
-    form = LeadCreateForm(request.POST or None, company=request.company)
-    if request.method == "POST" and form.is_valid():
-        d = form.cleaned_data
-        try:
-            lead = LeadCreationService.create(
-                company=request.company, actor=request.user,
-                request_meta=getattr(request, "request_meta", None),
-                source_code=d["source_code"], name=d["name"], phone=d["phone"],
-                email=d["email"], country_code=d["country_code"], origin=d["origin"],
-                language=d["language"], broker_owner=d["broker_owner"],
-                referrer_name=d["referrer_name"],
-            )
-            messages.success(request, "Lead created.")
-            return redirect("leads:detail", lead_id=lead.id)
-        except Exception as exc:  # surface service validation to the user
-            messages.error(request, str(exc))
-    return render(request, "form.html", {"title": "New lead", "form": form,
-                                         "submit_label": "Create"})
+    """Dynamic lead-creation page (leads spec §4). The page itself is thin: it
+    renders the shell; all data and submission go through the AJAX endpoints in
+    api.py, which enforce per-source permissions and route to services."""
+    return render(request, "leads/lead_create.html", {})
 
 
 @login_required

@@ -132,6 +132,7 @@ class EventRecord(BaseModel):
         CampaignAsset, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     target_attendees = models.PositiveIntegerField(default=0)
+    lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
     class Meta:
         constraints = [_budget_constraint("event_budget_non_negative")]
@@ -172,6 +173,7 @@ class TVAdRecord(BaseModel):
     end_date = models.DateField(null=True, blank=True)
     budget = models.DecimalField(default=0, **MONEY)
     description = models.TextField(blank=True)
+    lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
 
 class TVChannel(BaseModel):
@@ -198,6 +200,7 @@ class StreetAdRecord(BaseModel):
     end_date = models.DateField(null=True, blank=True)
     budget = models.DecimalField(default=0, **MONEY)
     description = models.TextField(blank=True)
+    lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
 
 class StreetAdTypeDefinition(BaseModel):
@@ -243,6 +246,7 @@ class ExhibitionRecord(BaseModel):
     end_date = models.DateField(null=True, blank=True)
     budget = models.DecimalField(default=0, **MONEY)
     place = models.CharField(max_length=200, blank=True)
+    lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
 
 # --- Social Media ---
@@ -268,6 +272,7 @@ class SocialMediaAdRecord(BaseModel):
         EventRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     description = models.TextField(blank=True)
+    lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
 
 class SocialMediaPlatformLine(BaseModel):

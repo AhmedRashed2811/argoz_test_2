@@ -86,6 +86,12 @@ class Lead(BaseModel, CompanyOwnedModel):
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="assigned_leads",
     )
+    # Call Center source: the agent who captured the lead, distinct from the
+    # salesman who follows up (leads spec §4.2g call-center).
+    call_center_agent = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="cc_agent_leads",
+    )
     current_stage = models.ForeignKey(
         LeadStageDefinition, on_delete=models.PROTECT, related_name="leads",
         null=True, blank=True,

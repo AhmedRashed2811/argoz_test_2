@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Add Lead — Argoz CRM{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'leads/lead_create.css' %}">{% endblock %}
+
+{% block content %}
+<div class="page-body">
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Add New Lead</h1>
+        <p>Fill in all details, then review and create the lead</p>
+      </div>
+    </div>
+    <a href="{% url 'leads:list' %}" class="btn btn-secondary back-to-leads-btn">
+      <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span class="btn-label">Back to Leads</span>
+    </a>
+  </div>
+
+  <div class="form-body">
+    <div class="form-main">
+      <!-- CLIENT INFORMATION -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Client Information
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" id="f_name" placeholder="e.g. Ahmed Ramzy El-Guindy" oninput="updateSummary()">
+          </div>
+          <div class="form-group">
+            <label>Phone Number <span class="req">*</span></label>
+            <div class="phone-wrap">
+              <div class="searchable-dropdown country-code-dropdown" id="cc-dropdown" data-dd="country">
+                <div class="sd-trigger"><span id="cc-flag">🇪🇬</span><span id="cc-code">+20</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                <div class="sd-panel"><div class="sd-search"><input type="text" placeholder="Search country…"></div><div class="sd-list"></div></div>
+              </div>
+              <input type="tel" id="f_phone" placeholder="010 xxxx xxxx" oninput="onPhoneInput()">
+            </div>
+            <div class="field-hint" id="phone-hint"></div>
+          </div>
+          <div class="form-group">
+            <label>Email Address <small>(optional)</small></label>
+            <input type="email" id="f_email" placeholder="ahmed@example.com" oninput="updateSummary()">
+          </div>
+          <div class="form-group">
+            <label>Lead Language <span class="req">*</span></label>
+            <div class="searchable-dropdown lang-dropdown" id="lang-dropdown" data-dd="language">
+              <div class="sd-trigger" style="width:100%"><span class="sd-display" id="lang-display">— Select Language —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+              <div class="sd-panel"><div class="sd-search"><input type="text" placeholder="Search language…"></div><div class="sd-list"></div></div>
+            </div>
+          </div>
+          <div class="form-group span-2">
+            <label>Notes</label>
+            <textarea id="f_notes" placeholder="Any initial notes about this lead…" rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEAD SOURCE -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Select Lead Source
+        </div>
+        <div class="source-grid" id="source-grid"><div class="sd-empty">Loading sources…</div></div>
+
+        <div id="source-partials-container" style="margin-top:16px">
+
+          <!-- Self-Generated -->
+          <div class="card source-partial" id="partial-self_generated" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Self-Generated — Assignment</div>
+            <!-- Sales Head view (rendered per company policy) -->
+            <div id="sg-head-view" style="display:none; flex-direction:column; gap:12px">
+              <div class="form-group" id="sg-assign-group">
+                <label>Assign To <span class="req">*</span></label>
+                <div class="radio-group" style="margin-top:6px">
+                  <label class="radio-opt"><input type="radio" name="sg_assign" value="self" checked onchange="toggleSGAssign(this.value)"><span>Myself</span></label>
+                  <label class="radio-opt"><input type="radio" name="sg_assign" value="member" onchange="toggleSGAssign(this.value)"><span>A salesman in my team</span></label>
+                </div>
+              </div>
+              <div class="info-banner blue" id="sg-auto-info" style="display:none">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Company policy assigns self-generated leads by <strong>automatic round-robin within your team</strong>.</span>
+              </div>
+              <div class="form-group" id="sg-member-select" style="display:none">
+                <label>Select Team Member <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-sg_member" data-dd="sg_member" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search team members…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+            <!-- Salesman view -->
+            <div id="sg-salesman-view" style="display:none">
+              <div class="info-banner blue">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>This lead will be <strong>automatically assigned to you</strong>. SLA keep-vs-redistribute follows your company policy.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Campaign -->
+          <div class="card source-partial" id="partial-campaign" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Campaign — Source Details</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Campaign <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-campaign" data-dd="campaign" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Campaign —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search campaigns…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Channel (Type) <span class="req">*</span></label>
+                <select id="camp-channel" onchange="onCampChannel(this.value)">
+                  <option value="">— Select Channel —</option>
+                  <option value="event">Event</option>
+                  <option value="tv_ad">TV Ad</option>
+                  <option value="street_ad">Street Ad</option>
+                  <option value="social_media_ad">Social Media Ad</option>
+                  <option value="exhibition">Exhibition</option>
+                </select>
+              </div>
+              <div class="form-group" id="camp-platform-group" style="display:none">
+                <label>Social Platform <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-camp_platform" data-dd="camp_platform" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Platform —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search platforms…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2" id="camp-child-group" style="display:none">
+                <label id="camp-child-label">Detail <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-camp_child" data-dd="camp_child" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2">
+                <label>Distribution Method <span class="req">*</span></label>
+                <div class="radio-group" style="margin-top:6px">
+                  <label class="radio-opt" id="camp-manual-opt"><input type="radio" name="camp_dist" value="manual" onchange="toggleCampDist(this.value)"><span>Manual</span></label>
+                  <label class="radio-opt"><input type="radio" name="camp_dist" value="auto" checked onchange="toggleCampDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                </div>
+              </div>
+              <div class="form-group span-2" id="camp-assign-group" style="display:none">
+                <label>Assign To <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-camp_assign" data-dd="camp_assign" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Team or Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search teams or salesmen…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="info-banner orange" style="margin-top:4px">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>Language filter (<strong id="camp-lang-display">—</strong>) is applied before automatic distribution.</span>
+            </div>
+          </div>
+
+          <!-- Broker -->
+          <div class="card source-partial" id="partial-broker" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Broker — Source Details</div>
+            <!-- Broker is the logged-in user -->
+            <div id="broker-self-panel" style="display:none; flex-direction:column; gap:14px">
+              <div class="info-banner blue">
+                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>You are logged in as a broker. This lead is automatically owned by your brokerage.</span>
+              </div>
+            </div>
+            <!-- Internal staff selecting a broker -->
+            <div id="broker-staff-panel" style="display:flex; flex-direction:column; gap:14px">
+              <div class="form-group">
+                <label>Broker <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-broker" data-dd="broker" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Broker —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search brokers…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+            <!-- Policy: also assign a salesman? (shown only when policy enables it) -->
+            <div id="broker-salesman-section" style="display:none; flex-direction:column; gap:12px; margin-top:4px">
+              <div class="form-group">
+                <label>Salesman Assignment</label>
+                <div class="radio-group" style="margin-top:6px">
+                  <label class="radio-opt"><input type="radio" name="broker_policy" value="broker_only" checked onchange="toggleBrokerPolicy(this.value)"><span>Keep with brokerage only</span></label>
+                  <label class="radio-opt"><input type="radio" name="broker_policy" value="salesman" onchange="toggleBrokerPolicy(this.value)"><span>Also assign a salesman</span></label>
+                </div>
+              </div>
+              <div class="form-group" id="broker-salesman-group" style="display:none">
+                <label>Assign Salesman <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-broker_salesman" data-dd="broker_salesman" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search salesmen…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Walk-in -->
+          <div class="card source-partial" id="partial-walk_in" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Walk-in — Reception Details</div>
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label>How Did You Know Us? <span class="req">*</span></label>
+                <select id="wk-channel" onchange="onChannelPick('wk', this.value)">
+                  <option value="">— Select —</option>
+                  <option value="event">Event</option>
+                  <option value="tv_ad">TV Ad</option>
+                  <option value="street_ad">Street Ad</option>
+                  <option value="social_media_ad">Social Media Ad</option>
+                  <option value="exhibition">Exhibition</option>
+                  <option value="WEBSITE">Website</option>
+                  <option value="PASSING_BY">Passing By</option>
+                </select>
+              </div>
+              <div class="form-group" id="wk-platform-group" style="display:none">
+                <label>Social Platform <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-wk_platform" data-dd="wk_platform" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Platform —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search platforms…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2" id="wk-record-group" style="display:none">
+                <label id="wk-record-label">Detail <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-wk_record" data-dd="wk_record" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="info-banner blue" style="margin-top:10px">
+              <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              <span id="wk-policy-text">Loading reception policy…</span>
+            </div>
+            <div id="wk-rotation" style="margin-top:10px"></div>
+          </div>
+
+          <!-- Call Center -->
+          <div class="card source-partial" id="partial-call_center" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.1 13.4 19.79 19.79 0 0 1 .93 4.73 2 2 0 0 1 2.89 2.5H5.8a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L6.91 10.1a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call Center — Caller Details</div>
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label>How Did the Caller Hear About Us? <span class="req">*</span></label>
+                <select id="cc-channel" onchange="onChannelPick('cc', this.value)">
+                  <option value="">— Select —</option>
+                  <option value="event">Event</option>
+                  <option value="tv_ad">TV Ad</option>
+                  <option value="street_ad">Street Ad</option>
+                  <option value="social_media_ad">Social Media Ad</option>
+                  <option value="exhibition">Exhibition</option>
+                  <option value="WEBSITE">Website</option>
+                  <option value="FRIEND">Friend / Referral</option>
+                </select>
+              </div>
+              <div class="form-group" id="cc-platform-group" style="display:none">
+                <label>Social Platform <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-cc_platform" data-dd="cc_platform" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Platform —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search platforms…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2" id="cc-record-group" style="display:none">
+                <label id="cc-record-label">Detail <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-cc_record" data-dd="cc_record" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2" id="cc-agent-group" style="display:none">
+                <label>Call Center Agent <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-cc_agent" data-dd="cc_agent" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Agent —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search agents…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2">
+                <label>Distribution Method <span class="req">*</span></label>
+                <div class="radio-group" style="margin-top:6px">
+                  <label class="radio-opt" id="cc-manual-opt"><input type="radio" name="cc_dist" value="manual" onchange="toggleCCDist(this.value)"><span>Manual</span></label>
+                  <label class="radio-opt"><input type="radio" name="cc_dist" value="auto" checked onchange="toggleCCDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                </div>
+              </div>
+              <div class="form-group span-2" id="cc-assign-group" style="display:none">
+                <label>Assign To <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-cc_salesman" data-dd="cc_salesman" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search salesmen…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Exhibition -->
+          <div class="card source-partial" id="partial-exhibition" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M3 3h18v13H3z"/><path d="M8 21l4-5 4 5"/><line x1="3" y1="8" x2="21" y2="8"/></svg>Exhibition — Details</div>
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label>Exhibition <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-exhib_record" data-dd="exhib_record" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Exhibition —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search exhibitions…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+              <div class="form-group span-2">
+                <label>Assigned Salesman <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-exhib_salesman" data-dd="exhib_salesman" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search salesmen…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="info-banner red">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>A salesman <strong>must</strong> be selected for Exhibition leads.</span>
+            </div>
+          </div>
+
+          <!-- Referral -->
+          <div class="card source-partial" id="partial-referral" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Referral — Referrer Details</div>
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label>Referrer Name <span class="req">*</span></label>
+                <input type="text" id="ref-name" placeholder="Who referred this lead?">
+              </div>
+              <div class="form-group span-2">
+                <label>Distribution Method <span class="req">*</span></label>
+                <div class="radio-group" style="margin-top:6px">
+                  <label class="radio-opt" id="ref-manual-opt"><input type="radio" name="ref_dist" value="manual" onchange="toggleRefDist(this.value)"><span>Manual</span></label>
+                  <label class="radio-opt"><input type="radio" name="ref_dist" value="auto" checked onchange="toggleRefDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                </div>
+              </div>
+              <div class="form-group span-2" id="ref-assign-group" style="display:none">
+                <label>Assign To <span class="req">*</span></label>
+                <div class="searchable-dropdown" id="dd-ref_salesman" data-dd="ref_salesman" style="width:100%">
+                  <div class="sd-trigger" style="width:100%"><span class="sd-display">— Select Salesman —</span><svg class="sd-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+                  <div class="sd-panel" style="min-width:100%"><div class="sd-search"><input type="text" placeholder="Search salesmen…"></div><div class="sd-list"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Existing Client -->
+          <div class="card source-partial" id="partial-existing_client" style="border-color:rgba(224,123,32,.25)">
+            <div class="card-title"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Existing Client — Lookup</div>
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label>Search by Phone Number</label>
+                <div class="phone-wrap">
+                  <input type="tel" id="existing-search" placeholder="Enter the client phone" style="flex:1">
+                  <button type="button" class="btn btn-outline" onclick="lookupExistingClient()">Search</button>
+                </div>
+              </div>
+            </div>
+            <div id="existing-result" style="margin-top:8px; display:none"></div>
+            <div class="info-banner blue" style="margin-top:8px">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>Assignment for existing clients follows the company policy automatically (preserve prior salesman if active, otherwise redistribute).</span>
+            </div>
+          </div>
+
+        </div><!-- /partials -->
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn-outline" onclick="checkDuplicate()" style="margin-right:4px">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Check Duplicates
+        </button>
+        <button type="button" class="btn btn-primary" onclick="openReview()">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          Review &amp; Create Lead
+        </button>
+      </div>
+    </div><!-- /form-main -->
+
+    <!-- SIDEBAR -->
+    <div class="form-sidebar">
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Lead Summary</div>
+        <div class="summary-section">
+          <div class="summary-row"><span>Name</span><span id="sum-name">—</span></div>
+          <div class="summary-row"><span>Phone</span><span id="sum-phone">—</span></div>
+          <div class="summary-row"><span>Source</span><span id="sum-source">—</span></div>
+          <div class="summary-row"><span>Language</span><span id="sum-lang">—</span></div>
+          <div class="summary-row"><span>Stage</span><span><span class="badge fresh"><span class="dot"></span>Fresh</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /form-body -->
+</div><!-- /page-body -->
+
+<!-- REVIEW OVERLAY -->
+<div id="review-overlay" onclick="if(event.target===this) closeReview()">
+  <div class="review-modal">
+    <div class="review-modal-header">
+      <div class="review-modal-title">Review Lead Details</div>
+      <button type="button" onclick="closeReview()" style="border:none; background:none; cursor:pointer; font-size:1.2rem; color:var(--clr-gray)">✕</button>
+    </div>
+    <div class="review-modal-body">
+      <div class="review-section">
+        <div class="review-section-title">Client Information</div>
+        <div class="review-grid" id="review-client-grid"></div>
+      </div>
+      <div class="review-section">
+        <div class="review-section-title">Source &amp; Assignment</div>
+        <div id="review-source-detail" style="font-size:.87rem; color:var(--clr-text-sub)">—</div>
+      </div>
+    </div>
+    <div class="review-modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeReview()">Back to Form</button>
+      <button type="button" class="btn btn-primary" onclick="closeReview(); submitLead()">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Create Lead
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DUPLICATE MODAL -->
+<div id="dup-modal-bg" style="display:none; position:fixed; inset:0; background:rgba(30,28,26,.4); z-index:999; backdrop-filter:blur(2px)" onclick="if(event.target===this) closeDupModal()">
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--clr-surface); border-radius:12px; border:1px solid var(--clr-border); padding:24px; width:520px; max-width:94vw; box-shadow:var(--shadow)">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+      <div style="font-family:'Times New Roman',serif; font-size:1.1rem; font-weight:700">Duplicate Check</div>
+      <button type="button" onclick="closeDupModal()" style="border:none; background:none; cursor:pointer; font-size:1.2rem; color:var(--clr-gray)">✕</button>
+    </div>
+    <div id="dup-modal-body"></div>
+  </div>
+</div>
+
+<script>
+  window.LEAD_CFG = {
+    csrf: "{{ csrf_token }}",
+    isBroker: false,
+    urls: {
+      create: "{% url 'leads:api_create' %}",
+      sources: "{% url 'leads:api_sources' %}",
+      languages: "{% url 'leads:api_languages' %}",
+      duplicate: "{% url 'leads:api_duplicate_check' %}",
+      existing: "{% url 'leads:api_existing_client' %}",
+      campaigns: "{% url 'leads:api_campaigns' %}",
+      campaignChannels: "{% url 'leads:api_campaign_channels' %}",
+      campaignChildren: "{% url 'leads:api_campaign_children' %}",
+      records: "{% url 'leads:api_records' %}",
+      walkinState: "{% url 'leads:api_walkin_state' %}",
+      walkinAdvance: "{% url 'leads:api_walkin_advance' %}",
+      brokers: "{% url 'leads:api_brokers' %}",
+      salesmen: "{% url 'leads:api_salesmen' %}",
+      teamMembers: "{% url 'leads:api_team_members' %}",
+      teams: "{% url 'leads:api_teams' %}",
+      ccAgents: "{% url 'leads:api_cc_agents' %}",
+      walkinRotation: "{% url 'leads:api_walkin_rotation' %}"
+    },
+    user: { id: "{{ user.id }}", name: "{{ user.get_full_name|default:user.email|escapejs }}" }
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'leads/lead_create.js' %}"></script>{% endblock %}

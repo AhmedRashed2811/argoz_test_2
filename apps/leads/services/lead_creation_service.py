@@ -43,10 +43,14 @@ class LeadCreationService:
         language=None,
         assigned_salesman=None,
         assigned_team=None,
+        call_center_agent=None,
         auto_distribute: bool = True,
         metadata: dict | None = None,
+        attribution_platform=None,
+        attribution_event=None,
         **extra,
     ) -> Lead:
+        print(f"\n[LeadCreationService] create called: source={source_code}, name={name}, phone={phone}, salesman={assigned_salesman}, team={assigned_team}, auto={auto_distribute}")
         if not name or not phone:
             raise ValidationError("Lead requires name and phone (docs §8.1).")
 
@@ -84,6 +88,7 @@ class LeadCreationService:
                     auto_distribute = False
 
         dup = DuplicateService.check(company=company, phone=phone)
+        print(f"[LeadCreationService] Duplicate check completed. requires_manual={dup.requires_manual}, existing={dup.existing}")
         # Active + in-SLA duplicate => manual escalation, never auto (docs §8.1).
         if dup.requires_manual:
             LeadCreationService._escalate_manual(company, dup.existing, actor)
@@ -105,12 +110,14 @@ class LeadCreationService:
             campaign_child_id=campaign_child_id,
             assigned_team=assigned_team,
             assigned_salesman=assigned_salesman,
+            call_center_agent=call_center_agent,
             current_stage=fresh,
             active_status=ActiveStatus.ACTIVE,
             created_by=actor,
             last_activity_at=timezone.now(),
             metadata=metadata,
         )
+        print(f"[LeadCreationService] Lead object created in DB: id={lead.id}, name={lead.name}")
 
         if broker_owner is not None:
             BrokerLeadOwnershipHistory.objects.create(
@@ -125,7 +132,9 @@ class LeadCreationService:
 
         # Attribution into campaign children (docs §10.5) when campaign present.
         if campaign is not None:
-            LeadCreationService._attribute(lead)
+            LeadCreationService._attribute(
+                lead, platform=attribution_platform, event=attribution_event
+            )
 
         AuditService.log(
             action=AuditAction.CREATE, instance=lead, actor=actor,
@@ -147,6 +156,7 @@ class LeadCreationService:
         else:
             LeadCreationService._escalate_manual(company, lead, actor)
 
+        print(f"[LeadCreationService] Lead creation workflow finished: lead_id={lead.id}, assigned_salesman={lead.assigned_salesman}, assigned_team={lead.assigned_team}\n")
         return lead
 
     @staticmethod
@@ -176,9 +186,11 @@ class LeadCreationService:
         ManualDistributionEscalation.notify(company=company, lead=lead, actor=actor)
 
     @staticmethod
-    def _attribute(lead):
+    def _attribute(lead, platform=None, event=None):
         from apps.marketing.services.campaign_attribution_service import (
             CampaignAttributionService,
         )
 
-        CampaignAttributionService.link_lead(lead=lead)
+        CampaignAttributionService.link_lead(
+            lead=lead, platform=platform, event=event
+        )

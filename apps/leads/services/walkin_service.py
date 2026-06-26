@@ -16,6 +16,9 @@ OPEN_FLOOR = "OPEN_FLOOR"
 TEAM_TURN = "TEAM_TURN"
 FULL_ROTATION = "FULL_ROTATION"
 
+ROT_FULL = "WALKIN_FULL_ROTATION"
+ROT_TEAM = "WALKIN_TEAM_TURN"
+
 
 class WalkInService:
     @staticmethod
@@ -69,6 +72,69 @@ class WalkInService:
             ManualDistributionEscalation.notify(
                 company=lead.company, lead=lead, actor=actor
             )
+
+    # ── Interactive rotation (matches the receptionist UI; docs §4.2d) ──
+    @staticmethod
+    def available_members(company):
+        """Available salesmen in a stable company-wide order (the By-Turn order)."""
+        from apps.accounts.models import TeamMember
+
+        return list(
+            TeamMember.objects.select_related("user", "team").filter(
+                team__company=company, team__is_active=True, is_available=True,
+                user__is_active=True, user__profile__availability_status="AVAILABLE",
+            ).order_by("team__order_index", "user_id")
+        )
+
+    @staticmethod
+    def _pointer(company, code):
+        from apps.distribution.models import RotationPointer
+
+        p, _ = RotationPointer.objects.get_or_create(
+            company=company, pointer_code=code, scope="GLOBAL",
+            defaults={"current_index": 0},
+        )
+        return p
+
+    @staticmethod
+    def advance_pointer(company, code, length):
+        """Move a rotation cursor forward by one (wraps). length=0 is a no-op."""
+        p = WalkInService._pointer(company, code)
+        if length:
+            p.current_index = (p.current_index + 1) % length
+            p.save(update_fields=["current_index", "updated_at"])
+        return p.current_index
+
+    @staticmethod
+    def rotation_state(company, policy):
+        """Snapshot the receptionist needs: whose turn it is, plus the pool."""
+        from apps.accounts.models import Team
+
+        members = WalkInService.available_members(company)
+
+        def person(m):
+            return {"id": str(m.user_id),
+                    "name": m.user.get_full_name() or m.user.email,
+                    "team": m.team.name, "team_id": str(m.team_id)}
+
+        if policy == FULL_ROTATION:
+            idx = WalkInService._pointer(company, ROT_FULL).current_index
+            idx = idx % len(members) if members else 0
+            return {"policy": policy, "order": [person(m) for m in members],
+                    "current_index": idx}
+        if policy == TEAM_TURN:
+            teams = list(Team.objects.filter(company=company, is_active=True)
+                         .order_by("order_index"))
+            tp = WalkInService._pointer(company, ROT_TEAM).current_index
+            tp = tp % len(teams) if teams else 0
+            cur = teams[tp] if teams else None
+            mem = [person(m) for m in members if cur and m.team_id == cur.id]
+            return {"policy": policy,
+                    "teams": [{"id": str(t.id), "name": t.name} for t in teams],
+                    "current_team": ({"id": str(cur.id), "name": cur.name}
+                                     if cur else None),
+                    "members": mem, "current_index": tp}
+        return {"policy": policy, "salesmen": [person(m) for m in members]}
 
     @staticmethod
     def _next_team(company):

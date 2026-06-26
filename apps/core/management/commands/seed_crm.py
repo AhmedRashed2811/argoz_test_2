@@ -211,6 +211,12 @@ class Command(BaseCommand):
              "leads", ValueType.OPTION,
              [("KEEP_WITH_OWNER", "Keep with owner", ""),
               ("REDISTRIBUTE_AFTER_SLA", "Redistribute after SLA", "")]),
+            (PolicyCode.SELF_GENERATED_HEAD_ASSIGNMENT,
+             "Self-Generated Head Assignment", "leads", ValueType.OPTION,
+             [("SELF_OR_MANUAL_TEAM", "Self or manual team member", ""),
+              ("AUTO_ROUND_ROBIN_TEAM", "Auto round-robin within team", "")]),
+            (PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN,
+             "Broker Lead Also Assigned to Salesman", "leads", ValueType.BOOLEAN, []),
             (PolicyCode.WALKIN_RECEPTION_POLICY, "Walk-in Reception Policy", "leads",
              ValueType.OPTION,
              [("OPEN_FLOOR", "Open Floor", ""), ("TEAM_TURN", "Team Turn", ""),
@@ -263,6 +269,10 @@ class Command(BaseCommand):
         self._set_value(company, PolicyCode.DIRECT_SLA, {"hours": 2})
         self._set_value(company, PolicyCode.BROKER_SLA, {"hours": 4})
         self._set_value(company, f"{PolicyCode.STAGE_SLA}.fresh", {"hours": 2})
+        self._select(company, PolicyCode.SELF_GENERATED_SALESMAN_POLICY, "KEEP_WITH_OWNER")
+        self._select(company, PolicyCode.SELF_GENERATED_HEAD_ASSIGNMENT,
+                     "SELF_OR_MANUAL_TEAM")
+        self._set_value(company, PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN, True)
         self.stdout.write(f"  policies: {len(defs)}")
 
     def _select(self, company, code, option_code):
@@ -331,6 +341,14 @@ class Command(BaseCommand):
             ("leads.dashboard.access", "Open leads", RiskLevel.LOW),
             ("leads.lead.create_self_generated", "Create self-generated lead", RiskLevel.LOW),
             ("leads.lead.create_any_source", "Create lead from any source", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_self_generated", "Create lead: Self-Generated", RiskLevel.LOW),
+            ("leads.lead.create_from_campaign", "Create lead: Campaign", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_broker", "Create lead: Broker", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_walk_in", "Create lead: Walk-in", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_call_center", "Create lead: Call Center", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_exhibition", "Create lead: Exhibition", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_referral", "Create lead: Referral", RiskLevel.MEDIUM),
+            ("leads.lead.create_from_existing_client", "Create lead: Existing Client", RiskLevel.MEDIUM),
             ("leads.lead.view_own", "View own leads", RiskLevel.LOW),
             ("leads.lead.view_team", "View team leads", RiskLevel.MEDIUM),
             ("leads.lead.view_all", "View all leads", RiskLevel.HIGH),
@@ -384,14 +402,21 @@ class Command(BaseCommand):
         all_codes = list(
             PermissionDefinition.objects.values_list("code", flat=True)
         )
+        # Source-level create permission codes (leads spec §4.2b role defaults).
+        all_source_creates = [f"leads.lead.create_from_{s.lower()}" for s in SourceCode.ALL]
         bundles = {
             "SYSTEM_ADMINS": all_codes,
+            "DIRECTORS": ["dashboard.main.access", "leads.dashboard.access",
+                          "leads.lead.view_all", "leads.distribution.manual_all",
+                          "notifications.view_own", *all_source_creates],
             "SALES": ["dashboard.main.access", "leads.dashboard.access",
-                      "leads.lead.create_self_generated", "leads.lead.view_own",
+                      "leads.lead.create_self_generated",
+                      "leads.lead.create_from_self_generated", "leads.lead.view_own",
                       "leads.stage.change_own", "leads.followup.create_own",
                       "leads.meeting.create_own", "notifications.view_own"],
             "SALES_HEAD": ["dashboard.main.access", "leads.dashboard.access",
-                           "leads.lead.create_self_generated", "leads.lead.view_own",
+                           "leads.lead.create_self_generated",
+                           "leads.lead.create_from_self_generated", "leads.lead.view_own",
                            "leads.lead.view_team", "leads.distribution.team_manual",
                            "leads.stage.change_own", "leads.followup.create_own",
                            "leads.meeting.create_own", "notifications.view_own"],
@@ -399,7 +424,19 @@ class Command(BaseCommand):
                                 "leads.lead.view_all", "leads.lead.create_any_source",
                                 "leads.distribution.manual_all", "notifications.view_own",
                                 "admin.teams.access", "admin.teams.create",
-                                "admin.teams.update", "admin.teams.delete"],
+                                "admin.teams.update", "admin.teams.delete",
+                                # All sources except self-generated (§4.2b).
+                                *[c for c in all_source_creates
+                                  if c != "leads.lead.create_from_self_generated"]],
+            "CALL_CENTER": ["dashboard.main.access", "leads.dashboard.access",
+                            "leads.lead.create_from_call_center",
+                            "leads.lead.create_from_existing_client",
+                            "leads.lead.view_own", "notifications.view_own"],
+            "BROKERS": ["dashboard.main.access", "leads.dashboard.access",
+                        "leads.lead.create_from_broker", "leads.lead.view_own",
+                        "notifications.view_own"],
+            "RECEPTIONISTS": ["dashboard.main.access", "leads.dashboard.access",
+                              "leads.lead.create_from_walk_in", "notifications.view_own"],
             "FINANCE_MANAGERS": ["finance.dashboard.access", "finance.campaign.review",
                                  "finance.campaign.approve",
                                  "marketing.campaign.view_all", "notifications.view_own"],
