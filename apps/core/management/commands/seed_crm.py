@@ -198,6 +198,10 @@ class Command(BaseCommand):
              "leads", ValueType.OPTION,
              [("ROUND_ROBIN", "Round Robin", "ROUND_ROBIN"),
               ("BY_TURN", "By Turn", "BY_TURN")]),
+            (PolicyCode.BULK_IMPORT_DISTRIBUTION, "Bulk Import Distribution", "leads",
+             ValueType.OPTION,
+             [("AUTO", "Automatic distribution", ""),
+              ("MANUAL", "Manual distribution only", "")]),
             (PolicyCode.DISTRIBUTION_SCOPE_MODE, "Distribution Scope Mode", "leads",
              ValueType.OPTION,
              [(ScopeMode.TEAM_THEN_SALESMAN, "Team then Salesman", ""),
@@ -234,6 +238,8 @@ class Command(BaseCommand):
              ValueType.DURATION, []),
             (PolicyCode.CAMPAIGN_RESTRICT_EDITING, "Restrict Approved Campaign Editing", "marketing",
              ValueType.BOOLEAN, []),
+            (PolicyCode.REQUEST_CAMPAIGN_APPROVAL, "Request Campaign Approval", "marketing",
+             ValueType.BOOLEAN, []),
             (PolicyCode.WEBHOOK_MAPPING_POLICY, "Webhook Mapping Policy", "integration",
              ValueType.JSON, []),
         ]
@@ -256,6 +262,7 @@ class Command(BaseCommand):
         # Sensible default selections + durations so the engine runs out of the box.
         self._select(company, PolicyCode.SLA_EXPIRY_METHOD, SLAExpiryMethod.BY_TURN)
         self._select(company, PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD, "BY_TURN")
+        self._select(company, PolicyCode.BULK_IMPORT_DISTRIBUTION, "MANUAL")
         self._select(company, PolicyCode.DISTRIBUTION_SCOPE_MODE, ScopeMode.ALL_SALESMEN)
         self._select(company, PolicyCode.WALKIN_RECEPTION_POLICY, "FULL_ROTATION")
         self._select(company, PolicyCode.EXISTING_CLIENT_POLICY,
@@ -271,6 +278,7 @@ class Command(BaseCommand):
         self._set_value(company, PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN, True)
         self._set_value(company, PolicyCode.FRESH_REMINDER_SCHEDULE, {"minutes": 2})
         self._set_value(company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, True)
+        self._set_value(company, PolicyCode.REQUEST_CAMPAIGN_APPROVAL, True)
         self._select(company, PolicyCode.NOT_REACHED_REMINDER_MODE, "AUTOMATIC")
         self.stdout.write(f"  policies: {len(defs)}")
 
@@ -351,6 +359,7 @@ class Command(BaseCommand):
             ("admin.brokers.create", "Create brokers", RiskLevel.MEDIUM),
             ("leads.dashboard.access", "Open leads", RiskLevel.LOW),
             ("leads.lead.create", "Create lead", RiskLevel.LOW),
+            ("leads.lead.bulk_create", "Bulk import leads (CSV)", RiskLevel.MEDIUM),
             ("leads.lead.create_self_generated", "Create self-generated lead", RiskLevel.LOW),
             ("leads.lead.create_any_source", "Create lead from any source", RiskLevel.MEDIUM),
             ("leads.lead.create_from_self_generated", "Create lead: Self-Generated", RiskLevel.LOW),
@@ -536,6 +545,11 @@ class Command(BaseCommand):
                                    "review_leads_analysis",
                                    "notifications.view_own"],
         }
+        # Bulk import follows single-lead create: any group that can create a lead
+        # gets bulk_create by default (admins can change it afterwards).
+        for codes in bundles.values():
+            if "leads.lead.create" in codes and "leads.lead.bulk_create" not in codes:
+                codes.append("leads.lead.bulk_create")
         perms = {p.code: p for p in PermissionDefinition.objects.all()}
         for role_code, codes in bundles.items():
             role = RoleGroup.objects.filter(company=company, code=role_code).first()

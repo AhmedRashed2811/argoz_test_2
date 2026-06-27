@@ -374,6 +374,35 @@ class PermissionManagementService:
 
 
 class RoleService:
+    # Per-group default landing page (url name) when a user hits the dashboard root.
+    # Receptionists / Call Center / Brokers intentionally fall through to the dashboard.
+    LANDING_BY_ROLE = {
+        "SALES": "leads:list",
+        "SALES_HEAD": "leads:list",
+        "SALES_OPERATION": "leads:all_list",
+        "SYSTEM_ADMINS": "accounts:user_list",
+        "DIRECTORS": "leads:leads_analysis",
+        "MARKETING_MEMBERS": "marketing:campaign_list",
+        "MARKETING_MANAGERS": "marketing:marketing_report",
+        "FINANCE_MANAGERS": "finance:campaign_approval",
+    }
+
+    @staticmethod
+    def default_landing(user) -> str | None:
+        """Url name of the user's group landing page, or None to stay on dashboard."""
+        codes = []
+        profile = getattr(user, "profile", None)
+        if profile and profile.default_role:
+            codes.append(profile.default_role.code)
+        codes += list(
+            user.roles.filter(is_active=True).values_list("role__code", flat=True)
+        )
+        for code in codes:
+            target = RoleService.LANDING_BY_ROLE.get(code)
+            if target:
+                return target
+        return None
+
     @staticmethod
     def get_roles_for_company(company):
         from django.db.models import Count, Q

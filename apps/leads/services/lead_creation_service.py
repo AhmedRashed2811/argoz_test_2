@@ -45,6 +45,7 @@ class LeadCreationService:
         assigned_team=None,
         call_center_agent=None,
         auto_distribute: bool = True,
+        notify: bool = True,
         metadata: dict | None = None,
         attribution_platform=None,
         attribution_event=None,
@@ -126,11 +127,12 @@ class LeadCreationService:
             )
             broker_owner.leads_count += 1
             broker_owner.save(update_fields=["leads_count", "updated_at"])
-            NotificationService.create_for_users(
-                company=company, recipients=[broker_owner.linked_user],
-                code=NotificationCode.BROKER_LEAD_CREATED,
-                related_type="Lead", related_id=lead.pk,
-            )
+            if notify:
+                NotificationService.create_for_users(
+                    company=company, recipients=[broker_owner.linked_user],
+                    code=NotificationCode.BROKER_LEAD_CREATED,
+                    related_type="Lead", related_id=lead.pk,
+                )
 
         # Attribution into campaign children (docs §10.5) when campaign present.
         if campaign is not None:
@@ -159,7 +161,8 @@ class LeadCreationService:
                         is_sg_owner_keep = True
 
             if is_sg_owner_keep:
-                NotificationService.lead_assigned(company, lead, assigned_salesman)
+                if notify:
+                    NotificationService.lead_assigned(company, lead, assigned_salesman)
             else:
                 deadline = SLAService.calculate_deadline(
                     company, stage_code=StageCode.FRESH, origin=origin, source_code=source_code
@@ -167,10 +170,11 @@ class LeadCreationService:
                 SLAService.open_instance(lead=lead, stage=fresh, deadline=deadline)
                 lead.sla_deadline = deadline
                 lead.save(update_fields=["sla_deadline", "updated_at"])
-                NotificationService.lead_assigned(company, lead, assigned_salesman)
+                if notify:
+                    NotificationService.lead_assigned(company, lead, assigned_salesman)
         elif auto_distribute and source_code != SourceCode.EXHIBITION:
             LeadCreationService._dispatch_distribution(lead, actor, request_meta)
-        else:
+        elif notify:
             LeadCreationService._escalate_manual(company, lead, actor)
 
         print(f"[LeadCreationService] Lead creation workflow finished: lead_id={lead.id}, assigned_salesman={lead.assigned_salesman}, assigned_team={lead.assigned_team}\n")

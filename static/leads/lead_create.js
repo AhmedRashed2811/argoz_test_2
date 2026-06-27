@@ -513,9 +513,8 @@ function submitLead() {
   postJSON(CFG.urls.create, buildPayload()).then(async r => {
     const d = await r.json();
     if (r.ok && d.ok) {
-      Swal.fire({ title: 'Lead Created!', icon: 'success', confirmButtonText: 'View Lead', confirmButtonColor: '#e07b20',
-        showCancelButton: true, cancelButtonText: 'Add Another' })
-        .then(res => { if (res.isConfirmed) window.location.href = d.redirect; else window.location.reload(); });
+      Swal.fire({ title: 'Lead Created!', icon: 'success', confirmButtonText: 'Add Another', confirmButtonColor: '#e07b20' })
+        .then(() => window.location.reload());
     } else {
       Swal.fire({ title: 'Could not create lead', text: d.error || 'Unexpected error', icon: 'error', confirmButtonColor: '#e07b20' });
     }
@@ -544,3 +543,128 @@ function init() {
   });
 }
 document.addEventListener('DOMContentLoaded', init);
+
+/* ═══════════════ BULK CSV IMPORT ═══════════════ */
+const BULK_COLUMNS = ['name','country_code','phone','email','source','broker_name',
+  'campaign_name','event','tv_ad','street_ad','social_media_ad','exhibition',
+  'referrer_name','language','notes'];
+let _bulkDuplicates = [];
+
+function _bulkShow(id) {
+  ['bulk-intro','bulk-spinner','bulk-result'].forEach(s =>
+    document.getElementById(s).style.display = s === id ? 'block' : 'none');
+}
+function openBulkImport() {
+  _bulkShow('bulk-intro');
+  document.getElementById('bulk-result').innerHTML = '';
+  const f = document.getElementById('bulk-file'); if (f) f.value = '';
+  document.getElementById('bulk-modal-bg').style.display = 'block';
+}
+function closeBulkImport() { document.getElementById('bulk-modal-bg').style.display = 'none'; }
+
+function _csv(rows) {
+  // rows: array of arrays -> RFC4180-ish CSV string.
+  return rows.map(r => r.map(v => {
+    const s = (v == null ? '' : String(v));
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\r\n');
+}
+function _downloadCsv(filename, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+function downloadBulkTemplate() {
+  const example = ['Ahmed Ali','+20','1001234567','ahmed@example.com','campaign',
+    '','Summer Launch','Opening Event','','','','','','ar','VIP lead'];
+  _downloadCsv('leads_import_template.csv', _csv([BULK_COLUMNS, example]));
+}
+
+function submitBulkImport() {
+  const input = document.getElementById('bulk-file');
+  const file = input.files && input.files[0];
+  if (!file) { Swal.fire({ title: 'Choose a CSV file first', icon: 'info', confirmButtonColor: '#e07b20' }); return; }
+  _bulkShow('bulk-spinner');
+  const fd = new FormData(); fd.append('file', file);
+  fetch(CFG.urls.bulkImport, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'X-CSRFToken': CFG.csrf }, body: fd,
+  }).then(async r => {
+    const d = await r.json();
+    if (!r.ok || !d.ok) { throw new Error(d.error || 'Import failed'); }
+    renderBulkResult(d);
+  }).catch(e => {
+    _bulkShow('bulk-result');
+    document.getElementById('bulk-result').innerHTML =
+      `<div style="color:#c0392b;font-size:.9rem">${e.message}</div>
+       <div style="text-align:right;margin-top:14px"><button type="button" class="btn btn-secondary" onclick="openBulkImport()">Back</button></div>`;
+  });
+}
+
+function _summaryList(obj) {
+  return Object.entries(obj || {}).map(([k, v]) =>
+    `<li>${v} × ${k.replace(/</g,'&lt;')}</li>`).join('');
+}
+
+let _bulkRejected = [], _bulkCols = BULK_COLUMNS;
+function renderBulkResult(d) {
+  _bulkDuplicates = d.duplicates || [];
+  _bulkRejected = d.rejected_rows || [];
+  _bulkCols = d.columns || BULK_COLUMNS;
+  const cleanOnly = d.rejected === 0 && d.duplicate_count === 0;
+  let html = `<div style="font-size:.95rem;font-weight:700;margin-bottom:10px">Import summary</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="background:rgba(39,174,96,.12);color:#1e8449;padding:5px 12px;border-radius:18px;font-size:.82rem;font-weight:600">${d.accepted} accepted</span>
+      <span style="background:rgba(192,57,43,.1);color:#c0392b;padding:5px 12px;border-radius:18px;font-size:.82rem;font-weight:600">${d.rejected} rejected</span>
+      <span style="background:rgba(243,156,18,.12);color:#b7770d;padding:5px 12px;border-radius:18px;font-size:.82rem;font-weight:600">${d.duplicate_count} duplicates</span>
+    </div>
+    <div style="font-size:.78rem;color:var(--clr-text-sub);margin-bottom:14px">Distribution mode: <strong>${d.distribution}</strong></div>`;
+
+  if (cleanOnly) {
+    html += `<div style="color:#1e8449;font-size:.9rem;margin-bottom:14px">✓ All rows accepted. No action needed.</div>`;
+  }
+
+  if (d.rejected > 0) {
+    html += `<div style="font-weight:600;font-size:.85rem;margin-bottom:4px">Why rows were rejected</div>
+      <ul style="margin:0 0 10px 18px;font-size:.82rem;color:var(--clr-text-sub)">${_summaryList(d.reasons_summary)}</ul>
+      <button type="button" class="btn btn-outline" style="margin-bottom:16px" onclick="downloadRejected()">Download rejected rows</button>`;
+  }
+
+  if (d.duplicate_count > 0) {
+    html += `<div style="font-weight:600;font-size:.85rem;margin-bottom:4px">Duplicate phones (skipped)</div>
+      <ul style="margin:0 0 10px 18px;font-size:.82rem;color:var(--clr-text-sub)">${_summaryList(d.duplicate_summary)}</ul>
+      <div style="background:#faf9f7;border:1px solid var(--clr-border);border-radius:8px;padding:12px 14px;font-size:.84rem;margin-bottom:14px">
+        Reactivate these ${d.duplicate_count} existing lead(s)? They will be set active and require manual distribution (no SLA).
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button type="button" class="btn btn-primary" onclick="reactivateDuplicates()">Yes, reactivate</button>
+          <button type="button" class="btn btn-secondary" onclick="closeBulkImport()">No, ignore</button>
+        </div>
+      </div>`;
+  }
+
+  html += `<div style="text-align:right;margin-top:8px"><button type="button" class="btn btn-secondary" onclick="closeBulkImport()">Close</button></div>`;
+  _bulkShow('bulk-result');
+  document.getElementById('bulk-result').innerHTML = html;
+}
+
+function downloadRejected() {
+  // Original columns untouched, plus a trailing 'error' column explaining why.
+  const header = [..._bulkCols, 'error'];
+  const data = _bulkRejected.map(r => header.map(c => r[c] != null ? r[c] : ''));
+  _downloadCsv('rejected_leads.csv', _csv([header, ...data]));
+}
+
+function reactivateDuplicates() {
+  const phones = _bulkDuplicates.map(d => d.phone).filter(Boolean);
+  if (!phones.length) return;
+  postJSON(CFG.urls.bulkReactivate, { phones }).then(async r => {
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      Swal.fire({ title: `Reactivated ${d.reactivated} lead(s)`, icon: 'success', confirmButtonColor: '#e07b20' })
+        .then(() => closeBulkImport());
+    } else {
+      Swal.fire({ title: d.error || 'Could not reactivate', icon: 'error', confirmButtonColor: '#e07b20' });
+    }
+  });
+}

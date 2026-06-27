@@ -4,8 +4,8 @@
 {% block content %}
   <h1>{{ campaign.name }}</h1>
   <p>{{ campaign.start_date }} → {{ campaign.end_date }} ·
-     Lifecycle: {{ campaign.lifecycle_status }} ·
-     Approval: <strong>{{ campaign.approval_status }}</strong></p>
+     Lifecycle: {{ campaign.lifecycle_status }}{% if approval_required %} ·
+     Approval: <strong>{{ campaign.approval_status }}</strong>{% endif %}</p>
   <p>Total budget: <strong>{{ campaign.total_budget }}</strong> EGP</p>
 
   <h3>ROI</h3>
@@ -68,7 +68,7 @@
       {% csrf_token %}{{ other_cost_form.as_p }}<button>Add & recalculate</button>
     </form>
   {% endif %}
-  {% if request.user|can:'marketing.campaign.submit_finance' %}
+  {% if approval_required and request.user|can:'marketing.campaign.submit_finance' %}
     <form method="post" action="{% url 'marketing:campaign_submit_finance' campaign.id %}">
       {% csrf_token %}<button>Submit to finance</button>
     </form>

@@ -218,7 +218,7 @@ col.col-meta      { width: 20%; }
 .filter-item { display: flex; align-items: center; gap: 9px; padding: 7px 14px; cursor: pointer; transition: background .12s; }
 .filter-item:hover { background: #f7f3ee; }
 .filter-item input[type="checkbox"] { accent-color: var(--clr-orange); width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
-.filter-actions { display: contents; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--clr-border); }
+.filter-dropdown .filter-actions { display: flex; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--clr-border); }
 .filter-btn { flex: 1; padding: 7px 0; font-family: 'Times New Roman', Times, serif; font-size: .76rem; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; letter-spacing: .03em; border: none; transition: background .15s; }
 .filter-btn.select-all { background: var(--clr-orange); color: #fff; }
 .filter-btn.select-all:hover { background: var(--clr-orange-dk); }

@@ -21,6 +21,7 @@ from apps.distribution.selectors import eligible_pool
 
 from .constants import ActiveStatus, SourceCode, StageCode
 from .services import (
+    BulkLeadImportService,
     DuplicateService,
     FollowUpService,
     LeadStageService,
@@ -351,6 +352,42 @@ def api_create(request):
         "ok": True, "lead_id": str(lead.id),
         "redirect": reverse("leads:detail", args=[lead.id]),
     })
+
+
+@login_required
+@crm_permission_required("leads.lead.bulk_create")
+@require_POST
+def api_bulk_import(request):
+    """Import leads from an uploaded CSV. Validation, dedup and creation live in
+    BulkLeadImportService; this view only checks the file and returns the summary."""
+    upload = request.FILES.get("file")
+    if upload is None:
+        return _err("Attach a CSV file.")
+    result = BulkLeadImportService.import_csv(
+        company=request.company, actor=request.user,
+        file_bytes=upload.read(),
+        request_meta=getattr(request, "request_meta", None),
+    )
+    if "error" in result:
+        return _err(result["error"])
+    return JsonResponse({"ok": True, **result})
+
+
+@login_required
+@crm_permission_required("leads.lead.bulk_create")
+@require_POST
+def api_bulk_reactivate(request):
+    """Reactivate the existing leads for the given phones (manual distribution,
+    no SLA, no notification) after the importer confirms in the modal."""
+    try:
+        phones = json.loads(request.body.decode() or "{}").get("phones", [])
+    except ValueError:
+        return _err("Malformed request.")
+    count = BulkLeadImportService.reactivate(
+        company=request.company, actor=request.user, phones=phones,
+        request_meta=getattr(request, "request_meta", None),
+    )
+    return JsonResponse({"ok": True, "reactivated": count})
 
 
 # ── Leads analysis report page (leads_analysis.html) ──────────────────────────

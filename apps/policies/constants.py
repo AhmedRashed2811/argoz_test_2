@@ -10,6 +10,7 @@ class PolicyCode:
     SLA_EXPIRY_METHOD = "lead.sla_expiry_method"
     RETRY_ATTEMPTS_PER_TEAM = "lead.retry_attempts_per_team"
     DEFAULT_AUTO_DISTRIBUTION_METHOD = "lead.default_auto_distribution_method"
+    BULK_IMPORT_DISTRIBUTION = "lead.bulk_import_distribution"
     DISTRIBUTION_SCOPE_MODE = "lead.distribution_scope_mode"
     LANGUAGE_DEFAULT = "lead.language_default"
     SELF_GENERATED_SALESMAN_POLICY = "lead.self_generated_salesman_policy"
@@ -21,6 +22,7 @@ class PolicyCode:
     FRESH_REMINDER_SCHEDULE = "lead.fresh_reminder_schedule"
     BUDGET_CALCULATION_RULE = "marketing.budget_calculation_rule"
     CAMPAIGN_RESTRICT_EDITING = "marketing.restrict_approved_campaign_editing"
+    REQUEST_CAMPAIGN_APPROVAL = "marketing.request_campaign_approval"
     WEBHOOK_MAPPING_POLICY = "integration.webhook_mapping_policy"
 
 

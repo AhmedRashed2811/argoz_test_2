@@ -1,4 +1,5 @@
 """Leads service layer (docs §15.1). Import services from here."""
+from .bulk_import_service import BulkLeadImportService
 from .duplicate_service import DuplicateService
 from .existing_client_service import ExistingClientService
 from .lead_admin_service import LeadAdminService
@@ -13,6 +14,7 @@ from .source_router_service import SourceRouterService
 from .walkin_service import WalkInService
 
 __all__ = [
+    "BulkLeadImportService",
     "DuplicateService",
     "ExistingClientService",
     "FollowUpService",

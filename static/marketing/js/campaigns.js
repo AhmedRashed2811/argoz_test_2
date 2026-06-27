@@ -324,7 +324,7 @@ function renderTable() {
       <td><span class="budget-val"> ${calcBudget(c).toLocaleString('en-US')}</span></td>
       <td><span class="leads-badge">${leadsVal}</span></td>
       <td><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:${statusColors[status]}1a;color:${statusColors[status]}">${statusLabels[status]}</span></td>
-      <td><span class="approval-badge ${apprClass}" onclick="openApprovalModal(${origIndex})" title="Click to view approval status"><span class="dot"></span>${apprLabel}</span></td>
+      <td class="approval-cell"><span class="approval-badge ${apprClass}" onclick="openApprovalModal(${origIndex})" title="Click to view approval status"><span class="dot"></span>${apprLabel}</span></td>
       <td>
         <div class="action-btns">
           <button class="action-btn view"   title="View details" onclick="openView(${origIndex})"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -1698,7 +1698,7 @@ function openView(index) {
   </div>
 
   <!-- KPI stats row -->
-  <div style="display:grid;grid-template-columns:repeat(${c.interestedProject?4:3},1fr);gap:10px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(${(c.interestedProject?1:0)+(_cfg().approvalRequired?1:0)+2},1fr);gap:10px;margin-bottom:16px">
     <div style="background:#fff;border:1px solid var(--clr-border);border-radius:9px;padding:12px 14px;text-align:center">
       <div style="font-size:1.1rem;font-weight:700;color:${statusColors[status]}">${statusLabels[status]}</div>
       <div style="font-size:.65rem;color:var(--clr-text-sub);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Campaign Status</div>
@@ -1708,10 +1708,10 @@ function openView(index) {
       <div style="font-size:.65rem;color:var(--clr-text-sub);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Total Leads</div>
       ${Object.keys(typeBreakdown).length > 1 ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;justify-content:center;gap:4px">${Object.entries(typeBreakdown).map(([t,n])=>`<span style="font-size:.62rem;background:rgba(39,174,96,.1);color:#1e8449;padding:2px 6px;border-radius:10px;font-weight:600">${typeIcons[t]||''} ${n}</span>`).join('')}</div>` : ''}
     </div>
-    <div style="background:${apprColors[appr]||'#f5f3f0'};border:1px solid var(--clr-border);border-radius:9px;padding:12px 14px;text-align:center">
+    ${_cfg().approvalRequired?`<div style="background:${apprColors[appr]||'#f5f3f0'};border:1px solid var(--clr-border);border-radius:9px;padding:12px 14px;text-align:center">
       <div style="font-size:.9rem;font-weight:700;color:${apprTextColors[appr]||'#555'}">${APPROVAL_LABELS[appr]||'Pending'}</div>
       <div style="font-size:.65rem;color:var(--clr-text-sub);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Finance Approval</div>
-    </div>
+    </div>`:''}
     ${c.interestedProject?`<div style="background:rgba(41,128,185,.06);border:1px solid rgba(41,128,185,.18);border-radius:9px;padding:12px 14px;text-align:center">
       <div style="font-size:.85rem;font-weight:700;color:#1a5276">${escHtml(c.interestedProject)}</div>
       <div style="font-size:.65rem;color:var(--clr-text-sub);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Interested Project</div>
@@ -1885,9 +1885,13 @@ document.addEventListener('click', e => {
 });
 
 // Init create form project dropdown on page load
-document.addEventListener('DOMContentLoaded', () => { initProjDD('c_proj', ''); });
+function applyApprovalVisibility() {
+  // No finance-approval flow => hide the Approval column entirely.
+  document.body.classList.toggle('no-approval', !_cfg().approvalRequired);
+}
+document.addEventListener('DOMContentLoaded', () => { initProjDD('c_proj', ''); applyApprovalVisibility(); });
 // Also call directly since DOMContentLoaded may have already fired
-if (document.readyState !== 'loading') { setTimeout(() => initProjDD('c_proj', ''), 0); }
+if (document.readyState !== 'loading') { setTimeout(() => { initProjDD('c_proj', ''); applyApprovalVisibility(); }, 0); }
 
 
 function deleteCampaign(index) {

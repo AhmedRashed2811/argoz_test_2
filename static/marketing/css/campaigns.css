@@ -79,6 +79,9 @@
     .action-btn.delete svg   { stroke: var(--clr-gray-lt); }
     .action-btn.delete:hover { background: rgba(192,57,43,.07); border-color: rgba(192,57,43,.3); }
     .action-btn.delete:hover svg { stroke: #c0392b; }
+    /* Approval flow disabled (no-approval policy): hide the Approval column. */
+    body.no-approval #approvalCol, body.no-approval .approval-cell { display: none; }
+
     /* Approval status badge */
     .approval-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; cursor: pointer; transition: opacity .15s; border: 1px solid transparent; }
     .approval-badge:hover { opacity: .82; }

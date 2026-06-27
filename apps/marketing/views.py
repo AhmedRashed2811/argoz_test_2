@@ -48,10 +48,12 @@ def marketing_report_api(request):
 @login_required
 @crm_permission_required("marketing.campaigns.access")
 def campaign_list(request):
-    from apps.policies.constants import PolicyCode
-    from apps.policies.services import PolicyResolver
-    restrict_editing = PolicyResolver.value(request.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
-    return render(request, "marketing/campaign_list.html", {"restrict_editing": restrict_editing})
+    restrict_editing = CampaignApprovalService.restrict_editing(request.company)
+    approval_required = CampaignApprovalService.approval_required(request.company)
+    return render(request, "marketing/campaign_list.html", {
+        "restrict_editing": restrict_editing,
+        "approval_required": approval_required,
+    })
 
 
 # ── AJAX API for the campaigns page (thin: all work in services, §10.3) ──
@@ -139,6 +141,7 @@ def campaign_detail(request, campaign_id):
         "campaign": campaign,
         "roi": CampaignROIService.calculate(campaign=campaign),
         "other_cost_form": OtherCostForm(),
+        "approval_required": CampaignApprovalService.approval_required(request.company),
     })
 
 
@@ -146,11 +149,9 @@ def campaign_detail(request, campaign_id):
 @crm_permission_required("marketing.budget.manage")
 def campaign_budget(request, campaign_id):
     campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
-    from apps.policies.constants import PolicyCode
-    from apps.policies.services import PolicyResolver
     from apps.marketing.constants import ApprovalStatus
-    
-    restrict_editing = PolicyResolver.value(campaign.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+
+    restrict_editing = CampaignApprovalService.restrict_editing(campaign.company)
     if restrict_editing:
         if campaign.approval_status == ApprovalStatus.APPROVED:
             messages.error(request, "Approved campaigns cannot be edited.")
@@ -179,11 +180,9 @@ def campaign_budget(request, campaign_id):
 @crm_permission_required("marketing.campaign.update")
 def campaign_update(request, campaign_id):
     campaign = get_object_or_404(campaigns_for_user(request.user, request.company), id=campaign_id)
-    from apps.policies.constants import PolicyCode
-    from apps.policies.services import PolicyResolver
     from apps.marketing.constants import ApprovalStatus
-    
-    restrict_editing = PolicyResolver.value(campaign.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+
+    restrict_editing = CampaignApprovalService.restrict_editing(campaign.company)
     if restrict_editing:
         if campaign.approval_status == ApprovalStatus.APPROVED:
             messages.error(request, "Approved campaigns cannot be edited.")

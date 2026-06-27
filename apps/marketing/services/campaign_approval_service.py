@@ -24,11 +24,32 @@ _NOTIF = {
 
 class CampaignApprovalService:
     @staticmethod
+    def approval_required(company) -> bool:
+        """Whether the company runs campaigns through finance approval (docs §10.4)."""
+        from apps.policies.constants import PolicyCode
+        from apps.policies.services import PolicyResolver
+        return bool(PolicyResolver.value(
+            company, PolicyCode.REQUEST_CAMPAIGN_APPROVAL, default=True))
+
+    @staticmethod
+    def restrict_editing(company) -> bool:
+        """Editing is restricted only when approval is required AND the company
+        opts to lock approved campaigns. No approval flow => fully editable."""
+        from apps.policies.constants import PolicyCode
+        from apps.policies.services import PolicyResolver
+        if not CampaignApprovalService.approval_required(company):
+            return False
+        return bool(PolicyResolver.value(
+            company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True))
+
+    @staticmethod
     @transaction.atomic
     def submit_for_finance(*, campaign_id, actor=None, request_meta=None) -> Campaign:
         from .campaign_creation_service import CampaignCreationService
 
         campaign = Campaign.objects.select_for_update().get(id=campaign_id)
+        if not CampaignApprovalService.approval_required(campaign.company):
+            raise ValidationError("Campaign approval is disabled for this company.")
         CampaignCreationService.assert_submittable(campaign)
         CampaignBudgetService.recalculate(campaign=campaign, actor=actor)
         AuditService.log(

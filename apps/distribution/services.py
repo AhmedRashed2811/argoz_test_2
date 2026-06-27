@@ -6,8 +6,6 @@ from __future__ import annotations
 from django.db import transaction
 from django.utils import timezone
 
-from apps.audit.services import AuditService
-from apps.core.constants import AuditAction
 from apps.core.exceptions import ValidationError
 from apps.leads.constants import (
     AssignmentMethod,
@@ -52,13 +50,7 @@ def _assign(*, lead: Lead, team, salesman, method: str, strategy_code: str = "",
         assignment_method=method, strategy_code=strategy_code,
         reason=reason, actor=actor,
     )
-    AuditService.log(
-        action=AuditAction.ASSIGN, instance=lead, actor=actor, company=lead.company,
-        module="distribution", request_meta=request_meta,
-        before={"salesman": str(from_salesman) if from_salesman else None},
-        after={"salesman": str(salesman) if salesman else None, "method": method},
-        reason=reason,
-    )
+    # Assignment is already captured in LeadAssignmentHistory (Lead history); no audit write.
     code = (
         NotificationCode.LEAD_REASSIGNED_SLA
         if method in (AssignmentMethod.SLA_ROTATION, AssignmentMethod.ESCALATION)
@@ -341,11 +333,7 @@ class SLAExpiryService:
             sla_instance=sla_instance, lead=lead, breach_type="SLA_EXPIRY",
             handled_by_task_id=task_id, action_taken=method,
         )
-        AuditService.log(
-            action=AuditAction.SLA_EVENT, instance=lead, company=lead.company,
-            module="distribution", after={"method": method},
-            reason="SLA expired", source="celery",
-        )
+        # SLA expiry is recorded in SLABreachEvent (Lead history); no audit write.
         NotificationService.create_for_users(
             company=lead.company, recipients=[lead.assigned_salesman],
             code=NotificationCode.SLA_BREACHED, title="Lead SLA breached",

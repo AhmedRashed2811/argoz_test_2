@@ -1,0 +1,25 @@
+name,country_code,phone,email,source,broker_name,campaign_name,event,tv_ad,street_ad,social_media_ad,exhibition,referrer_name,language,notes
+Auto Valid Campaign Event,+20,202000000001,a1@example.com,campaign,,camp 1,event 1,,,,,,ar,auto-distributes via default method
+Auto Valid Social Ad,+20,202000000002,a2@example.com,campaign,,Vert Camp,,,,Vert,,,en,auto-distributes
+Auto Valid Exhibition,+20,202000000003,,campaign,,Vert Camp,,,,,City Scape,,ar,auto-distributes (blank email ok)
+Auto Broker Stays Manual,+20,202000000004,a4@example.com,broker,ahmed,,,,,,,,ar,broker leads never auto-distribute (sec 8.5)
+Auto Broker Stays Manual 2,+20,202000000005,,broker,LT Ext Broker,,,,,,,,en,broker stays manual even in auto mode
+Auto Valid Referral,+20,202000000006,a6@example.com,referral,,,,,,,,Sara Adel,ar,auto-distributes
+Auto Valid Call Center,+20,202000000007,a7@example.com,call_center,,,,,,,,,en,auto-distributes no campaign
+Auto Call Center With Campaign,+20,202000000008,a8@example.com,call_center,,camp 1,event 1,,,,,,ar,auto + campaign attribution
+Auto Default Country Code,,202000000009,a9@example.com,referral,,,,,,,,No Country Person,ar,blank country -> defaults to +20
+REJECT Missing Name,+20,202000000010,,broker,ahmed,,,,,,,,ar,name is required
+REJECT Missing Phone,+20,,r11@example.com,referral,,,,,,,,Someone,ar,phone is required
+REJECT Bad Phone,+20,2020ABC123,,call_center,,,,,,,,,en,phone must be digits only
+REJECT Bad Email,+20,202000000013,not-an-email,call_center,,,,,,,,,ar,invalid email
+REJECT Unknown Source,+20,202000000014,,exhibition,,,,,,,,,ar,source not allowed in bulk
+REJECT Ghost Broker,+20,202000000015,,broker,Ghost Broker,,,,,,,,en,broker not in system
+REJECT Missing Campaign,+20,202000000016,,campaign,,No Such Campaign,event 1,,,,,,ar,campaign not in system
+REJECT Wrong Channel Record,+20,202000000017,,campaign,,camp 1,Wrong Event,,,,,,ar,event not in this campaign
+REJECT Campaign No Channel,+20,202000000018,,campaign,,camp 1,,,,,,,ar,must fill exactly one channel
+REJECT Campaign Two Channels,+20,202000000019,,campaign,,Vert Camp,Launce Event,,,,City Scape,,ar,fill exactly one channel
+REJECT Referral No Referrer,+20,202000000020,,referral,,,,,,,,,ar,referrer name required
+REJECT Bad Language,+20,202000000021,,call_center,,,,,,,,,fr,language not in system
+REJECT Bad Country Code,20,202000000022,,call_center,,,,,,,,,ar,country code must look like +20
+Duplicate First Copy,+20,202000000023,d1@example.com,call_center,,,,,,,,,ar,first occurrence -> accepted
+Duplicate Second Copy,+20,202000000023,d2@example.com,call_center,,,,,,,,,ar,same phone -> duplicate within file

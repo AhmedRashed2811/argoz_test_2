@@ -122,7 +122,7 @@
                 <button class="th-icon-btn" id="filterStatusBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
               </div>
             </th>
-            <th>
+            <th id="approvalCol">
               <div class="th-inner">Approval
                 <button class="th-icon-btn" id="filterApprovalBtn"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
               </div>
@@ -465,7 +465,8 @@
     csrf: "{{ csrf_token }}",
     canUpdate: {% if request.user|can:'marketing.campaign.update' %}true{% else %}false{% endif %},
     canDelete: {% if request.user|can:'marketing.campaign.delete' %}true{% else %}false{% endif %},
-    restrictEditing: {% if restrict_editing %}true{% else %}false{% endif %}
+    restrictEditing: {% if restrict_editing %}true{% else %}false{% endif %},
+    approvalRequired: {% if approval_required %}true{% else %}false{% endif %}
   };
 </script>
 <script src="{% static 'marketing/js/campaigns.js' %}"></script>

@@ -147,10 +147,9 @@ class CampaignPayloadService:
     @staticmethod
     @transaction.atomic
     def update(*, campaign: Campaign, actor, payload, request_meta=None) -> Campaign:
-        from apps.policies.constants import PolicyCode
-        from apps.policies.services import PolicyResolver
+        from .campaign_approval_service import CampaignApprovalService
 
-        restrict_editing = PolicyResolver.value(campaign.company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, default=True)
+        restrict_editing = CampaignApprovalService.restrict_editing(campaign.company)
         if restrict_editing:
             if campaign.approval_status == ApprovalStatus.APPROVED:
                 raise ValidationError("Approved campaigns cannot be edited under current company policy.")

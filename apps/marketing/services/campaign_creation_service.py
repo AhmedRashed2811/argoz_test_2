@@ -20,8 +20,18 @@ class CampaignCreationService:
     @transaction.atomic
     def create_campaign(*, company, name, start_date, end_date, actor=None,
                         selected_types=None, request_meta=None, **fields) -> Campaign:
+        from apps.policies.constants import PolicyCode
+        from apps.policies.services import PolicyResolver
+        from ..constants import ApprovalStatus
+
         if end_date < start_date:
             raise ValidationError("Campaign end_date cannot precede start_date (§10.1).")
+        # When the company doesn't require campaign approval, skip the finance flow
+        # entirely: campaigns are approved by default and stay fully editable.
+        approval_required = PolicyResolver.value(
+            company, PolicyCode.REQUEST_CAMPAIGN_APPROVAL, default=True)
+        if not approval_required:
+            fields.setdefault("approval_status", ApprovalStatus.APPROVED)
         campaign = Campaign.objects.create(
             company=company, name=name, start_date=start_date, end_date=end_date,
             created_by=actor, **fields,
