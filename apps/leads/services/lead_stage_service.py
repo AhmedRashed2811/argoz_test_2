@@ -35,8 +35,25 @@ class LeadStageService:
             scheduled_time=scheduled_time
         )
         # Not Interested is terminal -> lead becomes Inactive, no SLA (docs §9.1).
+        skip_sla = False
+        if lead.source and lead.source.code == "SELF_GENERATED" and lead.assigned_salesman_id == lead.created_by_id:
+            creator = lead.created_by
+            if creator and creator.team_memberships.filter(team__company=lead.company).exists():
+                from apps.policies.constants import PolicyCode
+                from apps.policies.services import PolicyResolver
+                sg_policy = PolicyResolver.option_code(
+                    lead.company, PolicyCode.SELF_GENERATED_SALESMAN_POLICY, default="KEEP_WITH_OWNER"
+                )
+                if sg_policy == "KEEP_WITH_OWNER":
+                    skip_sla = True
+
         if to_stage.is_terminal or to_stage_code == StageCode.NOT_INTERESTED:
             lead.active_status = ActiveStatus.INACTIVE
+            lead.sla_deadline = None
+            lead.sla_instances.filter(status=SLAStatus.ACTIVE).update(
+                status=SLAStatus.CANCELLED
+            )
+        elif skip_sla:
             lead.sla_deadline = None
             lead.sla_instances.filter(status=SLAStatus.ACTIVE).update(
                 status=SLAStatus.CANCELLED
@@ -66,6 +83,43 @@ class LeadStageService:
                 code=NotificationCode.STAGE_CHANGED, title=f"Lead moved to {to_stage.name}",
                 related_type="Lead", related_id=lead.pk,
             )
+
+        if to_stage_code == StageCode.NOT_REACHED:
+            from apps.policies.constants import PolicyCode
+            from apps.policies.services import PolicyResolver
+            from .reminder_service import ReminderService
+            from .sla_service import _duration_to_timedelta
+
+            mode = PolicyResolver.option_code(
+                lead.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
+            )
+            if mode == "AUTOMATIC":
+                interval_val = PolicyResolver.param(
+                    lead.company, PolicyCode.NOT_REACHED_REMINDER_MODE, "interval", default=None
+                )
+                if interval_val is not None:
+                    delta = _duration_to_timedelta(interval_val)
+                else:
+                    stage_sla_val = PolicyResolver.value(
+                        lead.company, f"{PolicyCode.STAGE_SLA}.not_reached", default={"hours": 2}
+                    )
+                    delta = _duration_to_timedelta(stage_sla_val)
+
+                due_at = timezone.now() + delta
+                if lead.assigned_salesman:
+                    ReminderService.create(
+                        company=lead.company, user=lead.assigned_salesman, due_at=due_at,
+                        reminder_type="STAGE_NOT_REACHED", lead=lead, related_type="Lead",
+                        related_id=lead.pk
+                    )
+            elif mode == "MANUAL" and scheduled_time:
+                if lead.assigned_salesman:
+                    ReminderService.create(
+                        company=lead.company, user=lead.assigned_salesman, due_at=scheduled_time,
+                        reminder_type="STAGE_NOT_REACHED", lead=lead, related_type="Lead",
+                        related_id=lead.pk
+                    )
+
         return lead
 
     @staticmethod

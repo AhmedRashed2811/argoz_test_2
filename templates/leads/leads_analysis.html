@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Leads Analysis · Argoz CRM{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'leads/leads_analysis.css' %}">{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Leads Analysis</h1>
+        <p>Pipeline health, stage distribution, source performance, and lead growth trends</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="exportReport()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Global Filter Bar -->
+  <div class="global-filter-bar" id="globalFilterBar">
+    <span class="gf-label">Filters</span>
+
+    <div class="gf-filters-row">
+
+      <!-- Period -->
+      <div class="gf-group" id="gfg-period">
+        <div class="gf-group-label">Period</div>
+        <div class="gf-select-btn" id="gfsb-period" onclick="toggleDropdown('period')">
+          <span id="gfsb-period-txt">All Time</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-period">
+          <div class="gf-dd-head"><p>Period</p></div>
+          <div class="gf-dd-list" id="gflist-period"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('period')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('period')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage (multi) -->
+      <div class="gf-group" id="gfg-stage">
+        <div class="gf-group-label">Stage</div>
+        <div class="gf-select-btn" id="gfsb-stage" onclick="toggleDropdown('stage')">
+          <span id="gfsb-stage-txt">All Stages</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-stage">
+          <div class="gf-dd-head"><p>Stage</p></div>
+          <div class="gf-dd-list" id="gflist-stage"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('stage')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('stage')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Source (multi) -->
+      <div class="gf-group" id="gfg-source">
+        <div class="gf-group-label">Source</div>
+        <div class="gf-select-btn" id="gfsb-source" onclick="toggleDropdown('source')">
+          <span id="gfsb-source-txt">All Sources</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-source">
+          <div class="gf-dd-head"><p>Source</p></div>
+          <div class="gf-dd-list" id="gflist-source"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('source')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('source')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Origin -->
+      <div class="gf-group" id="gfg-origin">
+        <div class="gf-group-label">Origin</div>
+        <div class="gf-select-btn" id="gfsb-origin" onclick="toggleDropdown('origin')">
+          <span id="gfsb-origin-txt">All</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-origin">
+          <div class="gf-dd-head"><p>Origin</p></div>
+          <div class="gf-dd-list" id="gflist-origin"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('origin')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('origin')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Status -->
+      <div class="gf-group" id="gfg-active">
+        <div class="gf-group-label">Active Status</div>
+        <div class="gf-select-btn" id="gfsb-active" onclick="toggleDropdown('active')">
+          <span id="gfsb-active-txt">All</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-active">
+          <div class="gf-dd-head"><p>Active Status</p></div>
+          <div class="gf-dd-list" id="gflist-active"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('active')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('active')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /gf-filters-row -->
+
+    <div class="gf-actions">
+      <span class="gf-summary" id="gfSummary">All leads · All time</span>
+      <button class="gf-clear" onclick="clearAllFilters()">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Active Filter Chips -->
+  <div class="active-chips" id="activeChips"></div>
+
+  <!-- KPI Stage Cards -->
+  <div class="kpi-grid" id="stageKpiGrid"></div>
+
+  <!-- Activity Mini Cards -->
+  <div class="activity-grid">
+    <div class="activity-card">
+      <div class="activity-icon teal"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></div>
+      <div>
+        <div class="activity-val" id="act-active">3,120</div>
+        <div class="activity-label">Active Leads</div>
+      </div>
+    </div>
+    <div class="activity-card">
+      <div class="activity-icon coral"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg></div>
+      <div>
+        <div class="activity-val" id="act-inactive">1,080</div>
+        <div class="activity-label">Inactive Leads</div>
+      </div>
+    </div>
+    <div class="activity-card">
+      <div class="activity-icon amber"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div>
+        <div class="activity-val" id="act-todayNew">210</div>
+        <div class="activity-label">New Leads Today</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Row 1: Timeline (full) -->
+  <div class="chart-card full" id="card-timeline" style="margin-bottom:14px;">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Lead Generation &amp; Conversion Timeline</div>
+        <div class="chart-subtitle">Created leads vs. leads converted to Interested — daily trend</div>
+        <div class="chart-click-hint">Click a point to filter the dashboard by that day</div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div> Created Leads</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--indigo)"></div> Converted Leads</div>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:200px;"><canvas id="chartTimeline"></canvas></div>
+  </div>
+
+  <!-- Chart Row 2: Stage Donut + Source Donut + Origin -->
+  <div class="charts-grid-3">
+    <div class="chart-card" id="card-stageDonut">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Stage Distribution</div>
+          <div class="chart-subtitle">Active pipeline by current stage</div>
+          <div class="chart-click-hint">Click a slice to filter by stage</div>
+        </div>
+      </div>
+      <div class="donut-wrap" style="height:220px;">
+        <canvas id="chartStageDonut"></canvas>
+        <div class="donut-center">
+          <div class="donut-center-val" id="donutCenterVal">4,200</div>
+          <div class="donut-center-label">Total Active</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card" id="card-sourceDonut">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Source Distribution</div>
+          <div class="chart-subtitle">Lead origin by channel</div>
+          <div class="chart-click-hint">Click a slice to filter by source</div>
+        </div>
+      </div>
+      <div class="donut-wrap" style="height:220px;">
+        <canvas id="chartSourceDonut"></canvas>
+        <div class="donut-center">
+          <div class="donut-center-val" id="sourceCenterVal">5</div>
+          <div class="donut-center-label">Channels</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card" id="card-origin">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Direct vs. Broker Origin</div>
+          <div class="chart-subtitle">Lead sourcing partnership breakdown</div>
+          <div class="chart-click-hint">Click a card or bar to filter by origin</div>
+        </div>
+      </div>
+      <div class="origin-split" id="originSplit"></div>
+      <div style="margin-top:14px;">
+        <div class="chart-wrap" style="height:110px;"><canvas id="chartOriginBar"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Source Channel Performance Table -->
+  <div class="table-card">
+    <div class="table-head">
+      <div>
+        <div class="table-title">Source Channel Performance</div>
+        <div class="table-subtitle">Full breakdown per source — click a row to filter the dashboard, or use column headers to sort/filter</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="sourceTable">
+        <thead>
+          <tr>
+            <th><div class="th-inner">Source
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('source','label',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'source','label')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Total Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('source','count',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'source','count')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Interested
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('source','interested',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'source','interested')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Share of Pipeline
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('source','pct',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'source','pct')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+          </tr>
+        </thead>
+        <tbody id="sourceTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page-body -->
+
+<!-- Column Filter Dropdown (shared) -->
+<div class="col-filter-dropdown" id="colFilterDropdown">
+  <div class="cfd-head"><p id="cfdTitle">Filter</p><input class="cfd-search" id="cfdSearch" placeholder="Search…" oninput="filterCfdList(this.value)"></div>
+  <div class="cfd-list" id="cfdList"></div>
+  <div class="cfd-actions" id="cfdCheckActions">
+    <button class="cfd-btn sa" onclick="cfdSelectAll()">Select All</button>
+    <button class="cfd-btn ca" onclick="cfdClearAll()">Clear</button>
+  </div>
+  <div class="cfd-budget-range" id="cfdBudgetRange" style="display:none">
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Min</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMin" placeholder="e.g. 100" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Max</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMax" placeholder="e.g. 2000" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+  </div>
+  <div class="cfd-actions" id="cfdBudgetActions" style="display:none">
+    <button class="cfd-btn ca" style="flex:1" onclick="cfdClearBudget()">Clear</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  window.ANALYSIS_CFG = {
+    dataUrl: "{% url 'leads:api_leads_analysis' %}",
+    csrf: "{{ csrf_token }}"
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="{% static 'leads/leads_analysis.js' %}"></script>
+{% endblock %}

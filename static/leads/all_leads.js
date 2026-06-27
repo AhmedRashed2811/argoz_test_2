@@ -178,6 +178,10 @@ const NEXT_ACTIONS={
   'Frozen':   [{val:'frozenCall',label:'❄️ Call back after a period',type:'frozenCall'}],
 };
 
+if (((window.ALL_LEADS_CFG && window.ALL_LEADS_CFG.not_reached_reminder_mode) || 'AUTOMATIC') === 'MANUAL') {
+  NEXT_ACTIONS['Not Reached'] = [{val:'retry',label:'📅 Set a reminder to retry call later',type:'reminder'}];
+}
+
 function openStageModal(id){
   const l=leads.find(x=>x.id===id);if(!l)return;
   stageEditId=id;_selectedStage=null;
@@ -248,6 +252,7 @@ document.getElementById('stageModalSave').addEventListener('click',()=>{
   if(_selectedStage==='Frozen'&&nextType==='frozenCall'){const d=parseInt(document.getElementById('frozenDays').value);if(!d||d<1){Swal.fire({title:'Call-back period required',text:'Enter the number of days.',icon:'warning',confirmButtonColor:'var(--clr-orange)'});return;}}
   if(_selectedStage==='Meeting'&&!document.getElementById('meetingDate').value){Swal.fire({title:'Meeting date required',icon:'warning',confirmButtonColor:'var(--clr-orange)'});return;}
   if(_selectedStage==='Follow-up'&&!document.getElementById('reminderDate').value){Swal.fire({title:'Follow-up date required',icon:'warning',confirmButtonColor:'var(--clr-orange)'});return;}
+  if(_selectedStage==='Not Reached'&&((window.ALL_LEADS_CFG && window.ALL_LEADS_CFG.not_reached_reminder_mode) || 'AUTOMATIC')==='MANUAL'&&!document.getElementById('reminderDate').value){Swal.fire({title:'Reminder date required',icon:'warning',confirmButtonColor:'var(--clr-orange)'});return;}
 
   // Route through the shared backend endpoint (services handle audit, history,
   // reminders and notifications server-side).

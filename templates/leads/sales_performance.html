@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sales Performance · Argoz CRM{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'leads/sales_performance.css' %}">{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Performance Reports</h1>
+        <p>Sales conversion rates, SLA compliance, lead lifecycle velocity, and team leaderboards</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="exportReport()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Global Filter Bar -->
+  <div class="global-filter-bar" id="globalFilterBar">
+    <span class="gf-label">Filters</span>
+
+    <div class="gf-filters-row">
+
+      <!-- Period -->
+      <div class="gf-group" id="gfg-period">
+        <div class="gf-group-label">Period</div>
+        <div class="gf-select-btn" id="gfsb-period" onclick="toggleDropdown('period')">
+          <span id="gfsb-period-txt">All Time</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-period">
+          <div class="gf-dd-head"><p>Period</p></div>
+          <div class="gf-dd-list" id="gflist-period"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('period')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('period')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team -->
+      <div class="gf-group" id="gfg-team">
+        <div class="gf-group-label">Team</div>
+        <div class="gf-select-btn" id="gfsb-team" onclick="toggleDropdown('team')">
+          <span id="gfsb-team-txt">All Teams</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-team">
+          <div class="gf-dd-head"><p>Team</p></div>
+          <div class="gf-dd-list" id="gflist-team"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('team')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('team')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLA Status -->
+      <div class="gf-group" id="gfg-sla">
+        <div class="gf-group-label">SLA Status</div>
+        <div class="gf-select-btn" id="gfsb-sla" onclick="toggleDropdown('sla')">
+          <span id="gfsb-sla-txt">All Statuses</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-sla">
+          <div class="gf-dd-head"><p>SLA Status</p></div>
+          <div class="gf-dd-list" id="gflist-sla"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('sla')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('sla')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Performers -->
+      <div class="gf-group" id="gfg-perf">
+        <div class="gf-group-label">Top Performers</div>
+        <div class="gf-select-btn" id="gfsb-perf" onclick="toggleDropdown('perf')">
+          <span id="gfsb-perf-txt">All</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-perf">
+          <div class="gf-dd-head"><p>Top Performers</p></div>
+          <div class="gf-dd-list" id="gflist-perf"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('perf')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('perf')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /gf-filters-row -->
+
+    <div class="gf-actions">
+      <span class="gf-summary" id="gfSummary">All teams · All time</span>
+      <button class="gf-clear" onclick="clearAllFilters()">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Active Filter Chips -->
+  <div class="active-chips" id="activeChips"></div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div>
+        <div class="kpi-value small" id="kpi-velocity">—</div>
+        <div class="kpi-label">Avg. Lead Lifecycle Velocity</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+      <div>
+        <div class="kpi-value" id="kpi-sla">—</div>
+        <div class="kpi-label">Overall SLA Compliance</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div>
+        <div class="kpi-value" id="kpi-assigned">—</div>
+        <div class="kpi-label">Total Assigned Leads</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon coral"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      <div>
+        <div class="kpi-value" id="kpi-interested">—</div>
+        <div class="kpi-label">Total Interested Leads</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1: Funnel + Leaderboard -->
+  <div class="charts-grid charts-grid-funnel">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Sales Conversion Funnel</div>
+          <div class="chart-subtitle">Stage-by-stage pipeline volume</div>
+        </div>
+      </div>
+      <div class="funnel-wrap" id="stageFunnel"></div>
+    </div>
+    <div class="chart-card" id="card-leaderboard">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Sales Leaderboard</div>
+          <div class="chart-subtitle">Ranked by conversion rate</div>
+          <div class="chart-click-hint">Click a rep to filter the dashboard</div>
+        </div>
+      </div>
+      <div class="leaderboard" id="leaderboard"></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Grouped Bar + Scatter -->
+  <div class="charts-grid">
+    <div class="chart-card" id="card-leaderBar">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Assigned vs. Interested Leads</div>
+          <div class="chart-subtitle">Per salesperson comparison</div>
+          <div class="chart-click-hint">Click a bar to filter by that salesperson</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(224,123,32,.3)"></div>Assigned</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--clr-orange)"></div>Interested</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartLeaderBar"></canvas></div>
+    </div>
+    <div class="chart-card" id="card-scatter">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">SLA Compliance Scatter</div>
+          <div class="chart-subtitle">Response time vs. compliance</div>
+          <div class="chart-click-hint">Click a bubble to filter by that salesperson</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartScatter"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Team SLA Breach Detail Table -->
+  <div class="table-card">
+    <div class="table-head">
+      <div>
+        <div class="table-title">Team SLA Breach Detail</div>
+        <div class="table-subtitle">Full breakdown per team — click a row to filter the dashboard, or use column headers to sort/filter</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="teamSlaTable">
+        <thead>
+          <tr>
+            <th><div class="th-inner">Team
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('team','name',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','name')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Leads (SLA)
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('team','total',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','total')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Completed
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('team','completed',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','completed')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Breached
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('team','breached',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','breached')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Compliance Rate
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('team','comp',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','comp')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Status
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'team','status')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+          </tr>
+        </thead>
+        <tbody id="teamSlaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Salesperson Performance Detail Table -->
+  <div class="table-card">
+    <div class="table-head">
+      <div>
+        <div class="table-title">Salesperson Performance Detail</div>
+        <div class="table-subtitle">Individual metrics for the current filter selection — click a row to filter the dashboard, or use column headers to sort/filter</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="salesTable">
+        <thead>
+          <tr>
+            <th><div class="th-inner">Salesperson
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','name',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','name')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Team
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','teamLabel',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','teamLabel')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Assigned Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','assigned',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','assigned')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Interested Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','interested',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','interested')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Conversion Rate
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','conv',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','conv')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">SLA Compliance
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','sla',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','sla')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Avg. Response
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('sales','response',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'sales','response')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page-body -->
+
+<!-- Column Filter Dropdown (shared) -->
+<div class="col-filter-dropdown" id="colFilterDropdown">
+  <div class="cfd-head"><p id="cfdTitle">Filter</p><input class="cfd-search" id="cfdSearch" placeholder="Search…" oninput="filterCfdList(this.value)"></div>
+  <div class="cfd-list" id="cfdList"></div>
+  <div class="cfd-actions" id="cfdCheckActions">
+    <button class="cfd-btn sa" onclick="cfdSelectAll()">Select All</button>
+    <button class="cfd-btn ca" onclick="cfdClearAll()">Clear</button>
+  </div>
+  <div class="cfd-budget-range" id="cfdBudgetRange" style="display:none">
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Min</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMin" placeholder="e.g. 10" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Max</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMax" placeholder="e.g. 100" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+  </div>
+  <div class="cfd-actions" id="cfdBudgetActions" style="display:none">
+    <button class="cfd-btn ca" style="flex:1" onclick="cfdClearBudget()">Clear</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  window.PERF_CFG = {
+    dataUrl: "{% url 'leads:api_sales_performance' %}",
+    csrf: "{{ csrf_token }}"
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{% static 'leads/sales_performance.js' %}"></script>
+{% endblock %}

@@ -11,6 +11,10 @@ urlpatterns = [
     path("manual-distribution/", views.manual_distribution, name="manual_distribution"),
     path("create/", views.lead_create, name="create"),
     path("walkin/", views.walkin_create, name="walkin_create"),
+    path("sales-performance/", views.sales_performance, name="sales_performance"),
+    path("api/sales-performance/", api.api_sales_performance, name="api_sales_performance"),
+    path("leads-analysis/", views.leads_analysis, name="leads_analysis"),
+    path("api/leads-analysis/", api.api_leads_analysis, name="api_leads_analysis"),
     # --- AJAX/JSON endpoints for the dynamic management page ---
     path("api/leads/", api.api_leads, name="api_leads"),
     path("api/lead-history/", api.api_lead_history, name="api_lead_history"),

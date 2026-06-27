@@ -353,6 +353,32 @@ def api_create(request):
     })
 
 
+# ── Leads analysis report page (leads_analysis.html) ──────────────────────────
+
+@login_required
+@crm_permission_required("review_leads_analysis")
+@require_GET
+def api_leads_analysis(request):
+    """Company-wide pipeline analytics for the leads-analysis page. Thin:
+    permission check -> service -> JSON. Aggregation lives in the service."""
+    from .services.leads_analysis_service import LeadsAnalysisService
+
+    return JsonResponse(LeadsAnalysisService.build(request.company))
+
+
+# ── Sales performance report page (sales_performance.html) ────────────────────
+
+@login_required
+@crm_permission_required("review_sales_performance_report")
+@require_GET
+def api_sales_performance(request):
+    """Per-salesperson / per-team performance + funnel figures. Thin: permission
+    check -> service -> JSON. Scoping and aggregation live in the service."""
+    from .services.sales_performance_service import SalesPerformanceService
+
+    return JsonResponse(SalesPerformanceService.build(request.user, request.company))
+
+
 # ── Sales-leads management page (lead_list.html) ──────────────────────────────
 
 def _ms(dt):
@@ -562,6 +588,26 @@ def api_stage_update(request):
             LeadStageService.change_stage(
                 lead_id=lead_id, to_stage_code=stage, actor=request.user,
                 reason=note, request_meta=meta,
+            )
+        elif stage == StageCode.NOT_REACHED:
+            from apps.policies.constants import PolicyCode
+            from apps.policies.services import PolicyResolver
+
+            mode = PolicyResolver.option_code(
+                request.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
+            )
+            scheduled_time = None
+            if mode == "MANUAL":
+                r_date = data.get("reminder_date")
+                r_time = data.get("reminder_time")
+                if r_date:
+                    scheduled_time = _combine(r_date, r_time)
+                else:
+                    raise ValidationError("Reminder date is required for manual reminder mode.")
+
+            LeadStageService.change_stage(
+                lead_id=lead_id, to_stage_code=stage, actor=request.user,
+                reason=feedback, request_meta=meta, scheduled_time=scheduled_time,
             )
         else:
             LeadStageService.change_stage(

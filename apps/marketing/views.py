@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.authorization.decorators import crm_permission_required
 from apps.core.exceptions import ValidationError
@@ -23,6 +23,26 @@ from .services import (
     CampaignPayloadService,
     CampaignROIService,
 )
+
+
+@login_required
+@crm_permission_required("review_marketing_report")
+def marketing_report(request):
+    """Financial & marketing report (campaign ROI). Thin shell: every figure
+    loads via the AJAX endpoint below, which enforces review_marketing_report
+    and aggregates through MarketingReportService."""
+    return render(request, "marketing/reports.html", {})
+
+
+@login_required
+@crm_permission_required("review_marketing_report")
+@require_GET
+def marketing_report_api(request):
+    """Aggregated campaign budget / lead / KPI figures for the report page.
+    Thin: permission check -> service -> JSON. Aggregation lives in the service."""
+    from .services.marketing_report_service import MarketingReportService
+
+    return JsonResponse(MarketingReportService.build(request.company))
 
 
 @login_required

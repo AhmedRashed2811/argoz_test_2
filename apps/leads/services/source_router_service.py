@@ -175,6 +175,9 @@ class SourceRouterService:
             )
             assign = data.get("sg_assign", "self")
             head_teams = list(Team.objects.filter(company=company, sales_head=actor))
+            if mode == "SELF_ONLY":
+                return LeadCreationService.create(**base, assigned_salesman=actor,
+                                                  auto_distribute=False)
             if mode == "AUTO_ROUND_ROBIN_TEAM" or assign == "rr":
                 # Round-robin scoped to the head's own team(s).
                 return LeadCreationService.create(

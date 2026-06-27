@@ -19,13 +19,9 @@ class PolicyCode:
     EXISTING_CLIENT_POLICY = "lead.existing_client_policy"
     NOT_REACHED_REMINDER_MODE = "lead.not_reached_reminder_mode"
     FRESH_REMINDER_SCHEDULE = "lead.fresh_reminder_schedule"
-    CAMPAIGN_TYPE_REPEATABILITY = "marketing.campaign_type_repeatability"
-    TYPE_DATE_POLICY = "marketing.type_date_policy"
     BUDGET_CALCULATION_RULE = "marketing.budget_calculation_rule"
-    FINANCE_REASON_REQUIRED = "marketing.finance_reason_required"
     CAMPAIGN_RESTRICT_EDITING = "marketing.restrict_approved_campaign_editing"
     WEBHOOK_MAPPING_POLICY = "integration.webhook_mapping_policy"
-    NOTIFICATION_DELIVERY_POLICY = "notification.delivery_policy"
 
 
 class ValueType:

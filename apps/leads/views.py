@@ -25,6 +25,10 @@ from .services import (
 )
 
 
+from apps.policies.constants import PolicyCode
+from apps.policies.services import PolicyResolver
+
+
 @login_required
 @crm_permission_required("leads.dashboard.access")
 def lead_list(request):
@@ -32,7 +36,12 @@ def lead_list(request):
     leads belong on the company-wide database page, so send them there."""
     if EffectivePermissionResolver.has(request.user, "leads.lead.view_all"):
         return redirect("leads:all_list")
-    return render(request, "leads/lead_list.html", {})
+    mode = PolicyResolver.option_code(
+        request.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
+    )
+    return render(request, "leads/lead_list.html", {
+        "not_reached_reminder_mode": mode
+    })
 
 
 @login_required
@@ -41,8 +50,31 @@ def all_leads(request):
     """Company-wide lead database (admin/limited access). Thin shell: data,
     history and the edit/stage/status controls all load via AJAX endpoints in
     api.py, which enforce permissions and route writes through services."""
-    return render(request, "leads/all_leads.html", {})
+    mode = PolicyResolver.option_code(
+        request.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
+    )
+    return render(request, "leads/all_leads.html", {
+        "not_reached_reminder_mode": mode
+    })
 
+
+
+@login_required
+@crm_permission_required("review_sales_performance_report")
+def sales_performance(request):
+    """Sales performance report. Thin shell: every figure loads via the AJAX
+    endpoint in api.py, which enforces review_sales_performance_report and
+    aggregates (team-scoped for Sales Heads) through SalesPerformanceService."""
+    return render(request, "leads/sales_performance.html", {})
+
+
+@login_required
+@crm_permission_required("review_leads_analysis")
+def leads_analysis(request):
+    """Leads analysis report. Thin shell: every figure loads via the AJAX
+    endpoint in api.py, which enforces review_leads_analysis and aggregates
+    company-wide pipeline analytics through LeadsAnalysisService."""
+    return render(request, "leads/leads_analysis.html", {})
 
 
 def _can_manual_distribute(user):

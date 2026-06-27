@@ -62,6 +62,18 @@ def _d(value) -> Decimal:
         return Decimal("0")
 
 
+def _kpi_number(value) -> Decimal:
+    """Extract the numeric target from a free-text KPI label (e.g. '1,000 leads'
+    -> 1000). Returns 0 when no number is present."""
+    import re
+
+    digits = re.sub(r"[^\d.]", "", str(value or "").replace(",", ""))
+    try:
+        return Decimal(digits) if digits else Decimal("0")
+    except Exception:
+        return Decimal("0")
+
+
 def _date(value):
     if not value:
         return None
@@ -574,12 +586,21 @@ class CampaignPayloadService:
                 linked_event=events_by_name.get((sm.get("linkedEventId") or "").strip()),
             )
             _save_assets(campaign, "social_image", record.id, sm.get("images"), actor, existing_by_url, claimed)
-            for pb in sm.get("platformBudgets", []):
+            # The form captures one ad-level target (free text). Spread it evenly
+            # across the ad's platform lines so the per-platform report column
+            # (Sum of target_kpi_value) reconstructs the ad total.
+            platform_budgets = sm.get("platformBudgets", [])
+            target_total = _kpi_number(sm.get("targetKpi"))
+            per_platform = (
+                target_total / len(platform_budgets) if platform_budgets else Decimal("0")
+            )
+            for pb in platform_budgets:
                 platform, _ = SocialPlatformDefinition.objects.get_or_create(
                     code=pb["platform"][:40], defaults={"name": pb["platform"]},
                 )
                 SocialMediaPlatformLine.objects.create(
                     social_ad=record, platform=platform, budget=_d(pb.get("budget")),
+                    target_kpi_value=per_platform,
                 )
 
         for oc in payload.get("otherCosts", []):

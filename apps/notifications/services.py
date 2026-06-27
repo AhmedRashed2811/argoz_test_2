@@ -1,6 +1,3 @@
-"""Notification creation + fan-out (docs §12). Business services call the typed
-helpers; delivery (websocket/email) is dispatched on commit via Celery (Phase 12
-tasks). Channel selection follows the notification.delivery_policy (§7.2)."""
 from __future__ import annotations
 
 from django.db import transaction

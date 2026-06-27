@@ -246,6 +246,10 @@ const NEXT_ACTIONS = {
   'Frozen':    [{ val:'frozenCall', label:'❄️ Call back after a period', type:'frozenCall' }],
 };
 
+if ((window.LEAD_MGMT_CFG && window.LEAD_MGMT_CFG.not_reached_reminder_mode) === 'MANUAL') {
+  NEXT_ACTIONS['Not Reached'] = [{ val:'retry', label:'📅 Set a reminder to retry call later', hasDate:true, type:'reminder' }];
+}
+
 function openStageModal(id){
   const l=leads.find(x=>x.id===id); if(!l)return;
   stageEditId=id; _selectedStage=null;
@@ -364,6 +368,10 @@ document.getElementById('stageModalSave').addEventListener('click',()=>{
   if(_selectedStage==='Follow-up'){
     const rd=document.getElementById('reminderDate').value;
     if(!rd){ Swal.fire({title:'Follow-up date required',text:'Please set the reminder date so it appears correctly in the lead history.',icon:'warning',confirmButtonColor:'var(--clr-orange)'}); return; }
+  }
+  if(_selectedStage==='Not Reached' && ((window.LEAD_MGMT_CFG && window.LEAD_MGMT_CFG.not_reached_reminder_mode) || 'AUTOMATIC') === 'MANUAL'){
+    const rd=document.getElementById('reminderDate').value;
+    if(!rd){ Swal.fire({title:'Reminder date required',text:'Please set the reminder date so it appears correctly in the lead history.',icon:'warning',confirmButtonColor:'var(--clr-orange)'}); return; }
   }
 
   // Build the payload; the backend routes to the right service
@@ -864,6 +872,9 @@ function validateStageForm() {
     const val = document.getElementById('meetingDate').value;
     if (!val) isValid = false;
   } else if (_selectedStage === 'Follow-up') {
+    const val = document.getElementById('reminderDate').value;
+    if (!val) isValid = false;
+  } else if (_selectedStage === 'Not Reached' && ((window.LEAD_MGMT_CFG && window.LEAD_MGMT_CFG.not_reached_reminder_mode) || 'AUTOMATIC') === 'MANUAL') {
     const val = document.getElementById('reminderDate').value;
     if (!val) isValid = false;
   }

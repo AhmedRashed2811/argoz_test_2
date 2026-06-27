@@ -146,13 +146,28 @@ class LeadCreationService:
 
         # Distribution decision is owned by the distribution engine (docs §8.3).
         if assigned_salesman is not None:
-            deadline = SLAService.calculate_deadline(
-                company, stage_code=StageCode.FRESH, origin=origin, source_code=source_code
-            )
-            SLAService.open_instance(lead=lead, stage=fresh, deadline=deadline)
-            lead.sla_deadline = deadline
-            lead.save(update_fields=["sla_deadline", "updated_at"])
-            NotificationService.lead_assigned(company, lead, assigned_salesman)
+            is_sg_owner_keep = False
+            if source_code == SourceCode.SELF_GENERATED and assigned_salesman == actor:
+                is_salesman = actor is not None and actor.team_memberships.filter(team__company=company).exists()
+                if is_salesman:
+                    from apps.policies.constants import PolicyCode
+                    from apps.policies.services import PolicyResolver
+                    sg_policy = PolicyResolver.option_code(
+                        company, PolicyCode.SELF_GENERATED_SALESMAN_POLICY, default="KEEP_WITH_OWNER"
+                    )
+                    if sg_policy == "KEEP_WITH_OWNER":
+                        is_sg_owner_keep = True
+
+            if is_sg_owner_keep:
+                NotificationService.lead_assigned(company, lead, assigned_salesman)
+            else:
+                deadline = SLAService.calculate_deadline(
+                    company, stage_code=StageCode.FRESH, origin=origin, source_code=source_code
+                )
+                SLAService.open_instance(lead=lead, stage=fresh, deadline=deadline)
+                lead.sla_deadline = deadline
+                lead.save(update_fields=["sla_deadline", "updated_at"])
+                NotificationService.lead_assigned(company, lead, assigned_salesman)
         elif auto_distribute and source_code != SourceCode.EXHIBITION:
             LeadCreationService._dispatch_distribution(lead, actor, request_meta)
         else:

@@ -255,10 +255,18 @@ function loadRecord(prefix) {
 /* ───────── self-generated head assignment (policy-driven) ───────── */
 function renderHeadAssign() {
   const auto = state.headAssignment === 'AUTO_ROUND_ROBIN_TEAM';
-  $('sg-assign-group').style.display = auto ? 'none' : '';
-  $('sg-auto-info').style.display = auto ? '' : 'none';
-  $('sg-member-select').style.display = 'none';
-  if (!auto) document.querySelectorAll('input[name="sg_assign"]').forEach(r => { r.checked = r.value === 'self'; });
+  const selfOnly = state.headAssignment === 'SELF_ONLY';
+  if (selfOnly) {
+    $('sg-assign-group').style.display = 'none';
+    $('sg-auto-info').style.display = 'none';
+    $('sg-member-select').style.display = 'none';
+    document.querySelectorAll('input[name="sg_assign"]').forEach(r => { r.checked = r.value === 'self'; });
+  } else {
+    $('sg-assign-group').style.display = auto ? 'none' : '';
+    $('sg-auto-info').style.display = auto ? '' : 'none';
+    $('sg-member-select').style.display = 'none';
+    if (!auto) document.querySelectorAll('input[name="sg_assign"]').forEach(r => { r.checked = r.value === 'self'; });
+  }
 }
 
 /* ───────── walk-in rotation (interactive; pointer moves server-side) ───────── */

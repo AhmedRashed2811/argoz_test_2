@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Financial & Marketing Reports · Argoz CRM{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'marketing/reports.css' %}">{% endblock %}
+
+{% block content %}
+<div class="page-body">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M6 8h4M6 11h8M6 14h3"/></svg>
+      </div>
+      <div class="page-title">
+        <h1>Financial &amp; Marketing Reports</h1>
+        <p>Budget performance, lead acquisition &amp; campaign ROI — all channels</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="exportReport()">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Global Filter Bar -->
+  <div class="global-filter-bar" id="globalFilterBar">
+    <span class="gf-label">Filters</span>
+
+    <div class="gf-filters-row">
+
+      <!-- Period -->
+      <div class="gf-group" id="gfg-period">
+        <div class="gf-group-label">Period</div>
+        <div class="gf-select-btn" id="gfsb-period" onclick="toggleDropdown('period')">
+          <span id="gfsb-period-txt">All Time</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-period">
+          <div class="gf-dd-head"><p>Period</p></div>
+          <div class="gf-dd-list" id="gflist-period"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('period')">All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('period')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Campaign Type -->
+      <div class="gf-group" id="gfg-type">
+        <div class="gf-group-label">Campaign Type</div>
+        <div class="gf-select-btn" id="gfsb-type" onclick="toggleDropdown('type')">
+          <span id="gfsb-type-txt">All Types</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-type">
+          <div class="gf-dd-head"><p>Campaign Type</p><input class="gf-dd-search" placeholder="Search…" oninput="filterGfList('type',this.value)"></div>
+          <div class="gf-dd-list" id="gflist-type"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('type')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('type')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Platform -->
+      <div class="gf-group" id="gfg-platform">
+        <div class="gf-group-label">Platform</div>
+        <div class="gf-select-btn" id="gfsb-platform" onclick="toggleDropdown('platform')">
+          <span id="gfsb-platform-txt">All Platforms</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-platform">
+          <div class="gf-dd-head"><p>Platform</p></div>
+          <div class="gf-dd-list" id="gflist-platform"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('platform')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('platform')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Status -->
+      <div class="gf-group" id="gfg-status">
+        <div class="gf-group-label">KPI Status</div>
+        <div class="gf-select-btn" id="gfsb-status" onclick="toggleDropdown('status')">
+          <span id="gfsb-status-txt">All Statuses</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-status">
+          <div class="gf-dd-head"><p>KPI Status</p></div>
+          <div class="gf-dd-list" id="gflist-status"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('status')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('status')">Clear</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /gf-filters-row -->
+
+    <div class="gf-actions">
+      <span class="gf-summary" id="gfSummary">All campaigns · All time</span>
+      <button class="gf-clear" onclick="clearAllFilters()">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Active Filter Chips -->
+  <div class="active-chips" id="activeChips"></div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+      <div>
+        <div class="kpi-value small" id="kpi-budget">EGP 6.25M</div>
+        <div class="kpi-label">Total Budget Spent</div>
+        <div class="kpi-delta up" id="kpi-budget-delta">↑ 12% vs last period</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon teal"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div>
+        <div class="kpi-value" id="kpi-leads">4,200</div>
+        <div class="kpi-label">Total Leads Generated</div>
+        <div class="kpi-delta up">↑ 8% vs last period</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div>
+        <div class="kpi-value small" id="kpi-cpl">EGP 1,488</div>
+        <div class="kpi-label">Avg. Cost Per Lead</div>
+        <div class="kpi-delta down">↓ 3% vs last period</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon coral"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      <div>
+        <div class="kpi-value" id="kpi-interested">850</div>
+        <div class="kpi-label">Interested Leads</div>
+        <div class="kpi-delta up">↑ 18% vs last period</div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div>
+        <div class="kpi-value small" id="kpi-cpil">EGP 7,353</div>
+        <div class="kpi-label">Avg. Cost Per Interested Lead</div>
+        <div class="kpi-delta down">↓ 5% vs last period</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Row 1: Budget vs Interested Leads + CPL vs CPIL -->
+  <div class="charts-grid">
+    <div class="chart-card" id="card-budgetVsLeads">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Budget vs. Interested Leads by Campaign</div>
+          <div class="chart-subtitle">Dual-axis: budget spend (bars) vs qualified leads (line)</div>
+          <div class="chart-click-hint">Click a bar to filter dashboard by that campaign type</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--indigo)"></div>Budget (EGP)</div>
+          <div class="legend-item"><div class="legend-line" style="background:var(--teal)"></div>Interested Leads</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartBudgetVsLeads"></canvas></div>
+    </div>
+    <div class="chart-card" id="card-cplCpil">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Cost Efficiency: CPL vs. CPIL</div>
+          <div class="chart-subtitle">Lower is better — cost to acquire each lead type</div>
+          <div class="chart-click-hint">Click a bar to filter by campaign type</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--emerald)"></div>CPL</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>CPIL</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartCplCpil"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Chart Row 2: Social KPIs + Event Funnel -->
+  <div class="charts-grid">
+    <div class="chart-card" id="card-socialKpis">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Social Media Platform KPIs</div>
+          <div class="chart-subtitle">Target vs. actual leads per platform</div>
+          <div class="chart-click-hint">Click a platform bar to filter by platform</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(99,102,241,.35)"></div>Target</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--indigo)"></div>Actual</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartSocialKpis"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Event Attendance Funnel</div>
+          <div class="chart-subtitle">Target → Checked-in → Converted to Interested</div>
+        </div>
+      </div>
+      <div class="funnel-wrap" id="funnelWrap"></div>
+    </div>
+  </div>
+
+  <!-- Social Platform Performance Table -->
+  <div class="table-card">
+    <div class="table-head">
+      <div>
+        <div class="table-title">Platform Performance Detail</div>
+        <div class="table-subtitle">Budget allocation and KPI achievement per social platform — click column headers to sort or filter</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="socialTable">
+        <thead>
+          <tr>
+            <th><div class="th-inner">Platform
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('social','platform',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','platform')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Budget
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('social','budget',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','budget')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Target Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('social','target',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','target')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Actual Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('social','actual',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','actual')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Achievement</div></th>
+            <th><div class="th-inner">CPL
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('social','cpl',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','cpl')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Status
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'social','status')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+          </tr>
+        </thead>
+        <tbody id="socialTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Campaign Type Performance Table -->
+  <div class="table-card">
+    <div class="table-head">
+      <div>
+        <div class="table-title">Campaign Type Performance</div>
+        <div class="table-subtitle">Full ROI breakdown by channel — click column headers to sort or filter</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="campaignTable">
+        <thead>
+          <tr>
+            <th><div class="th-inner">Campaign Type
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','label',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','label')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Budget
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','budget',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','budget')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Total Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','leads_count',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','leads_count')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Interested Leads
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','interested_leads',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','interested_leads')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">CPL
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','cpl',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','cpl')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">CPIL
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','cpil',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','cpil')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+            <th><div class="th-inner">Conversion Rate
+              <button class="th-icon-btn" title="Sort" onclick="sortTable('campaign','rate',this)"><svg viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg></button>
+              <button class="th-icon-btn" title="Filter" onclick="openColFilter(event,'campaign','rate')"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>
+            </div></th>
+          </tr>
+        </thead>
+        <tbody id="campaignTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /page-body -->
+
+<!-- Column Filter Dropdown (shared) -->
+<div class="col-filter-dropdown" id="colFilterDropdown">
+  <div class="cfd-head"><p id="cfdTitle">Filter</p><input class="cfd-search" id="cfdSearch" placeholder="Search…" oninput="filterCfdList(this.value)"></div>
+  <!-- Checkbox mode -->
+  <div class="cfd-list" id="cfdList"></div>
+  <div class="cfd-actions" id="cfdCheckActions">
+    <button class="cfd-btn sa" onclick="cfdSelectAll()">Select All</button>
+    <button class="cfd-btn ca" onclick="cfdClearAll()">Clear</button>
+  </div>
+  <!-- Budget range mode -->
+  <div class="cfd-budget-range" id="cfdBudgetRange" style="display:none">
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Min</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMin" placeholder="e.g. 500,000" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+    <div class="cfd-budget-row">
+      <span class="cfd-budget-label">Max</span>
+      <input type="number" class="cfd-budget-input" id="cfdBudgetMax" placeholder="e.g. 2,500,000" min="0" oninput="applyBudgetRangeFilter()">
+    </div>
+  </div>
+  <div class="cfd-actions" id="cfdBudgetActions" style="display:none">
+    <button class="cfd-btn ca" style="flex:1" onclick="cfdClearBudget()">Clear</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  window.REPORT_CFG = {
+    dataUrl: "{% url 'marketing:api_marketing_report' %}",
+    csrf: "{{ csrf_token }}"
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{% static 'marketing/reports.js' %}"></script>
+{% endblock %}

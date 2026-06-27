@@ -216,7 +216,8 @@ class Command(BaseCommand):
             (PolicyCode.SELF_GENERATED_HEAD_ASSIGNMENT,
              "Self-Generated Head Assignment", "leads", ValueType.OPTION,
              [("SELF_OR_MANUAL_TEAM", "Self or manual team member", ""),
-              ("AUTO_ROUND_ROBIN_TEAM", "Auto round-robin within team", "")]),
+              ("AUTO_ROUND_ROBIN_TEAM", "Auto round-robin within team", ""),
+              ("SELF_ONLY", "Self Only", "")]),
             (PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN,
              "Broker Lead Also Assigned to Salesman", "leads", ValueType.BOOLEAN, []),
             (PolicyCode.WALKIN_RECEPTION_POLICY, "Walk-in Reception Policy", "leads",
@@ -231,20 +232,10 @@ class Command(BaseCommand):
              ValueType.OPTION, [("AUTOMATIC", "Automatic", ""), ("MANUAL", "Manual", "")]),
             (PolicyCode.FRESH_REMINDER_SCHEDULE, "Fresh Reminder Schedule", "leads",
              ValueType.DURATION, []),
-            (PolicyCode.CAMPAIGN_TYPE_REPEATABILITY, "Campaign Type Repeatability",
-             "marketing", ValueType.BOOLEAN, []),
-            (PolicyCode.TYPE_DATE_POLICY, "Campaign Type Date Policy", "marketing",
-             ValueType.OPTION,
-             [("STRICT_WITHIN_CAMPAIGN", "Strict within campaign", ""),
-              ("WARN_ONLY", "Warn only", "")]),
-            (PolicyCode.FINANCE_REASON_REQUIRED, "Finance Reason Required", "marketing",
-             ValueType.JSON, []),
             (PolicyCode.CAMPAIGN_RESTRICT_EDITING, "Restrict Approved Campaign Editing", "marketing",
              ValueType.BOOLEAN, []),
             (PolicyCode.WEBHOOK_MAPPING_POLICY, "Webhook Mapping Policy", "integration",
              ValueType.JSON, []),
-            (PolicyCode.NOTIFICATION_DELIVERY_POLICY, "Notification Delivery Policy",
-             "notification", ValueType.JSON, []),
         ]
         # Per-stage SLA durations.
         for stage in (StageCode.FRESH, StageCode.INTERESTED, StageCode.FOLLOW_UP,
@@ -280,6 +271,7 @@ class Command(BaseCommand):
         self._set_value(company, PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN, True)
         self._set_value(company, PolicyCode.FRESH_REMINDER_SCHEDULE, {"minutes": 2})
         self._set_value(company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, True)
+        self._select(company, PolicyCode.NOT_REACHED_REMINDER_MODE, "AUTOMATIC")
         self.stdout.write(f"  policies: {len(defs)}")
 
     def _select(self, company, code, option_code):
@@ -316,6 +308,12 @@ class Command(BaseCommand):
             ("leads", "manual_distribution", "Manual Distribution",
              "leads:manual_distribution", 2),
             ("marketing", "campaigns", "Campaigns", "marketing:campaign_list", 2),
+            ("marketing", "marketing_report", "Marketing Reports",
+             "marketing:marketing_report", 3),
+            ("leads", "sales_performance", "Sales Performance",
+             "leads:sales_performance", 3),
+            ("leads", "leads_analysis", "Leads Analysis",
+             "leads:leads_analysis", 3),
             ("finance", "dashboard", "Finance Approvals", "finance:campaign_approval", 3),
             ("notifications", "view_own", "Notifications", "notifications:list", 4),
             ("admin", "users", "Users", "accounts:user_list", 10),
@@ -422,7 +420,40 @@ class Command(BaseCommand):
             PermissionDefinition.objects.filter(
                 code="leads.lead.create"
             ).update(page=create_page)
-        self.stdout.write(f"  permissions: {len(codes)}")
+        # Marketing report gate (review_marketing_report). Flat code, linked to
+        # the report page so _page_allowed() surfaces the menu item for holders.
+        report_page = PageDefinition.objects.filter(
+            code="marketing.marketing_report"
+        ).first()
+        PermissionDefinition.objects.update_or_create(
+            code="review_marketing_report",
+            defaults=dict(module="marketing", action="review_marketing_report",
+                          name="Review marketing report", page=report_page,
+                          risk_level=RiskLevel.MEDIUM),
+        )
+        # Sales performance report gate (review_sales_performance_report). Flat
+        # code linked to its page so _page_allowed() surfaces the menu item.
+        perf_page = PageDefinition.objects.filter(
+            code="leads.sales_performance"
+        ).first()
+        PermissionDefinition.objects.update_or_create(
+            code="review_sales_performance_report",
+            defaults=dict(module="leads", action="review_sales_performance_report",
+                          name="Review sales performance report", page=perf_page,
+                          risk_level=RiskLevel.MEDIUM),
+        )
+        # Leads analysis report gate (review_leads_analysis). Flat code linked to
+        # its page so _page_allowed() surfaces the menu item for holders.
+        analysis_page = PageDefinition.objects.filter(
+            code="leads.leads_analysis"
+        ).first()
+        PermissionDefinition.objects.update_or_create(
+            code="review_leads_analysis",
+            defaults=dict(module="leads", action="review_leads_analysis",
+                          name="Review leads analysis", page=analysis_page,
+                          risk_level=RiskLevel.MEDIUM),
+        )
+        self.stdout.write(f"  permissions: {len(codes) + 3}")
 
     def _role_defaults(self, company):
         """Seed default permission bundles per role (docs §5.2). Editable by
@@ -444,6 +475,9 @@ class Command(BaseCommand):
                           "leads.lead.create", "leads.lead.view_all", "leads.lead.edit_all",
                           "leads.lead.deactivate", "leads.stage.change_own",
                           "leads.distribution.manual_all",
+                          "review_marketing_report",
+                          "review_sales_performance_report",
+                          "review_leads_analysis",
                           "notifications.view_own", *all_source_creates,
                           "admin.brokers.access", "admin.brokers.create"],
             "SALES": ["dashboard.main.access", "leads.dashboard.access",
@@ -456,12 +490,15 @@ class Command(BaseCommand):
                            "leads.lead.create_from_self_generated", "leads.lead.view_own",
                            "leads.lead.view_team", "leads.distribution.team_manual",
                            "leads.stage.change_own", "leads.followup.create_own",
-                           "leads.meeting.create_own", "notifications.view_own"],
+                           "leads.meeting.create_own",
+                           "review_sales_performance_report",
+                           "notifications.view_own"],
             "SALES_OPERATION": ["dashboard.main.access", "leads.dashboard.access",
                                 "leads.lead.create", "leads.lead.view_all", "leads.lead.edit_all",
                                 "leads.lead.deactivate", "leads.stage.change_own",
                                 "leads.lead.create_any_source",
                                 "leads.distribution.manual_all", "notifications.view_own",
+                                "review_leads_analysis",
                                 "admin.teams.access", "admin.teams.create",
                                 "admin.teams.update", "admin.teams.delete",
                                 "admin.brokers.access", "admin.brokers.create",
@@ -479,7 +516,10 @@ class Command(BaseCommand):
                               "leads.lead.create", "leads.lead.create_from_walk_in", "notifications.view_own"],
             "FINANCE_MANAGERS": ["finance.dashboard.access", "finance.campaign.review",
                                  "finance.campaign.approve",
-                                 "marketing.campaign.view_all", "notifications.view_own"],
+                                 "marketing.campaign.view_all",
+                                 "review_marketing_report",
+                                 "review_leads_analysis",
+                                 "notifications.view_own"],
             "MARKETING_MEMBERS": ["marketing.campaigns.access",
                                   "marketing.campaign.create",
                                   "marketing.campaign.update", "marketing.budget.manage",
@@ -492,6 +532,8 @@ class Command(BaseCommand):
                                    "marketing.campaign.view_all",
                                    "marketing.budget.manage",
                                    "marketing.campaign.submit_finance",
+                                   "review_marketing_report",
+                                   "review_leads_analysis",
                                    "notifications.view_own"],
         }
         perms = {p.code: p for p in PermissionDefinition.objects.all()}
