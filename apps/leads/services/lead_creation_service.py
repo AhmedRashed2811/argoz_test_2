@@ -89,11 +89,17 @@ class LeadCreationService:
                     auto_distribute = False
 
         dup = DuplicateService.check(company=company, phone=phone)
-        print(f"[LeadCreationService] Duplicate check completed. requires_manual={dup.requires_manual}, existing={dup.existing}")
-        # Active + in-SLA duplicate => manual escalation, never auto (docs §8.1).
-        if dup.requires_manual:
-            LeadCreationService._escalate_manual(company, dup.existing, actor)
-            return dup.existing
+        # Never create a second lead for the same phone (docs §8.1): refresh the
+        # existing lead's info (everything but the phone) and re-route it.
+        if dup.is_duplicate:
+            return LeadCreationService._merge_duplicate(
+                existing=dup.existing, source=source, name=name,
+                email=extra.get("email", ""), country_code=extra.get("country_code", ""),
+                language=language, broker_owner=broker_owner, campaign=campaign,
+                campaign_child_type=campaign_child_type, campaign_child_id=campaign_child_id,
+                call_center_agent=call_center_agent, metadata=metadata,
+                actor=actor, request_meta=request_meta,
+            )
 
         fresh = LeadStageDefinition.objects.get(code=StageCode.FRESH)
         lead = Lead.objects.create(
@@ -179,6 +185,63 @@ class LeadCreationService:
 
         print(f"[LeadCreationService] Lead creation workflow finished: lead_id={lead.id}, assigned_salesman={lead.assigned_salesman}, assigned_team={lead.assigned_team}\n")
         return lead
+
+    @staticmethod
+    def _merge_duplicate(*, existing, source, name, email, country_code, language,
+                         broker_owner, campaign, campaign_child_type, campaign_child_id,
+                         call_center_agent, metadata, actor, request_meta):
+        """A lead with this phone already exists (docs §8.1). Update its info
+        (phone stays fixed — it's the dedup key) then re-route it: inactive ->
+        reactivate + auto-distribute (company DEFAULT_AUTO_DISTRIBUTION_METHOD);
+        active -> escalate to manual distribution ('Call Me Again')."""
+        was_active = existing.active_status == ActiveStatus.ACTIVE
+        before = {"name": existing.name, "active_status": existing.active_status}
+
+        existing.name = name or existing.name
+        existing.source = source
+        if email:
+            existing.email = email
+        if country_code:
+            existing.country_code = country_code
+        if language is not None:
+            existing.language = language
+        if broker_owner is not None:
+            existing.broker_owner = broker_owner
+        if campaign is not None:
+            existing.campaign = campaign
+            existing.campaign_child_type = campaign_child_type
+            existing.campaign_child_id = campaign_child_id
+        if call_center_agent is not None:
+            existing.call_center_agent = call_center_agent
+        if metadata:
+            existing.metadata = {**(existing.metadata or {}), **metadata}
+        existing.last_activity_at = timezone.now()
+
+        if was_active:
+            # Surface on the manual-distribution board (active + unassigned).
+            existing.assigned_salesman = None
+            existing.assigned_team = None
+        else:
+            existing.active_status = ActiveStatus.ACTIVE
+            existing.current_stage = LeadStageDefinition.objects.get(code=StageCode.FRESH)
+        existing.save()
+
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=existing, actor=actor,
+            company=existing.company, module="leads", request_meta=request_meta,
+            before=before,
+            after={"name": existing.name, "active_status": existing.active_status,
+                   "source": source.code},
+            reason="Duplicate re-submission",
+        )
+
+        if was_active:
+            LeadCreationService._escalate_manual(existing.company, existing, actor)
+        else:
+            LeadCreationService._dispatch_distribution(existing, actor, request_meta)
+
+        existing._duplicate_action = "manual" if was_active else "reactivated"
+        return existing
 
     @staticmethod
     def _validate_source(source, *, broker_owner, campaign, assigned_salesman, **extra):

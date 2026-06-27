@@ -64,10 +64,16 @@
           </div>
         </div>
 
+        {% if can_edit %}
         <button type="submit" class="btn-primary">
           <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
           Save Overrides & Policies
         </button>
+        {% else %}
+        <div class="info-banner orange" style="margin-top:8px">
+          System Admin permissions are locked. Only Directors can change them.
+        </div>
+        {% endif %}
       </div>
 
       <!-- ── Right Panel: Permissions ── -->

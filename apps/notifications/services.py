@@ -189,7 +189,7 @@ class NotificationService:
 
         qs = Notification.objects.filter(
             recipient=user
-        ).select_related("notification_type").order_by("-created_at")[:50]
+        ).select_related("notification_type").order_by("-created_at")
 
         lead_ids = [n.related_id for n in qs if n.related_type == "Lead" and n.related_id]
         leads_map = {}

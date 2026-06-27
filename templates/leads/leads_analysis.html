@@ -82,6 +82,23 @@
         </div>
       </div>
 
+      <!-- Agency (multi) -->
+      <div class="gf-group" id="gfg-agency">
+        <div class="gf-group-label">Agency</div>
+        <div class="gf-select-btn" id="gfsb-agency" onclick="toggleDropdown('agency')">
+          <span id="gfsb-agency-txt">All Agencies</span>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="gf-dropdown" id="gfdd-agency">
+          <div class="gf-dd-head"><p>Agency</p></div>
+          <div class="gf-dd-list" id="gflist-agency"></div>
+          <div class="gf-dd-actions">
+            <button class="gf-dd-btn sel-all" onclick="selectAllGf('agency')">Select All</button>
+            <button class="gf-dd-btn clr-all" onclick="clearGf('agency')">Clear</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Origin -->
       <div class="gf-group" id="gfg-origin">
         <div class="gf-group-label">Origin</div>
@@ -216,6 +233,34 @@
       <div class="origin-split" id="originSplit"></div>
       <div style="margin-top:14px;">
         <div class="chart-wrap" style="height:110px;"><canvas id="chartOriginBar"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Row 3: Agency leads + Broker user breakdown -->
+  <div class="charts-grid" style="margin-bottom:14px;">
+    <div class="chart-card" id="card-agency">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Leads by Agency / Company</div>
+          <div class="chart-subtitle">Which broker agency brings the most leads</div>
+          <div class="chart-click-hint">Click a bar to filter the dashboard by that agency</div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:260px;"><canvas id="chartAgency"></canvas></div>
+    </div>
+    <div class="chart-card" id="card-brokerUsers">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Broker Breakdown</div>
+          <div class="chart-subtitle">Leads per individual broker — click a row to filter by its agency</div>
+        </div>
+      </div>
+      <div class="tbl-scroll" style="max-height:260px;">
+        <table id="brokerUsersTable">
+          <thead><tr><th style="text-align:left;">Broker</th><th style="text-align:left;">Agency</th><th>Leads</th></tr></thead>
+          <tbody id="brokerUsersBody"></tbody>
+        </table>
       </div>
     </div>
   </div>

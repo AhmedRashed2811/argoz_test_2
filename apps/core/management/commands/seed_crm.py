@@ -487,6 +487,11 @@ class Command(BaseCommand):
                           "review_marketing_report",
                           "review_sales_performance_report",
                           "review_leads_analysis",
+                          # Oversight of System Admins: only Directors may edit the
+                          # System Admins role / a System Admin's permissions (§4.4).
+                          "authorization.roles.manage",
+                          "authorization.permissions.manage",
+                          "admin.users.access",
                           "notifications.view_own", *all_source_creates,
                           "admin.brokers.access", "admin.brokers.create"],
             "SALES": ["dashboard.main.access", "leads.dashboard.access",
@@ -514,15 +519,18 @@ class Command(BaseCommand):
                                 # All sources except self-generated (§4.2b).
                                 *[c for c in all_source_creates
                                   if c != "leads.lead.create_from_self_generated"]],
+            # Capture-only: only the Call Center source (default on the restricted page).
             "CALL_CENTER": ["dashboard.main.access", "leads.dashboard.access",
                             "leads.lead.create", "leads.lead.create_from_call_center",
-                            "leads.lead.create_from_existing_client",
                             "leads.lead.view_own", "notifications.view_own"],
             "BROKERS": ["dashboard.main.access", "leads.dashboard.access",
                         "leads.lead.create", "leads.lead.create_from_broker", "leads.lead.view_own",
                         "notifications.view_own"],
+            # Capture-only: Walk-in (default) + Existing Client sources.
             "RECEPTIONISTS": ["dashboard.main.access", "leads.dashboard.access",
-                              "leads.lead.create", "leads.lead.create_from_walk_in", "notifications.view_own"],
+                              "leads.lead.create", "leads.lead.create_from_walk_in",
+                              "leads.lead.create_from_existing_client",
+                              "notifications.view_own"],
             "FINANCE_MANAGERS": ["finance.dashboard.access", "finance.campaign.review",
                                  "finance.campaign.approve",
                                  "marketing.campaign.view_all",
@@ -546,8 +554,13 @@ class Command(BaseCommand):
                                    "notifications.view_own"],
         }
         # Bulk import follows single-lead create: any group that can create a lead
-        # gets bulk_create by default (admins can change it afterwards).
-        for codes in bundles.values():
+        # gets bulk_create by default (admins can change it afterwards). Capture-only
+        # roles (Call Center / Receptionist / Broker) are excluded — they use the
+        # restricted single-lead create page and may not import CSVs.
+        _no_bulk = {"CALL_CENTER", "RECEPTIONISTS", "BROKERS"}
+        for role_code, codes in bundles.items():
+            if role_code in _no_bulk:
+                continue
             if "leads.lead.create" in codes and "leads.lead.bulk_create" not in codes:
                 codes.append("leads.lead.bulk_create")
         perms = {p.code: p for p in PermissionDefinition.objects.all()}

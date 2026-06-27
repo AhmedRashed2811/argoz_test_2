@@ -34,7 +34,7 @@
     <!-- LEFT: Role Details -->
     <div class="left-col">
       
-      {% if is_edit_mode and role_instance.is_system_default %}
+      {% if perms_locked %}
         <div class="system-warning">
           <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span>This is a <strong>system default role</strong>. Its default permission bundle is locked and cannot be modified.</span>
@@ -95,7 +95,7 @@
                 <span class="toggle-desc">Inactive roles cannot be assigned to users.</span>
               </div>
               <label class="toggle-switch">
-                <input type="checkbox" id="inp-is_active" {% if not is_edit_mode or role_instance.is_active %}checked{% endif %} {% if is_edit_mode and role_instance.is_system_default %}disabled{% endif %}>
+                <input type="checkbox" id="inp-is_active" {% if not is_edit_mode or role_instance.is_active %}checked{% endif %} {% if perms_locked %}disabled{% endif %}>
                 <span class="toggle-slider"></span>
               </label>
             </div>
@@ -141,7 +141,7 @@
               <div class="module-group" data-module="{{ group.grouper }}">
                 <div class="module-header">
                   <h3>{{ group.grouper|title }} Module</h3>
-                  {% if not is_edit_mode or not role_instance.is_system_default %}
+                  {% if not perms_locked %}
                     <div class="module-actions">
                       <button type="button" class="btn-mod" onclick="setModule('{{ group.grouper }}', true)">All</button>
                       <button type="button" class="btn-mod" onclick="setModule('{{ group.grouper }}', false)">None</button>
@@ -150,7 +150,7 @@
                 </div>
                 <div class="perms-grid">
                   {% for perm in group.list %}
-                    <div class="perm-item {% if perm.id|stringformat:'s' in selected_permission_ids %}checked{% endif %} {% if is_edit_mode and role_instance.is_system_default %}disabled{% endif %}"
+                    <div class="perm-item {% if perm.id|stringformat:'s' in selected_permission_ids %}checked{% endif %} {% if perms_locked %}disabled{% endif %}"
                          data-id="{{ perm.id }}"
                          data-code="{{ perm.code|lower }}"
                          data-name="{{ perm.name|lower }}"

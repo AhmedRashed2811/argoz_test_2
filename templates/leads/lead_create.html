@@ -178,7 +178,7 @@
             <div id="broker-self-panel" style="display:none; flex-direction:column; gap:14px">
               <div class="info-banner blue">
                 <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span>You are logged in as a broker. This lead is automatically owned by your brokerage.</span>
+                <span id="broker-self-text">You are logged in as a broker. This lead is automatically owned by your brokerage.</span>
               </div>
             </div>
             <!-- Internal staff selecting a broker -->
@@ -377,10 +377,6 @@
       </div>
 
       <div class="btn-row">
-        <button type="button" class="btn btn-outline" onclick="checkDuplicate()" style="margin-right:4px">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Check Duplicates
-        </button>
         <button type="button" class="btn btn-primary" onclick="openReview()">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
           Review &amp; Create Lead
@@ -428,17 +424,6 @@
         Create Lead
       </button>
     </div>
-  </div>
-</div>
-
-<!-- DUPLICATE MODAL -->
-<div id="dup-modal-bg" style="display:none; position:fixed; inset:0; background:rgba(30,28,26,.4); z-index:999; backdrop-filter:blur(2px)" onclick="if(event.target===this) closeDupModal()">
-  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--clr-surface); border-radius:12px; border:1px solid var(--clr-border); padding:24px; width:520px; max-width:94vw; box-shadow:var(--shadow)">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
-      <div style="font-family:'Times New Roman',serif; font-size:1.1rem; font-weight:700">Duplicate Check</div>
-      <button type="button" onclick="closeDupModal()" style="border:none; background:none; cursor:pointer; font-size:1.2rem; color:var(--clr-gray)">✕</button>
-    </div>
-    <div id="dup-modal-body"></div>
   </div>
 </div>
 
@@ -512,7 +497,8 @@
       ccAgents: "{% url 'leads:api_cc_agents' %}",
       walkinRotation: "{% url 'leads:api_walkin_rotation' %}"
     },
-    user: { id: "{{ user.id }}", name: "{{ user.get_full_name|default:user.email|escapejs }}" }
+    user: { id: "{{ user.id }}", name: "{{ user.get_full_name|default:user.email|escapejs }}" },
+    createMode: "{{ create_mode }}"
   };
 </script>
 {% endblock %}

@@ -57,10 +57,11 @@ def api_sources(request):
             request.user, f"leads.lead.create_from_{code.lower()}"
         )
     ]
-    is_broker = (
-        request.user.broker_profile.filter(company=request.company).exists()
-        if hasattr(request.user, "broker_profile") else False
+    own_broker = (
+        request.user.broker_profile.filter(company=request.company).first()
+        if hasattr(request.user, "broker_profile") else None
     )
+    is_broker = own_broker is not None
     is_head = Team.objects.filter(
         company=request.company, sales_head=request.user
     ).exists()
@@ -80,7 +81,9 @@ def api_sources(request):
         request.company, PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN, default=False
     ))
     return JsonResponse({
-        "sources": allowed, "is_broker": is_broker, "is_head": is_head,
+        "sources": allowed, "is_broker": is_broker,
+        "broker_name": own_broker.name if own_broker else "",
+        "is_head": is_head,
         "is_salesman": is_salesman, "can_manual": can_manual,
         "head_assignment": head_assignment,
         "broker_also_assign_salesman": broker_also_assign_salesman,
@@ -289,14 +292,17 @@ def api_teams(request):
 @login_required
 @require_GET
 def api_cc_agents(request):
-    """Users permitted to capture call-center leads (§4.2g)."""
+    """Actual Call Center agents (§4.2g) — users in the CALL_CENTER role, not
+    everyone who happens to hold the call-center create permission."""
+    from apps.authorization.services import RoleService
+
     users = User.objects.filter(
         is_active=True, profile__company=request.company
     ).select_related("profile")
     agents = [
         {"id": str(u.id), "name": u.get_full_name() or u.email}
         for u in users
-        if EffectivePermissionResolver.has(u, "leads.lead.create_from_call_center")
+        if RoleService.CALL_CENTER_CODE in RoleService.role_codes(u)
     ]
     return JsonResponse({"agents": agents})
 
@@ -348,10 +354,15 @@ def api_create(request):
         return _err(exc, status=400)
     from django.urls import reverse
 
-    return JsonResponse({
+    resp = {
         "ok": True, "lead_id": str(lead.id),
         "redirect": reverse("leads:detail", args=[lead.id]),
-    })
+    }
+    action = getattr(lead, "_duplicate_action", None)
+    if action:
+        resp["duplicate"] = True
+        resp["duplicate_action"] = action
+    return JsonResponse(resp)
 
 
 @login_required

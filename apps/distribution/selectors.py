@@ -19,7 +19,9 @@ def eligible_pool(*, company, language=None, scope_mode=ScopeMode.ALL_SALESMEN, 
         qs = qs.filter(team=team)
     if language is not None:
         qs = qs.filter(user__languages__language=language).distinct()
-    return list(qs)
+    # Stable ordering so the By-Turn pointer maps to a consistent rotation slot
+    # across calls (the DB's default order is not guaranteed).
+    return list(qs.order_by("user_id"))
 
 
 MANUAL_DIST_CODE = "leads.distribution.manual_all"

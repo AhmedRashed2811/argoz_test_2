@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 
 from apps.accounts.models import User
+from apps.core.exceptions import PermissionDenied
 
 from .decorators import crm_permission_required
 from .forms import RoleForm, UserOverrideForm
@@ -30,6 +31,7 @@ def role_create(request):
         "permissions": PermissionManagementService.get_active_permissions(),
         "is_edit_mode": False,
         "selected_permission_ids": [],
+        "perms_locked": False,
     }
     return render(request, "authorization/role_form.html", context)
 
@@ -46,6 +48,8 @@ def role_edit(request, role_id):
         "is_edit_mode": True,
         "permissions": PermissionManagementService.get_active_permissions(),
         "selected_permission_ids": current_permission_ids,
+        # System-default bundles stay locked unless the editor is a Director/superuser.
+        "perms_locked": role.is_system_default and not RoleService.is_director(request.user),
     }
     return render(request, "authorization/role_form.html", context)
 
@@ -121,16 +125,19 @@ def role_api_edit(request, role_id):
 
     form = RoleForm(data, instance=role)
     if form.is_valid():
-        RoleService.update_role(
-            role=role,
-            code=form.cleaned_data["code"],
-            name=form.cleaned_data["name"],
-            description=form.cleaned_data["description"],
-            is_active=form.cleaned_data["is_active"],
-            permission_ids=data.get("permissions", []),
-            actor=request.user,
-            request_meta=request.request_meta,
-        )
+        try:
+            RoleService.update_role(
+                role=role,
+                code=form.cleaned_data["code"],
+                name=form.cleaned_data["name"],
+                description=form.cleaned_data["description"],
+                is_active=form.cleaned_data["is_active"],
+                permission_ids=data.get("permissions", []),
+                actor=request.user,
+                request_meta=request.request_meta,
+            )
+        except PermissionDenied as exc:
+            return JsonResponse({"error": str(exc)}, status=403)
         return JsonResponse({"ok": True})
     else:
         errors = {field: [str(e) for e in err_list] for field, err_list in form.errors.items()}
@@ -164,7 +171,8 @@ def permission_catalog(request):
 def user_permission_matrix(request, user_id):
     """Show matrix layout page, override saves via AJAX JSON POST."""
     target = get_object_or_404(User, id=user_id, profile__company=request.company)
-    
+    can_edit = not RoleService.is_system_admin(target) or RoleService.is_director(request.user)
+
     if request.method == "POST":
         import json
         if request.content_type == "application/json":
@@ -175,7 +183,16 @@ def user_permission_matrix(request, user_id):
             permission_codes = data.get("permissions", [])
         else:
             permission_codes = request.POST.getlist("permissions")
-            
+
+        # Self-escalation guard: only Directors may edit a System Admin's permissions.
+        try:
+            RoleService.assert_can_edit_user_permissions(request.user, target)
+        except PermissionDenied as exc:
+            if request.content_type == "application/json":
+                return JsonResponse({"error": str(exc)}, status=403)
+            messages.error(request, str(exc))
+            return redirect("authorization:user_matrix", user_id=target.id)
+
         PermissionManagementService.update_user_overrides(
             user=target,
             permission_codes=permission_codes,
@@ -186,8 +203,10 @@ def user_permission_matrix(request, user_id):
             return JsonResponse({"ok": True})
         messages.success(request, "Permission overrides updated successfully.")
         return redirect("authorization:user_matrix", user_id=target.id)
-        
-    return render(request, "authorization/user_matrix.html", {"target": target})
+
+    return render(request, "authorization/user_matrix.html", {
+        "target": target, "can_edit": can_edit,
+    })
 
 
 @login_required

@@ -374,8 +374,11 @@ class PermissionManagementService:
 
 
 class RoleService:
+    SYSTEM_ADMIN_CODE = "SYSTEM_ADMINS"
+    DIRECTOR_CODE = "DIRECTORS"
+    CALL_CENTER_CODE = "CALL_CENTER"
+
     # Per-group default landing page (url name) when a user hits the dashboard root.
-    # Receptionists / Call Center / Brokers intentionally fall through to the dashboard.
     LANDING_BY_ROLE = {
         "SALES": "leads:list",
         "SALES_HEAD": "leads:list",
@@ -385,11 +388,22 @@ class RoleService:
         "MARKETING_MEMBERS": "marketing:campaign_list",
         "MARKETING_MANAGERS": "marketing:marketing_report",
         "FINANCE_MANAGERS": "finance:campaign_approval",
+        # Capture-only roles land directly on the (restricted) lead-create page.
+        "CALL_CENTER": "leads:create",
+        "RECEPTIONISTS": "leads:create",
+        "BROKERS": "leads:create",
+    }
+
+    # Restricted lead-create experience per capture-only role (drives template/JS).
+    CREATE_MODE_BY_ROLE = {
+        "CALL_CENTER": "call_center",
+        "RECEPTIONISTS": "receptionist",
+        "BROKERS": "broker",
     }
 
     @staticmethod
-    def default_landing(user) -> str | None:
-        """Url name of the user's group landing page, or None to stay on dashboard."""
+    def role_codes(user) -> list[str]:
+        """All role codes a user holds (default role + active assigned roles)."""
         codes = []
         profile = getattr(user, "profile", None)
         if profile and profile.default_role:
@@ -397,11 +411,52 @@ class RoleService:
         codes += list(
             user.roles.filter(is_active=True).values_list("role__code", flat=True)
         )
-        for code in codes:
+        return codes
+
+    @staticmethod
+    def default_landing(user) -> str | None:
+        """Url name of the user's group landing page, or None to stay on dashboard."""
+        for code in RoleService.role_codes(user):
             target = RoleService.LANDING_BY_ROLE.get(code)
             if target:
                 return target
         return None
+
+    @staticmethod
+    def create_mode(user) -> str | None:
+        """Restricted create-page mode for capture-only roles, else None."""
+        for code in RoleService.role_codes(user):
+            mode = RoleService.CREATE_MODE_BY_ROLE.get(code)
+            if mode:
+                return mode
+        return None
+
+    @staticmethod
+    def is_director(user) -> bool:
+        return RoleService.DIRECTOR_CODE in RoleService.role_codes(user) \
+            or bool(getattr(user, "is_superuser", False))
+
+    @staticmethod
+    def is_system_admin(user) -> bool:
+        return RoleService.SYSTEM_ADMIN_CODE in RoleService.role_codes(user)
+
+    @staticmethod
+    def assert_can_edit_role(actor, role) -> None:
+        """System admins cannot edit the System Admins role (self-escalation guard,
+        docs §4.4). Only Directors (or superusers) may change those defaults."""
+        if role.code == RoleService.SYSTEM_ADMIN_CODE and not RoleService.is_director(actor):
+            raise PermissionDenied(
+                "Only Directors can edit the System Admins role permissions."
+            )
+
+    @staticmethod
+    def assert_can_edit_user_permissions(actor, target) -> None:
+        """A System Admin cannot change permission overrides of any System Admin
+        (including themselves); only Directors can (self-escalation guard)."""
+        if RoleService.is_system_admin(target) and not RoleService.is_director(actor):
+            raise PermissionDenied(
+                "Only Directors can edit a System Admin's permissions."
+            )
 
     @staticmethod
     def get_roles_for_company(company):
@@ -448,6 +503,8 @@ class RoleService:
         from apps.audit.services import AuditService
         from apps.core.constants import AuditAction
 
+        RoleService.assert_can_edit_role(actor, role)
+
         before_data = {
             "code": role.code,
             "name": role.name,
@@ -462,18 +519,16 @@ class RoleService:
         role.is_active = is_active
         role.save()
 
-        if not role.is_system_default:
-            if permission_ids is not None:
-                # Sync permissions
-                existing_pids = set(role.permissions.values_list("permission_id", flat=True))
-                target_pids = set(permission_ids)
-
-                # Delete removed ones
-                role.permissions.filter(permission_id__in=existing_pids - target_pids).delete()
-
-                # Add new ones
-                for pid in target_pids - existing_pids:
-                    RolePermission.objects.create(role=role, permission_id=pid, allow=True)
+        # Custom roles: anyone with manage may edit. System-default roles: only
+        # Directors/superusers may change the locked default permission bundle.
+        if permission_ids is not None and (
+            not role.is_system_default or RoleService.is_director(actor)
+        ):
+            existing_pids = set(role.permissions.values_list("permission_id", flat=True))
+            target_pids = set(permission_ids)
+            role.permissions.filter(permission_id__in=existing_pids - target_pids).delete()
+            for pid in target_pids - existing_pids:
+                RolePermission.objects.create(role=role, permission_id=pid, allow=True)
 
         after_data = {
             "code": role.code,

@@ -15,7 +15,12 @@ class ByTurnStrategy(AssignmentStrategyInterface):
         pool = list(eligible_pool)
         if not pool:
             return AssignmentDecision(reason="No eligible candidate")
-        scope = context.params.get("pointer_scope", "GLOBAL")
+        # The rotation cursor must be per-pool: a lead's language (and scope mode)
+        # changes which salesmen are eligible, so a single GLOBAL pointer shared
+        # across differently-sized pools desyncs the turn (e.g. a 1-person language
+        # pool resets it every time and starves the tail of the larger pool).
+        lang = getattr(context.language, "code", None) or "ANY"
+        scope = context.params.get("pointer_scope") or f"{context.scope_mode or 'ALL'}:{lang}"
         # Lock the pointer row so concurrent runs can't pick the same turn (§17).
         with transaction.atomic():
             pointer, _ = RotationPointer.objects.select_for_update().get_or_create(

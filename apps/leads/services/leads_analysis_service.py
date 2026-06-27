@@ -32,6 +32,8 @@ class LeadsAnalysisService:
             "stageCounts": LeadsAnalysisService._stage_counts(leads),
             "sources": LeadsAnalysisService._sources(leads),
             "sourceStages": LeadsAnalysisService._source_stages(leads),
+            "agencies": LeadsAnalysisService._agencies(leads),
+            "brokerUsers": LeadsAnalysisService._broker_users(leads),
             "timeline": LeadsAnalysisService._timeline(company),
             "activeTotal": leads.filter(active_status=ActiveStatus.ACTIVE).count(),
             "inactiveTotal": leads.filter(active_status=ActiveStatus.INACTIVE).count(),
@@ -89,6 +91,40 @@ class LeadsAnalysisService:
                 continue
             out.setdefault(code, {})[stage] = r["c"]
         return out
+
+    @staticmethod
+    def _agencies(leads) -> list[dict]:
+        """Leads grouped by broker agency/company (broker-owned leads only) — who
+        brings the most leads. Brokers without an agency name show as Independent."""
+        rows = leads.filter(broker_owner__isnull=False).values(
+            "broker_owner__company_name"
+        ).annotate(
+            count=Count("id"),
+            interested=Count("id", filter=Q(current_stage__code=StageCode.INTERESTED)),
+        ).order_by("-count")
+        return [
+            {
+                "agency": r["broker_owner__company_name"] or "Independent",
+                "count": r["count"],
+                "interested": r["interested"],
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def _broker_users(leads) -> list[dict]:
+        """Per-broker breakdown (each broker is a linked user) under its agency."""
+        rows = leads.filter(broker_owner__isnull=False).values(
+            "broker_owner__name", "broker_owner__company_name"
+        ).annotate(count=Count("id")).order_by("-count")
+        return [
+            {
+                "name": r["broker_owner__name"] or "—",
+                "agency": r["broker_owner__company_name"] or "Independent",
+                "count": r["count"],
+            }
+            for r in rows
+        ]
 
     @staticmethod
     def _timeline(company) -> list[dict]:

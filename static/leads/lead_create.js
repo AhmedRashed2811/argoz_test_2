@@ -178,6 +178,23 @@ function resetDD(name) {
 }
 function ddVal(name) { return DD[name] && DD[name].selected ? DD[name].selected.id : null; }
 
+function lockDD(name) {
+  // Visually + functionally lock a dropdown to its current selection.
+  const d = DD[name]; if (!d) return;
+  d.el.classList.add('dd-locked');
+  d.el.style.pointerEvents = 'none';
+  d.el.style.opacity = '0.65';
+}
+function lockCCAgentToSelf() {
+  // Call-center capture role: agent is always the logged-in user, not changeable.
+  const d = DD.cc_agent; if (!d) return;
+  getJSON(CFG.urls.ccAgents).then(resp => {
+    d.items = resp.agents || []; d.loaded = true;
+    selectDD('cc_agent', CFG.user.id);
+    lockDD('cc_agent');
+  });
+}
+
 document.addEventListener('click', e => {
   if (!e.target.closest('.searchable-dropdown'))
     document.querySelectorAll('.searchable-dropdown.open').forEach(x => x.classList.remove('open'));
@@ -338,9 +355,16 @@ function selectSource(code) {
   if (code === 'broker') {
     $('broker-self-panel').style.display = state.isBroker ? 'flex' : 'none';
     $('broker-staff-panel').style.display = state.isBroker ? 'none' : 'flex';
+    if (state.isBroker && state.brokerName) {
+      $('broker-self-text').textContent =
+        `This lead is automatically owned by you (${state.brokerName}) and cannot be changed.`;
+    }
     if (state.isBroker && state.brokerAlsoAssignSalesman) $('broker-salesman-section').style.display = 'flex';
   }
-  if (code === 'call_center') $('cc-agent-group').style.display = '';
+  if (code === 'call_center') {
+    $('cc-agent-group').style.display = '';
+    if (CFG.createMode === 'call_center') lockCCAgentToSelf();
+  }
   if (code === 'walk_in') loadWalkin();
 }
 
@@ -352,24 +376,7 @@ function updateSummary() {
   $('sum-lang').textContent = DD.language && DD.language.selected ? DD.language.selected.name : '—';
 }
 
-/* ───────── duplicate + existing client ───────── */
-function checkDuplicate() {
-  const phone = $('f_phone').value.trim();
-  if (!phone) { Swal.fire({ icon: 'info', title: 'Enter a phone number first', confirmButtonColor: '#e07b20' }); return; }
-  getJSON(`${CFG.urls.duplicate}?phone=${encodeURIComponent(phone)}`).then(d => {
-    const body = $('dup-modal-body');
-    if (!d.is_duplicate) { body.innerHTML = '<div class="info-banner blue">No existing lead with this phone number.</div>'; }
-    else {
-      const e = d.existing || {};
-      body.innerHTML = `<div class="info-banner orange" style="margin-bottom:14px">An existing lead was found with this phone number${d.requires_manual ? ' (active, within SLA — creating again escalates to manual distribution).' : '.'}</div>
-        <div class="matched-card"><div class="matched-card-name">${e.name || ''}</div>
-        <div class="matched-card-meta"><span>${e.phone || ''}</span><span>Source: ${e.source || '—'}</span><span>Stage: ${e.stage || '—'}</span><span>Salesman: ${e.salesman || '—'}</span></div></div>`;
-    }
-    $('dup-modal-bg').style.display = '';
-  });
-}
-function closeDupModal() { $('dup-modal-bg').style.display = 'none'; }
-
+/* ───────── existing client ───────── */
 function lookupExistingClient() {
   const phone = $('existing-search').value.trim();
   if (!phone) return;
@@ -513,8 +520,16 @@ function submitLead() {
   postJSON(CFG.urls.create, buildPayload()).then(async r => {
     const d = await r.json();
     if (r.ok && d.ok) {
-      Swal.fire({ title: 'Lead Created!', icon: 'success', confirmButtonText: 'Add Another', confirmButtonColor: '#e07b20' })
-        .then(() => window.location.reload());
+      if (d.duplicate) {
+        const msg = d.duplicate_action === 'manual'
+          ? 'This phone already belongs to an <strong>active</strong> lead. No new lead was created — its info was updated and it was escalated for <strong>manual distribution</strong>.'
+          : 'This phone matched an <strong>inactive</strong> lead. No new lead was created — it was <strong>reactivated</strong>, its info updated, and re-distributed automatically.';
+        Swal.fire({ title: 'Duplicate Lead', html: msg, icon: 'warning', confirmButtonText: 'OK', confirmButtonColor: '#e07b20' })
+          .then(() => window.location.reload());
+      } else {
+        Swal.fire({ title: 'Lead Created!', icon: 'success', confirmButtonText: 'Add Another', confirmButtonColor: '#e07b20' })
+          .then(() => window.location.reload());
+      }
     } else {
       Swal.fire({ title: 'Could not create lead', text: d.error || 'Unexpected error', icon: 'error', confirmButtonColor: '#e07b20' });
     }
@@ -535,7 +550,8 @@ function init() {
   preselectLanguage();
   getJSON(CFG.urls.sources).then(d => {
     state.isHead = d.is_head; state.isSalesman = d.is_salesman;
-    state.isBroker = d.is_broker; state.canManual = d.can_manual;
+    state.isBroker = d.is_broker; state.brokerName = d.broker_name || '';
+    state.canManual = d.can_manual;
     state.headAssignment = d.head_assignment || 'SELF_OR_MANUAL_TEAM';
     state.brokerAlsoAssignSalesman = d.broker_also_assign_salesman;
     renderSources(d.sources);

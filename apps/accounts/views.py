@@ -472,6 +472,7 @@ def broker_api_list(request):
         data.append({
             "id": str(b.id),
             "name": b.name,
+            "email": b.email,
             "agency": b.company_name,
             "phone": b.phone,
             "location": b.location,
@@ -498,6 +499,14 @@ def broker_api_create(request):
     if not name:
         return JsonResponse({"error": "Broker Name is required."}, status=400)
 
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    if not email or not password:
+        return JsonResponse(
+            {"error": "Login email and password are required for the broker's account."},
+            status=400,
+        )
+
     commission = data.get("commission")
     if commission == "":
         commission = None
@@ -506,6 +515,8 @@ def broker_api_create(request):
         broker = BrokerService.create_broker(
             company=request.company,
             name=name,
+            email=email,
+            password=password,
             company_name=data.get("agency", ""),
             phone=data.get("phone", ""),
             location=data.get("location", ""),
@@ -543,6 +554,8 @@ def broker_api_edit(request, broker_id):
         BrokerService.update_broker(
             broker_id=broker_id,
             name=name,
+            email=data.get("email", "").strip(),
+            password=data.get("password", ""),
             company_name=data.get("agency", ""),
             phone=data.get("phone", ""),
             location=data.get("location", ""),

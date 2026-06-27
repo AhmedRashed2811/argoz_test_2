@@ -1,0 +1,38 @@
+name,country_code,phone,email,source,broker_name,campaign_name,event,tv_ad,street_ad,social_media_ad,exhibition,referrer_name,language,notes
+AUTO-AUTO-AR Camp Event,+20,203000000001,a1@example.com,campaign,,camp 1,event 1,,,,,,ar,ar rotation 1
+AUTO-AUTO-AR Camp Launch,+20,203000000002,,campaign,,Vert Camp,Launce Event,,,,,,ar,ar rotation 2
+AUTO-AUTO-AR Camp CityScape,+20,203000000003,,campaign,,Vert Camp,,,,,City Scape,,ar,ar rotation 3 exhibition channel
+AUTO-AUTO-AR Camp S,+20,203000000004,,campaign,,s,,,,,a,,ar,ar rotation 4 campaign s exhibition a
+AUTO-AUTO-AR Camp Long,+20,203000000005,,campaign,,sgfsdbsbfsbfs,,,,,dsfgdfgdfsg,,ar,ar rotation 5
+AUTO-AUTO-AR Referral,+20,203000000006,r6@example.com,referral,,,,,,,,Khaled Mostafa,ar,ar rotation 6 referral
+AUTO-AUTO-AR CallCenter,+20,203000000007,,call_center,,,,,,,,,ar,ar rotation 7 wraps to first
+AUTO-AUTO-AR CC Social,+20,203000000008,,call_center,,Vert Camp,,,,Vert,,,ar,ar rotation 8 cc with social attribution
+AUTO-AUTO-EN Camp Social,+20,203000000009,e9@example.com,campaign,,Vert Camp,,,,Vert,,,en,en pool is Sales 3 only
+AUTO-AUTO-EN CallCenter,+20,203000000010,,call_center,,,,,,,,,en,en pool Sales 3 only
+AUTO-AUTO-Source Caps,+20,203000000011,,Campaign,,camp 1,event 1,,,,,,ar,source value Campaign in caps still works
+AUTO-AUTO-Source Space,+20,203000000012,,Call Center,,,,,,,,,ar,source Call Center with a space still works
+AUTO-AUTO-Broker Ahmed,+20,203000000013,b13@example.com,broker,ahmed,,,,,,,,ar,broker leads stay manual even in auto
+AUTO-AUTO-Broker Ext,+20,203000000014,,broker,LT Ext Broker,,,,,,,,en,broker stays manual
+AUTO-AUTO-Broker Self,+20,203000000015,,broker,LT Self Broker,,,,,,,,ar,broker stays manual
+AUTO-AUTO-No Country,,203000000016,,referral,,,,,,,,No Country Person,ar,blank country defaults to +20
+AUTO-AUTO-No Email No Lang,+20,203000000017,,call_center,,,,,,,,,,email and language both optional
+AUTO-AUTO-File Dup First,+20,203000000018,,call_center,,,,,,,,,ar,first occurrence accepted
+AUTO-AUTO-File Dup Second,+20,203000000018,,call_center,,,,,,,,,ar,same phone duplicate within file
+AUTO-AUTO-DB Duplicate A,+20,202000000001,,call_center,,,,,,,,,ar,phone already in DB from first auto import (reactivation test)
+AUTO-AUTO-DB Duplicate B,+20,202000000007,,call_center,,,,,,,,,ar,phone already in DB from first auto import
+,+20,203000000020,,call_center,,,,,,,,,ar,REJECT name is required (name left blank)
+AUTO-AUTO-REJECT No Phone,+20,,,referral,,,,,,,,Someone,ar,REJECT phone is required
+AUTO-AUTO-REJECT Short Phone,+20,12345,,call_center,,,,,,,,,ar,REJECT phone under 6 digits
+AUTO-AUTO-REJECT Long Phone,+20,1234567890123456,,call_center,,,,,,,,,ar,REJECT phone over 15 digits
+AUTO-AUTO-REJECT Bad Email,+20,203000000021,bademail,call_center,,,,,,,,,ar,REJECT invalid email
+AUTO-AUTO-REJECT Unknown Source,+20,203000000022,,self_generated,,,,,,,,,ar,REJECT self_generated not allowed in bulk
+AUTO-AUTO-REJECT Exhibition Source,+20,203000000023,,exhibition,,,,,,,,,ar,REJECT exhibition is not a bulk source
+AUTO-AUTO-REJECT Ghost Broker,+20,203000000024,,broker,Ghost Broker,,,,,,,,ar,REJECT broker not in system
+AUTO-AUTO-REJECT Missing Campaign,+20,203000000025,,campaign,,Nope Campaign,event 1,,,,,,ar,REJECT campaign not in system
+AUTO-AUTO-REJECT Wrong Record,+20,203000000026,,campaign,,camp 1,Ghost Event,,,,,,ar,REJECT event not in this campaign
+AUTO-AUTO-REJECT No Channel,+20,203000000027,,campaign,,camp 1,,,,,,,ar,REJECT campaign needs exactly one channel
+AUTO-AUTO-REJECT Two Channels,+20,203000000028,,campaign,,Vert Camp,Launce Event,,,,City Scape,,ar,REJECT fill exactly one channel
+AUTO-AUTO-REJECT No Referrer,+20,203000000029,,referral,,,,,,,,,ar,REJECT referrer name required
+AUTO-AUTO-REJECT Bad Language,+20,203000000030,,call_center,,,,,,,,,fr,REJECT language not in system
+AUTO-AUTO-REJECT Bad Country,20,203000000031,,call_center,,,,,,,,,ar,REJECT country code must look like +20
+AUTO-AUTO-REJECT Channel No Campaign,+20,203000000032,,call_center,,,event 1,,,,,,ar,REJECT channel filled but campaign_name missing

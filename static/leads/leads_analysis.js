@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 // RAW DATA — loaded via AJAX from the leads-analysis endpoint
 // ═══════════════════════════════════════════
-let RAW = { stages:[], sources:[], timeline:[], sourceStages:{}, activeTotal:0, inactiveTotal:0, todayNew:0 };
+let RAW = { stages:[], sources:[], agencies:[], brokerUsers:[], timeline:[], sourceStages:{}, activeTotal:0, inactiveTotal:0, todayNew:0 };
 
 // Static presentation metadata for the fixed stage set (counts come from the
 // backend). Stage codes are fixed; colors/icons are presentation, not data.
@@ -27,6 +27,7 @@ const GF_OPTIONS = {
   period: [{val:'all',label:'All Time'},{val:'7d',label:'Last 7 Days'},{val:'30d',label:'Last 30 Days'},{val:'q1',label:'Q1 2026'},{val:'q2',label:'Q2 2026'}],
   stage:  [],
   source: [],
+  agency: [],
   origin: [{val:'DIRECT',label:'Direct'},{val:'BROKER',label:'Broker'}],
   active: [{val:'active',label:'Active'},{val:'inactive',label:'Inactive'}],
 };
@@ -35,6 +36,7 @@ const state = {
   period: new Set(['all']),
   stage:  new Set(),
   source: new Set(),
+  agency: new Set(),
   origin: new Set(),
   active: new Set(),
   date:   new Set(),
@@ -140,6 +142,34 @@ function dateWeight(){
   return selectedCreated/totalCreated;
 }
 
+// Fraction of broker leads covered by the selected agencies (1 when none selected).
+// Folded into the global multiplier so an agency filter scales the whole dashboard.
+function agencyRatio(){
+  if(state.agency.size===0) return 1;
+  const total = RAW.agencies.reduce((a,x)=>a+x.count,0);
+  if(!total) return 1;
+  const sel = RAW.agencies.filter(x=>state.agency.has(x.agency)).reduce((a,x)=>a+x.count,0);
+  return sel/total;
+}
+
+// Multiplier for the agency/broker charts themselves: react to period/date/active
+// and origin (agency leads are broker-origin) — but NOT to agencyRatio (these
+// charts show the per-agency breakdown).
+function agencyDisplayMult(){
+  let m = periodMult()*dateWeight();
+  if(state.active.size===1) m *= state.active.has('active')?0.743:0.257;
+  if(state.origin.size===1) m *= state.origin.has('BROKER')?1:0;
+  return m;
+}
+
+function toggleAgency(agency){
+  if(state.agency.has(agency)) state.agency.delete(agency);
+  else state.agency.add(agency);
+  syncGfCheckboxes('agency');
+  cascadeFilters(); updateGfButtons(); updateAll();
+  updateChartActiveFilterCards();
+}
+
 function toggleDate(date){
   if(state.date.has(date)) state.date.delete(date);
   else state.date.add(date);
@@ -158,7 +188,26 @@ function getSourcesExcluding(excludeKey){
   const _tsc = RAW.stages.reduce((a,s)=>a+s.count,0);
   const _ssc = state.stage.size>0 ? RAW.stages.filter(s=>state.stage.has(s.stage)).reduce((a,s)=>a+s.count,0) : _tsc;
   const _stgR = _ssc / _tsc;
-  let sources = RAW.sources.map(s=>({...s, count:Math.round(s.count*mult*_stgR), interested:Math.round(s.interested*mult*_stgR)}));
+
+  const agencyRatioVal = state.agency.size > 0 ? agencyRatio() : 1;
+  const hasAgencyFilter = state.agency.size > 0;
+
+  let sources = RAW.sources.map(s=>{
+    let m = mult * _stgR;
+    if (hasAgencyFilter) {
+      if (s.origin === 'DIRECT') {
+        m = 0;
+      } else {
+        m *= agencyRatioVal;
+      }
+    }
+    return {
+      ...s,
+      count: Math.round(s.count * m),
+      interested: Math.round(s.interested * m)
+    };
+  });
+  if (hasAgencyFilter) sources = sources.filter(s=>s.origin==='BROKER');
   if(excludeKey!=='source' && state.source.size>0) sources = sources.filter(s=>state.source.has(s.source));
   if(excludeKey!=='origin' && state.origin.size>0) sources = sources.filter(s=>state.origin.has(s.origin));
   return sources;
@@ -226,7 +275,7 @@ function clearGf(key){
 }
 
 function clearAllFilters(){
-  ['stage','source','origin','active'].forEach(k=>{ state[k].clear(); document.querySelectorAll('#gflist-'+k+' input').forEach(cb=>cb.checked=false); });
+  ['stage','source','origin','active','agency'].forEach(k=>{ state[k].clear(); document.querySelectorAll('#gflist-'+k+' input').forEach(cb=>cb.checked=false); });
   state.date.clear();
   state.period.clear(); state.period.add('all');
   document.querySelectorAll('#gflist-period input').forEach(cb=>{ cb.checked=cb.closest('.gf-dd-item').dataset.val==='all'; });
@@ -247,6 +296,7 @@ function updateGfButtons(){
     source: ()=> state.source.size===0?'All Sources': state.source.size===1? GF_OPTIONS.source.find(o=>state.source.has(o.val))?.label : state.source.size+' Sources',
     origin: ()=> state.origin.size===0?'All': state.origin.size===1? GF_OPTIONS.origin.find(o=>state.origin.has(o.val))?.label : state.origin.size+' Origins',
     active: ()=> state.active.size===0?'All': state.active.size===1? GF_OPTIONS.active.find(o=>state.active.has(o.val))?.label : 'Active &amp; Inactive',
+    agency: ()=> state.agency.size===0?'All Agencies': state.agency.size===1? GF_OPTIONS.agency.find(o=>state.agency.has(o.val))?.label : state.agency.size+' Agencies',
   };
   const periodVal = [...state.period][0]||'all';
   document.getElementById('gfsb-period-txt').textContent = labels.period(periodVal);
@@ -254,11 +304,13 @@ function updateGfButtons(){
   document.getElementById('gfsb-source-txt').textContent = labels.source();
   document.getElementById('gfsb-origin-txt').textContent = labels.origin();
   document.getElementById('gfsb-active-txt').textContent = labels.active();
+  document.getElementById('gfsb-agency-txt').textContent = labels.agency();
 
   document.getElementById('gfsb-stage').classList.toggle('has-selection', state.stage.size>0);
   document.getElementById('gfsb-source').classList.toggle('has-selection', state.source.size>0);
   document.getElementById('gfsb-origin').classList.toggle('has-selection', state.origin.size>0);
   document.getElementById('gfsb-active').classList.toggle('has-selection', state.active.size>0);
+  document.getElementById('gfsb-agency').classList.toggle('has-selection', state.agency.size>0);
   document.getElementById('gfsb-period').classList.toggle('has-selection', periodVal!=='all');
 
   updateChips();
@@ -274,6 +326,7 @@ function updateChips(){
   state.source.forEach(v=>{ const l=SOURCE_LABELS[v]||v; html+=`<span class="chip">Source: ${l} <span class="chip-x" onclick="removeGfVal('source','${v}')">✕</span></span>`; });
   state.origin.forEach(v=>{ const l=GF_OPTIONS.origin.find(o=>o.val===v)?.label||v; html+=`<span class="chip">Origin: ${l} <span class="chip-x" onclick="removeGfVal('origin','${v}')">✕</span></span>`; });
   state.active.forEach(v=>{ const l=GF_OPTIONS.active.find(o=>o.val===v)?.label||v; html+=`<span class="chip">Status: ${l} <span class="chip-x" onclick="removeGfVal('active','${v}')">✕</span></span>`; });
+  state.agency.forEach(v=>{ html+=`<span class="chip">Agency: ${v} <span class="chip-x" onclick="removeGfVal('agency','${v}')">✕</span></span>`; });
   state.date.forEach(v=>{ html+=`<span class="chip">Date: ${v} <span class="chip-x" onclick="removeDateVal('${v}')">✕</span></span>`; });
   Object.keys(tblColFilter.source).forEach(col=>{ if(tblColFilter.source[col].size>0) html+=`<span class="chip">Source Tbl/${col} filter <span class="chip-x" onclick="clearColFilter('source','${col}')">✕</span></span>`; });
   Object.keys(tblRangeFilter.source||{}).forEach(col=>{ const rf=tblRangeFilter.source[col]||{}; if(rf.min!==null&&rf.min!==undefined||rf.max!==null&&rf.max!==undefined) html+=`<span class="chip">Source Tbl/${col} range <span class="chip-x" onclick="clearRangeFilter('source','${col}')">✕</span></span>`; });
@@ -304,6 +357,7 @@ function updateSummary(){
   if(state.source.size) parts.push([...state.source].map(v=>SOURCE_LABELS[v]).join(', '));
   if(state.origin.size) parts.push([...state.origin].map(v=>GF_OPTIONS.origin.find(o=>o.val===v)?.label).join(', '));
   if(state.active.size) parts.push([...state.active].map(v=>GF_OPTIONS.active.find(o=>o.val===v)?.label).join(', '));
+  if(state.agency.size) parts.push([...state.agency].join(', '));
   if(state.date.size) parts.push([...state.date].join(', '));
   document.getElementById('gfSummary').textContent = parts.length ? parts.join(' · ') : 'All leads · All time';
 }
@@ -337,27 +391,47 @@ function getFilteredData(){
     : totalSourceCount;
   const sourceRatio = selectedSourceCount / totalSourceCount;  // 1.0 when nothing selected
 
-  // ── Origin ratio
-  const originSources = state.origin.size>0
-    ? RAW.sources.filter(s=>state.origin.has(s.origin))
-    : RAW.sources;
-  const originRatio = originSources.reduce((a,s)=>a+s.count,0) / totalSourceCount;
+  // ── Origin/Agency ratio
+  let originAgencyRatio = 1;
+  if (state.agency.size > 0) {
+    const selectedAgencyLeads = RAW.agencies.filter(x=>state.agency.has(x.agency)).reduce((a,x)=>a+x.count,0);
+    originAgencyRatio = totalSourceCount ? selectedAgencyLeads / totalSourceCount : 0;
+  } else {
+    const originSources = state.origin.size>0
+      ? RAW.sources.filter(s=>state.origin.has(s.origin))
+      : RAW.sources;
+    originAgencyRatio = totalSourceCount ? originSources.reduce((a,s)=>a+s.count,0) / totalSourceCount : 1;
+  }
 
   // ── Active ratio
   const activeFrac = state.active.size===1 ? (state.active.has('active')?0.743:0.257) : 1;
 
   // Combined multiplier for charts that should reflect ALL filters
-  const allMult = baseMult * stageRatio * sourceRatio * originRatio * activeFrac;
+  const allMult = baseMult * stageRatio * sourceRatio * originAgencyRatio * activeFrac;
 
   // Stages list (filtered + scaled by source/origin/active/period/date)
-  let stages = RAW.stages.map(s=>({...s, count:Math.round(s.count * baseMult * sourceRatio * originRatio * activeFrac)}));
+  let stages = RAW.stages.map(s=>({...s, count:Math.round(s.count * baseMult * sourceRatio * originAgencyRatio * activeFrac)}));
   if(state.stage.size>0) stages = stages.filter(s=>state.stage.has(s.stage));
 
   // Sources list (filtered + scaled by stage/active/period/date)
-  let sources = RAW.sources.map(s=>({...s,
-    count:      Math.round(s.count      * baseMult * stageRatio * activeFrac),
-    interested: Math.round(s.interested * baseMult * stageRatio * activeFrac)
-  }));
+  const agencyRatioVal = state.agency.size > 0 ? agencyRatio() : 1;
+  const hasAgencyFilter = state.agency.size > 0;
+  let sources = RAW.sources.map(s=>{
+    let mult = baseMult * stageRatio * activeFrac;
+    if (hasAgencyFilter) {
+      if (s.origin === 'DIRECT') {
+        mult = 0;
+      } else {
+        mult *= agencyRatioVal;
+      }
+    }
+    return {
+      ...s,
+      count:      Math.round(s.count      * mult),
+      interested: Math.round(s.interested * mult)
+    };
+  });
+  if(hasAgencyFilter) sources = sources.filter(s=>s.origin==='BROKER');
   if(state.source.size>0) sources = sources.filter(s=>state.source.has(s.source));
   if(state.origin.size>0) sources = sources.filter(s=>state.origin.has(s.origin));
 
@@ -373,7 +447,24 @@ function getFilteredData(){
     converted: Math.max(0, Math.round(d.converted * allMult))
   }));
 
-  return {stages, sources, active, inactive, todayNew, timeline};
+  // Agencies list
+  let agencyMult = baseMult * stageRatio * sourceRatio * activeFrac;
+  if (state.origin.size === 1 && state.origin.has('DIRECT')) {
+    agencyMult = 0;
+  }
+  let agencies = RAW.agencies.map(a=>({
+    ...a,
+    count: Math.round(a.count * agencyMult),
+    interested: Math.round(a.interested * agencyMult)
+  }));
+
+  // Broker users list
+  let brokerUsers = RAW.brokerUsers.map(b=>({
+    ...b,
+    count: Math.round(b.count * agencyMult)
+  }));
+
+  return {stages, sources, active, inactive, todayNew, timeline, agencies, brokerUsers};
 }
 
 // ═══════════════════════════════════════════
@@ -442,6 +533,46 @@ function initCharts(){
       onHover:(evt,els)=>{ evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
       plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString()}}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,.04)'}}}}
   });
+
+  charts.agency = new Chart(document.getElementById('chartAgency'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        backgroundColor: [],
+        borderWidth: 0,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (evt, els) => {
+        if (els.length) {
+          const idx = els[0].index;
+          const agency = charts.agency._agencyLabels[idx];
+          if (agency) toggleAgency(agency);
+        }
+      },
+      onHover: (evt, els) => {
+        evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+      },
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => `${c.label}: ${c.raw.toLocaleString()} leads`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: 'rgba(0,0,0,.04)' }, beginAtZero: true }
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -482,6 +613,7 @@ function updateChartActiveFilterCards(){
   document.getElementById('card-sourceDonut')?.classList.toggle('chart-active-filter', state.source.size>0);
   document.getElementById('card-origin')?.classList.toggle('chart-active-filter', state.origin.size>0);
   document.getElementById('card-timeline')?.classList.toggle('chart-active-filter', state.date.size>0);
+  document.getElementById('card-agency')?.classList.toggle('chart-active-filter', state.agency.size>0);
 }
 
 // ═══════════════════════════════════════════
@@ -663,7 +795,7 @@ function getRowsExcluding(tbl, excludeCol){ return applyAllColFilters(computeFul
 function getColValuesExcluding(tbl, col){ return getRowsExcluding(tbl, col).map(r=>Number(r[col])).filter(v=>!isNaN(v)); }
 
 function updateAll(){
-  const {stages, sources, active, inactive, todayNew, timeline} = getFilteredData();
+  const {stages, sources, active, inactive, todayNew, timeline, agencies, brokerUsers} = getFilteredData();
   const totalLeads = sources.reduce((a,s)=>a+s.count,0);
 
   // Activity cards
@@ -691,13 +823,14 @@ function updateAll(){
 
   // ── Stage Donut — filtered by source/origin; slices = selected stages only ──
   const stageSelected = state.stage.size>0;
-  const srcFiltered   = state.source.size>0 || state.origin.size>0;
+  const srcFiltered   = state.source.size>0 || state.origin.size>0 || state.agency.size>0;
   const pm = periodMult() * dateWeight();
 
-  // Which sources are currently active (respecting source + origin filters)
+  // Which sources are currently active (respecting source + origin + agency filters)
   const activeSrcs = RAW.sources.filter(s=>
     (state.source.size===0 || state.source.has(s.source)) &&
-    (state.origin.size===0 || state.origin.has(s.origin))
+    (state.origin.size===0 || state.origin.has(s.origin)) &&
+    (state.agency.size===0 || s.origin === 'BROKER')
   );
 
   // Stage counts: sum only from active sources using the breakdown table
@@ -705,7 +838,13 @@ function updateAll(){
   RAW.stages.forEach(s=>{ stageCounts[s.stage] = 0; });
   activeSrcs.forEach(src=>{
     const bd = RAW.sourceStages[src.source]||{};
-    RAW.stages.forEach(stg=>{ stageCounts[stg.stage] += (bd[stg.stage]||0); });
+    RAW.stages.forEach(stg=>{
+      let stageCount = bd[stg.stage]||0;
+      if (state.agency.size > 0) {
+        stageCount = Math.round(stageCount * agencyRatio());
+      }
+      stageCounts[stg.stage] += stageCount;
+    });
   });
 
   // If no source filter, fall back to RAW counts
@@ -733,9 +872,16 @@ function updateAll(){
   // Source counts: sum only from selected stages using the breakdown table
   const sourceData = RAW.sources.map(src=>{
     const bd = RAW.sourceStages[src.source]||{};
-    const cnt = stgFiltered
+    let cnt = stgFiltered
       ? RAW.stages.filter(s=>state.stage.has(s.stage)).reduce((a,s)=>a+(bd[s.stage]||0),0)
       : src.count;
+    if (state.agency.size > 0) {
+      if (src.origin === 'DIRECT') {
+        cnt = 0;
+      } else {
+        cnt = Math.round(cnt * agencyRatio());
+      }
+    }
     return {...src, count: Math.round(cnt * pm)};
   });
 
@@ -751,7 +897,7 @@ function updateAll(){
   charts.sourceDonut.update('active');
   document.getElementById('sourceCenterVal').textContent = sourcesShown.length;
 
-  // Origin — scale by stage + source + active + period + date
+  // Origin — scale by stage + source + active + period + date + agency
   const _totalStageCnt3 = RAW.stages.reduce((a,s)=>a+s.count,0);
   const _selStageCnt3   = state.stage.size>0 ? RAW.stages.filter(s=>state.stage.has(s.stage)).reduce((a,s)=>a+s.count,0) : _totalStageCnt3;
   const _stgRatio3      = _selStageCnt3 / _totalStageCnt3;
@@ -759,8 +905,22 @@ function updateAll(){
   const _selSrcCnt3     = state.source.size>0 ? RAW.sources.filter(s=>state.source.has(s.source)).reduce((a,s)=>a+s.count,0) : _totalSrcCnt3;
   const _srcRatio3      = _selSrcCnt3 / _totalSrcCnt3;
   const _actFrac3       = state.active.size===1 ? (state.active.has('active')?0.743:0.257) : 1;
+
+  const agencyRatioVal3 = state.agency.size > 0 ? agencyRatio() : 1;
+  const hasAgencyFilter3 = state.agency.size > 0;
+
   const _originMult3    = periodMult() * dateWeight() * _stgRatio3 * _srcRatio3 * _actFrac3;
-  const originRows = RAW.sources.map(s=>({...s, count: Math.round(s.count * _originMult3)}));
+  const originRows = RAW.sources.map(s=>{
+    let countVal = s.count * _originMult3;
+    if (hasAgencyFilter3) {
+      if (s.origin === 'DIRECT') {
+        countVal = 0;
+      } else {
+        countVal *= agencyRatioVal3;
+      }
+    }
+    return {...s, count: Math.round(countVal)};
+  });
   const direct = originRows.filter(s=>s.origin==='DIRECT' && (state.origin.size===0||state.origin.has('DIRECT'))).reduce((a,s)=>a+s.count,0);
   const broker = originRows.filter(s=>s.origin==='BROKER' && (state.origin.size===0||state.origin.has('BROKER'))).reduce((a,s)=>a+s.count,0);
   const originTotal = direct+broker;
@@ -775,6 +935,20 @@ function updateAll(){
   charts.originBar._originCodes = originKeep.map(i=> i===0?'DIRECT':'BROKER');
   charts.originBar.update('active');
   renderOriginSplit(direct,broker,originTotal);
+
+  // ── Agency Bar Chart ──
+  const agencySelected = state.agency.size > 0;
+  charts.agency.data.labels = agencies.map(a=>a.agency);
+  charts.agency.data.datasets[0].data = agencies.map(a=>a.count);
+  charts.agency.data.datasets[0].backgroundColor = agencies.map(a=>{
+    if (!agencySelected) return 'rgba(99, 102, 241, 0.75)';
+    return state.agency.has(a.agency) ? 'rgba(99, 102, 241, 0.95)' : 'rgba(99, 102, 241, 0.2)';
+  });
+  charts.agency._agencyLabels = agencies.map(a=>a.agency);
+  charts.agency.update('active');
+
+  // ── Broker Users Table ──
+  renderBrokerUsersTable(brokerUsers);
 
   // Table
   renderTables();
@@ -828,6 +1002,32 @@ function renderOriginSplit(direct,broker,total){
       <div class="origin-pct" style="color:var(--indigo)">${bPct}%</div>
       <div class="origin-bar" style="background:var(--indigo);width:${bPct}%;"></div>
     </div>`;
+}
+
+function renderBrokerUsersTable(brokerUsers) {
+  const body = document.getElementById('brokerUsersBody');
+  if (!body) return;
+
+  let displayUsers = brokerUsers;
+  if (state.agency.size > 0) {
+    displayUsers = brokerUsers.filter(b => state.agency.has(b.agency));
+  }
+
+  if (!displayUsers.length) {
+    body.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--clr-text-sub);padding:24px;font-style:italic;">No brokers match the selected filters.</td></tr>';
+    return;
+  }
+
+  const anySelected = state.agency.size > 0;
+  body.innerHTML = displayUsers.map(b => {
+    const isSelected = state.agency.has(b.agency);
+    const rowClass = isSelected ? ' class="row-selected"' : (anySelected ? ' class="row-dim"' : '');
+    return `<tr${rowClass} onclick="toggleAgency('${b.agency}')" title="Click to filter by ${b.agency}" style="cursor:pointer;">
+      <td style="text-align:left;font-weight:600;">${b.name}</td>
+      <td style="text-align:left;">${b.agency}</td>
+      <td>${b.count.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderTables(){
@@ -926,12 +1126,15 @@ fetch(window.ANALYSIS_CFG.dataUrl, {headers:{'X-Requested-With':'XMLHttpRequest'
     RAW.activeTotal = d.activeTotal || 0;
     RAW.inactiveTotal = d.inactiveTotal || 0;
     RAW.todayNew = d.todayNew || 0;
+    RAW.agencies = d.agencies || [];
+    RAW.brokerUsers = d.brokerUsers || [];
 
     STAGE_LABELS = Object.fromEntries(RAW.stages.map(s=>[s.stage,s.label]));
     STAGE_META = Object.fromEntries(RAW.stages.map(s=>[s.stage,{iconClass:s.iconClass,icon:s.icon}]));
     SOURCE_LABELS = Object.fromEntries(RAW.sources.map(s=>[s.source,s.label]));
     GF_OPTIONS.stage = RAW.stages.map(s=>({val:s.stage,label:s.label}));
     GF_OPTIONS.source = RAW.sources.map(s=>({val:s.source,label:s.label}));
+    GF_OPTIONS.agency = RAW.agencies.map(a=>({val:a.agency,label:a.agency}));
 
     buildGfLists();
     initCharts();

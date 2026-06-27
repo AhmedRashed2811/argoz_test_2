@@ -492,11 +492,20 @@ class AvailabilityService:
 
 class BrokerService:
     @staticmethod
+    def _brokers_role(company):
+        """The BROKERS role for this company — assigning it seeds the broker's
+        permission baseline (docs §4.3)."""
+        from apps.authorization.models import RoleGroup
+        return RoleGroup.objects.filter(company=company, code="BROKERS").first()
+
+    @staticmethod
     @transaction.atomic
     def create_broker(
         *,
         company,
         name,
+        email="",
+        password=None,
         company_name="",
         phone="",
         location="",
@@ -510,9 +519,25 @@ class BrokerService:
         from apps.audit.services import AuditService
         from apps.core.constants import AuditAction
 
+        # A broker logs in as a regular user: create the account here (with the
+        # BROKERS role so it inherits all broker permissions) instead of from the
+        # user-creation page, and link it to the broker record.
+        linked_user = None
+        if email:
+            if User.objects.filter(email=email).exists():
+                raise ValueError("A user with this email already exists.")
+            linked_user = UserService.create_user(
+                company=company, email=email, password=password,
+                default_role=BrokerService._brokers_role(company),
+                first_name=name, phone=phone,
+                created_by=actor, request_meta=request_meta,
+            )
+
         broker = Broker.objects.create(
             company=company,
             name=name,
+            email=email,
+            linked_user=linked_user,
             company_name=company_name,
             phone=phone,
             location=location,
@@ -543,6 +568,8 @@ class BrokerService:
         *,
         broker_id,
         name,
+        email="",
+        password=None,
         company_name="",
         phone="",
         location="",
@@ -560,7 +587,29 @@ class BrokerService:
         broker = Broker.objects.select_for_update().get(id=broker_id)
         before_data = DiffService.snapshot(broker, fields=["name", "company_name", "phone", "location", "commission_rate", "contract_start_date", "contract_end_date", "leads_count", "notes"])
 
+        # Keep the linked login account in sync (or create one if missing).
+        if email or password:
+            user = broker.linked_user
+            if user is None and email:
+                if User.objects.filter(email=email).exists():
+                    raise ValueError("A user with this email already exists.")
+                broker.linked_user = UserService.create_user(
+                    company=broker.company, email=email, password=password,
+                    default_role=BrokerService._brokers_role(broker.company),
+                    first_name=name, phone=phone,
+                    created_by=actor, request_meta=request_meta,
+                )
+            elif user is not None:
+                if email and email != user.email:
+                    if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+                        raise ValueError("A user with this email already exists.")
+                    user.email = email
+                if password:
+                    user.set_password(password)
+                user.save()
+
         broker.name = name
+        broker.email = email or broker.email
         broker.company_name = company_name
         broker.phone = phone
         broker.location = location
@@ -619,5 +668,10 @@ class BrokerService:
             reason="Deleted broker and unassigned its leads",
             entity_display=broker.name,
         )
+
+        # Disable the broker's login account so it can no longer sign in.
+        if broker.linked_user is not None:
+            broker.linked_user.is_active = False
+            broker.linked_user.save(update_fields=["is_active"])
 
         broker.delete()

@@ -128,9 +128,11 @@ def lead_create(request):
     """Dynamic lead-creation page (leads spec §4). The page itself is thin: it
     renders the shell; all data and submission go through the AJAX endpoints in
     api.py, which enforce per-source permissions and route to services."""
+    from apps.authorization.services import RoleService
     return render(request, "leads/lead_create.html", {
         "can_bulk_import": EffectivePermissionResolver.has(
             request.user, "leads.lead.bulk_create"),
+        "create_mode": RoleService.create_mode(request.user) or "",
     })
 
 

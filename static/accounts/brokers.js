@@ -517,7 +517,7 @@ function dismissToast(el) {
    CREATE
    ═══════════════════════════════════ */
 function resetCreateForm() {
-  ['c_name','c_agency','c_phone','c_location','c_commission','c_startDate','c_endDate','c_notes'].forEach(id => {
+  ['c_name','c_email','c_password','c_agency','c_phone','c_location','c_commission','c_startDate','c_endDate','c_notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
 }
@@ -534,9 +534,15 @@ document.getElementById('createModal').addEventListener('click', e => { if (e.ta
 document.getElementById('createSave').addEventListener('click', async () => {
   const name = document.getElementById('c_name').value.trim();
   if (!name) { highlight('c_name'); return; }
+  const email = document.getElementById('c_email').value.trim();
+  if (!email) { highlight('c_email'); return; }
+  const password = document.getElementById('c_password').value;
+  if (!password) { highlight('c_password'); return; }
 
   const payload = {
     name,
+    email,
+    password,
     agency:     document.getElementById('c_agency').value.trim(),
     phone:      document.getElementById('c_phone').value.trim(),
     location:   document.getElementById('c_location').value.trim(),
@@ -562,6 +568,7 @@ document.getElementById('createSave').addEventListener('click', async () => {
     const broker = {
       id:         result.broker_id,
       name:       payload.name,
+      email:      payload.email,
       agency:     payload.agency,
       phone:      payload.phone,
       location:   payload.location,
@@ -595,6 +602,10 @@ function openEdit(index) {
       <p>Update this broker's information. You can also manually adjust the <strong>leads count</strong> if needed.</p>
     </div>
     <div class="form-group"><label class="form-label">Broker Name *</label><input type="text" class="form-input" id="ed_name" value="${escHtml(b.name)}"></div>
+    <div class="form-row">
+      <div><label class="form-label">Login Email</label><input type="email" class="form-input" id="ed_email" value="${escHtml(b.email||'')}"></div>
+      <div><label class="form-label">New Password</label><input type="password" class="form-input" id="ed_password" placeholder="Leave blank to keep current"></div>
+    </div>
     <div class="form-row">
       <div><label class="form-label">Agency / Company</label><input type="text" class="form-input" id="ed_agency" value="${escHtml(b.agency||'')}"></div>
       <div><label class="form-label">Phone</label><input type="tel" class="form-input" id="ed_phone" value="${escHtml(b.phone||'')}"></div>
@@ -630,6 +641,8 @@ document.getElementById('editSave').addEventListener('click', async () => {
   
   const payload = {
     name,
+    email:      document.getElementById('ed_email').value.trim(),
+    password:   document.getElementById('ed_password').value,
     agency:     document.getElementById('ed_agency').value.trim(),
     phone:      document.getElementById('ed_phone').value.trim(),
     location:   document.getElementById('ed_location').value.trim(),
@@ -655,6 +668,7 @@ document.getElementById('editSave').addEventListener('click', async () => {
     if (!response.ok) throw new Error(result.error || 'Failed to update broker');
 
     b.name       = payload.name;
+    b.email      = payload.email;
     b.agency     = payload.agency;
     b.phone      = payload.phone;
     b.location   = payload.location;
