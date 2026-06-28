@@ -258,8 +258,7 @@ if (matrixForm) {
         } else {
           alert('Permission overrides updated successfully.');
         }
-        recalculateMetrics();
-        document.querySelectorAll('input[name="permissions"]').forEach(cb => updatePermissionBadge(cb));
+        await loadMatrixData();
       } else {
         const errorMsg = data.error || 'Failed to save matrix overrides.';
         if (window.Swal) {

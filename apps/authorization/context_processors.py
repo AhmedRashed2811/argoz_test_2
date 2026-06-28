@@ -32,7 +32,15 @@ def nav_menu(request):
                     allowed_children.append(child)
             page.allowed_children = allowed_children
             items.append(page)
-    return {"nav_items": items}
+
+    # Brokers get a dedicated read-only "Leads" link to the All-Leads page,
+    # self-scoped by view_own (the page/api filter to their own leads).
+    show_broker_leads = (
+        "leads.lead.view_own" in codes
+        and hasattr(user, "broker_profile")
+        and user.broker_profile.exists()
+    )
+    return {"nav_items": items, "show_broker_leads": show_broker_leads}
 
 
 def _page_allowed(page, codes: set[str]) -> bool:

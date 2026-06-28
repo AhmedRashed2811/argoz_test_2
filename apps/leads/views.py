@@ -36,6 +36,10 @@ def lead_list(request):
     leads belong on the company-wide database page, so send them there."""
     if EffectivePermissionResolver.has(request.user, "leads.lead.view_all"):
         return redirect("leads:all_list")
+    # Brokers are read-only: they belong on the self-scoped All-Leads page, not
+    # the sales management page (which exposes stage/action controls).
+    if hasattr(request.user, "broker_profile") and request.user.broker_profile.exists():
+        return redirect("leads:all_list")
     mode = PolicyResolver.option_code(
         request.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
     )
@@ -45,16 +49,24 @@ def lead_list(request):
 
 
 @login_required
-@crm_permission_required("leads.lead.view_all")
+@crm_permission_required("leads.lead.view_all", "leads.lead.view_own")
 def all_leads(request):
     """Company-wide lead database (admin/limited access). Thin shell: data,
     history and the edit/stage/status controls all load via AJAX endpoints in
-    api.py, which enforce permissions and route writes through services."""
+    api.py, which enforce permissions and route writes through services.
+
+    Users without view_all (e.g. brokers with only view_own) get a read-only,
+    self-scoped view: api_all_leads filters to their own leads and read_only
+    hides the row action controls."""
     mode = PolicyResolver.option_code(
         request.company, PolicyCode.NOT_REACHED_REMINDER_MODE, default="AUTOMATIC"
     )
+    read_only = not EffectivePermissionResolver.has(
+        request.user, "leads.lead.view_all"
+    )
     return render(request, "leads/all_leads.html", {
-        "not_reached_reminder_mode": mode
+        "not_reached_reminder_mode": mode,
+        "read_only": read_only,
     })
 
 

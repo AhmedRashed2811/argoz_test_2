@@ -8,9 +8,6 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Prefetch, Sum
 
-from apps.policies.constants import PolicyCode
-from apps.policies.services import PolicyResolver
-
 from ..models import (
     Campaign,
     CampaignBudgetSnapshot,
@@ -120,12 +117,6 @@ class CampaignBudgetService:
         )
         breakdown["other_costs"] = float(other)
         total += other
-
-        rule = PolicyResolver.option_code(
-            campaign.company, PolicyCode.BUDGET_CALCULATION_RULE,
-            default="INCLUDE_MAIN_AND_CHILD",
-        )
-        breakdown["rule"] = rule
 
         campaign.total_budget = total
         campaign.save(update_fields=["total_budget", "updated_at"])

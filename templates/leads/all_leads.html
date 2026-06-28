@@ -21,7 +21,7 @@
     </div>
     <div class="header-actions">
       {% load crm_permissions %}
-      {% if request.user|can:'leads.lead.create' %}
+      {% if not read_only and request.user|can:'leads.lead.create' %}
         <a href="{% url 'leads:create' %}" class="btn-primary">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Lead
@@ -547,7 +547,8 @@
       salesmen: "{% url 'leads:api_salesmen' %}",
       teams: "{% url 'leads:api_teams' %}"
     },
-    not_reached_reminder_mode: "{{ not_reached_reminder_mode }}"
+    not_reached_reminder_mode: "{{ not_reached_reminder_mode }}",
+    readOnly: {{ read_only|yesno:"true,false" }}
   };
 </script>
 {% endblock %}

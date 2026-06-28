@@ -20,7 +20,6 @@ class PolicyCode:
     EXISTING_CLIENT_POLICY = "lead.existing_client_policy"
     NOT_REACHED_REMINDER_MODE = "lead.not_reached_reminder_mode"
     FRESH_REMINDER_SCHEDULE = "lead.fresh_reminder_schedule"
-    BUDGET_CALCULATION_RULE = "marketing.budget_calculation_rule"
     CAMPAIGN_RESTRICT_EDITING = "marketing.restrict_approved_campaign_editing"
     REQUEST_CAMPAIGN_APPROVAL = "marketing.request_campaign_approval"
     WEBHOOK_MAPPING_POLICY = "integration.webhook_mapping_policy"

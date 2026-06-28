@@ -738,14 +738,16 @@ function renderTable(){
       <td style="font-size:.78rem;color:var(--clr-text-sub)">${fmtDate(l.updatedAt||l.createdAt)}</td>
       <td>
         <div class="action-btns">
+          ${CFG.readOnly ? '' : `
           <button class="action-btn edit-btn" title="Edit Lead" onclick="openEditModal('${l.id}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-          ${!inactive?`<button class="action-btn stage-btn" title="Update Stage" onclick="openStageModal('${l.id}')"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></button>`:'<div style="width:30px"></div>'}
+          ${!inactive?`<button class="action-btn stage-btn" title="Update Stage" onclick="openStageModal('${l.id}')"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></button>`:'<div style="width:30px"></div>'}`}
           <button class="action-btn history" title="View History" onclick="openHistoryModal('${l.id}')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></button>
+          ${CFG.readOnly ? '' : `
           <button class="action-btn ${inactive?'activate':'deactivate'}" title="${inactive?'Reactivate':'Deactivate'} Lead" onclick="openDeactivateModal('${l.id}')">
             ${inactive
               ?'<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
               :'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>'}
-          </button>
+          </button>`}
         </div>
       </td>
     </tr>`;

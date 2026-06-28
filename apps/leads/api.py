@@ -696,11 +696,12 @@ def _campaign_child_names(leads_list):
 
 
 @login_required
-@crm_permission_required("leads.lead.view_all")
+@crm_permission_required("leads.lead.view_all", "leads.lead.view_own")
 @require_GET
 def api_all_leads(request):
-    """Every lead in the company (admin database view, leads.lead.view_all),
-    shaped for the All-Leads table with assignment / team / created-by columns."""
+    """Leads for the All-Leads table, shaped with assignment / team / created-by
+    columns. leads_for_user scopes by the caller's view permission, so a broker
+    with only view_own gets just their own leads."""
     from apps.reports.selectors import leads_for_user
 
     leads_list = list(leads_for_user(request.user, request.company).select_related("created_by"))
@@ -732,15 +733,21 @@ def api_all_leads(request):
 
 
 @login_required
-@crm_permission_required("leads.lead.view_all")
+@crm_permission_required("leads.lead.view_all", "leads.lead.view_own")
 @require_GET
 def api_all_lead_history(request):
-    """Timeline for one lead (admin All-Leads page)."""
+    """Timeline for one lead (All-Leads page). Scoped to leads the caller may
+    view, so a broker can only see history of their own leads."""
+    from apps.reports.selectors import leads_for_user
     from .selectors import lead_detail_qs
 
-    lead = lead_detail_qs().filter(
-        id=request.GET.get("lead_id"), company=request.company
-    ).first()
+    lead_id = request.GET.get("lead_id")
+    allowed = leads_for_user(request.user, request.company).filter(
+        id=lead_id
+    ).exists()
+    if not allowed:
+        return _err("Lead not found.", status=404)
+    lead = lead_detail_qs().filter(id=lead_id, company=request.company).first()
     if lead is None:
         return _err("Lead not found.", status=404)
     return JsonResponse({"history": _lead_history_items(lead)})
