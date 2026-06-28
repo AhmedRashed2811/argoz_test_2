@@ -24,6 +24,13 @@ class PolicyCode:
     CAMPAIGN_RESTRICT_EDITING = "marketing.restrict_approved_campaign_editing"
     REQUEST_CAMPAIGN_APPROVAL = "marketing.request_campaign_approval"
     WEBHOOK_MAPPING_POLICY = "integration.webhook_mapping_policy"
+    # Composite On/Off policies (task 16). Each stores a dict in value_json with
+    # an "enabled" flag (default False) plus its configured fields.
+    SALES_ACTION_LIMITS = "lead.sales_action_limits"             # 16a
+    SALES_ACTION_MAX_DURATION = "lead.sales_action_max_duration"  # 16b
+    NOTIFICATION_AUTO_CLEANUP = "notification.auto_cleanup"       # 16c
+    DAILY_TASK_EMAIL = "notification.daily_task_email"            # 16d
+    WEEKEND_SLA_FREEZE = "lead.weekend_sla_freeze"               # 16e
 
 
 class ValueType:
@@ -33,6 +40,7 @@ class ValueType:
     BOOLEAN = "BOOLEAN"
     JSON = "JSON"
     CODE = "CODE"
+    COMPOSITE = "COMPOSITE"  # On/Off toggle + structured fields (task 16)
     CHOICES = [
         (OPTION, "Option"),
         (DURATION, "Duration"),
@@ -40,4 +48,5 @@ class ValueType:
         (BOOLEAN, "Boolean"),
         (JSON, "JSON"),
         (CODE, "Code"),
+        (COMPOSITE, "Composite"),
     ]

@@ -133,12 +133,13 @@ class LeadCreationService:
             )
             broker_owner.leads_count += 1
             broker_owner.save(update_fields=["leads_count", "updated_at"])
-            if notify:
-                NotificationService.create_for_users(
-                    company=company, recipients=[broker_owner.linked_user],
-                    code=NotificationCode.BROKER_LEAD_CREATED,
-                    related_type="Lead", related_id=lead.pk,
-                )
+            # Disabled notification to brokers when a broker lead is created per user request
+            # if notify:
+            #     NotificationService.create_for_users(
+            #         company=company, recipients=[broker_owner.linked_user],
+            #         code=NotificationCode.BROKER_LEAD_CREATED,
+            #         related_type="Lead", related_id=lead.pk,
+            #     )
 
         # Attribution into campaign children (docs §10.5) when campaign present.
         if campaign is not None:

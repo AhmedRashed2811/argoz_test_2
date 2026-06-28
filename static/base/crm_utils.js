@@ -175,5 +175,63 @@
     return fetchWithRetry(input, init, {});
   };
 
-  window.CRM = { uuidv4, fetchWithRetry, withSpinner, showOverlay, hideOverlay, csrfToken };
+  /* ── Search bars: kill browser autofill/history on refresh ──
+     Any input that is a search box (type=search, .search-input, .filter-search,
+     or id/placeholder mentioning "search") gets autocomplete off and is cleared
+     on load so a page refresh never shows stale browser-remembered text. */
+  document.addEventListener('DOMContentLoaded', function () {
+    const sel = 'input[type="search"], .search-input, .filter-search, ' +
+                'input[id*="search" i], input[placeholder*="search" i]';
+    document.querySelectorAll(sel).forEach(function (el) {
+      el.setAttribute('autocomplete', 'off');
+      el.value = '';
+    });
+  });
+
+  /* ── Thousand-separated numbers (shown + typed) ──
+     CRM.formatNumber / CRM.parseNumber for display; a delegated live formatter
+     groups digits as the user types in any input carrying [data-thousands]
+     (use on text/tel inputs with inputmode=numeric — type=number can't hold
+     commas). Caret is kept roughly in place by counting digits to its left. */
+  function formatNumber(n) {
+    if (n === '' || n === null || n === undefined || isNaN(n)) return '';
+    return Number(n).toLocaleString('en-US');
+  }
+  function parseNumber(str) {
+    const v = String(str == null ? '' : str).replace(/,/g, '').trim();
+    return v === '' ? null : Number(v);
+  }
+  function groupDigits(raw) {
+    const neg = raw.trim().startsWith('-');
+    const parts = raw.replace(/[^\d.]/g, '').split('.');
+    parts[0] = parts[0].replace(/^0+(?=\d)/, '');
+    let out = parts[0] ? Number(parts[0]).toLocaleString('en-US') : '';
+    if (parts.length > 1) out += '.' + parts[1];
+    return (neg && out ? '-' : '') + out;
+  }
+  document.addEventListener('input', function (e) {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches('input[data-thousands]')) return;
+    const before = el.value;
+    const caret = el.selectionStart || 0;
+    const digitsLeft = before.slice(0, caret).replace(/[^\d]/g, '').length;
+    const formatted = groupDigits(before);
+    if (formatted === before) return;
+    el.value = formatted;
+    // restore caret after the same number of digits
+    let seen = 0, pos = formatted.length;
+    for (let i = 0; i < formatted.length; i++) {
+      if (/\d/.test(formatted[i])) seen++;
+      if (seen >= digitsLeft) { pos = i + 1; break; }
+    }
+    try { el.setSelectionRange(pos, pos); } catch (_) {}
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[data-thousands]').forEach(function (el) {
+      if (el.value) el.value = groupDigits(el.value);
+    });
+  });
+
+  window.CRM = { uuidv4, fetchWithRetry, withSpinner, showOverlay, hideOverlay,
+                 csrfToken, formatNumber, parseNumber };
 })();

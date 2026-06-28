@@ -154,7 +154,7 @@
                 <label>Distribution Method <span class="req">*</span></label>
                 <div class="radio-group" style="margin-top:6px">
                   <label class="radio-opt" id="camp-manual-opt"><input type="radio" name="camp_dist" value="manual" onchange="toggleCampDist(this.value)"><span>Manual</span></label>
-                  <label class="radio-opt"><input type="radio" name="camp_dist" value="auto" checked onchange="toggleCampDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                  <label class="radio-opt"><input type="radio" name="camp_dist" value="auto" checked onchange="toggleCampDist(this.value)"><span>Automatic</span></label>
                 </div>
               </div>
               <div class="form-group span-2" id="camp-assign-group" style="display:none">
@@ -291,7 +291,7 @@
                 <label>Distribution Method <span class="req">*</span></label>
                 <div class="radio-group" style="margin-top:6px">
                   <label class="radio-opt" id="cc-manual-opt"><input type="radio" name="cc_dist" value="manual" onchange="toggleCCDist(this.value)"><span>Manual</span></label>
-                  <label class="radio-opt"><input type="radio" name="cc_dist" value="auto" checked onchange="toggleCCDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                  <label class="radio-opt"><input type="radio" name="cc_dist" value="auto" checked onchange="toggleCCDist(this.value)"><span>Automatic</span></label>
                 </div>
               </div>
               <div class="form-group span-2" id="cc-assign-group" style="display:none">
@@ -341,7 +341,7 @@
                 <label>Distribution Method <span class="req">*</span></label>
                 <div class="radio-group" style="margin-top:6px">
                   <label class="radio-opt" id="ref-manual-opt"><input type="radio" name="ref_dist" value="manual" onchange="toggleRefDist(this.value)"><span>Manual</span></label>
-                  <label class="radio-opt"><input type="radio" name="ref_dist" value="auto" checked onchange="toggleRefDist(this.value)"><span>Automatic (Round Robin)</span></label>
+                  <label class="radio-opt"><input type="radio" name="ref_dist" value="auto" checked onchange="toggleRefDist(this.value)"><span>Automatic</span></label>
                 </div>
               </div>
               <div class="form-group span-2" id="ref-assign-group" style="display:none">
@@ -436,6 +436,17 @@
     </div>
 
     <div id="bulk-intro">
+      {% if create_mode == 'broker' %}
+      <div style="font-size:.86rem; color:var(--clr-text-sub); line-height:1.6; margin-bottom:14px">
+        Upload a UTF-8 CSV with columns <strong>name, country_code, phone, email, language, notes</strong>.
+        <strong>Name</strong> and <strong>phone</strong> are required; the rest are optional.
+        Every imported lead is automatically owned by your brokerage.
+        <ul style="margin:8px 0 0 18px; padding:0">
+          <li><strong>country_code</strong> defaults to <code>+20</code> when blank; phone digits only.</li>
+          <li>Existing phone numbers are skipped.</li>
+        </ul>
+      </div>
+      {% else %}
       <div style="font-size:.86rem; color:var(--clr-text-sub); line-height:1.6; margin-bottom:14px">
         Upload a UTF-8 CSV. <strong>Phone</strong> and <strong>name</strong> are required;
         <strong>email</strong> is optional. Each row needs a <strong>source</strong>:
@@ -449,6 +460,7 @@
           <li>Existing phone numbers are skipped; you can reactivate them after upload.</li>
         </ul>
       </div>
+      {% endif %}
       <div style="margin-bottom:14px">
         <button type="button" class="btn btn-outline" onclick="downloadBulkTemplate()">
           <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -470,7 +482,6 @@
     <div id="bulk-result" style="display:none"></div>
   </div>
 </div>
-<style>@keyframes bulkspin{to{transform:rotate(360deg)}}</style>
 
 <script>
   window.LEAD_CFG = {

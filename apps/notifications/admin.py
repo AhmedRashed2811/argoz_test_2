@@ -1,8 +1,6 @@
 from django.contrib import admin
 
 from .models import (
-    EmailOutbox,
-    EmailTemplate,
     Notification,
     NotificationDelivery,
     NotificationType,
@@ -26,17 +24,4 @@ class NotificationAdmin(admin.ModelAdmin):
 class NotificationDeliveryAdmin(admin.ModelAdmin):
     list_display = ("notification", "channel", "status", "sent_at")
     list_filter = ("channel", "status")
-
-
-@admin.register(EmailTemplate)
-class EmailTemplateAdmin(admin.ModelAdmin):
-    list_display = ("company", "code", "subject_template")
-    search_fields = ("code", "subject_template")
-
-
-@admin.register(EmailOutbox)
-class EmailOutboxAdmin(admin.ModelAdmin):
-    list_display = ("company", "to_email", "subject", "status", "send_after")
-    list_filter = ("status",)
-    search_fields = ("to_email", "subject")
 

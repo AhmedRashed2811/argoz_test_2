@@ -293,3 +293,4 @@
       .back-to-leads-btn .btn-label { display: none; }
       .back-to-leads-btn { padding: 8px; }
     }
+@keyframes bulkspin { to { transform: rotate(360deg); } }

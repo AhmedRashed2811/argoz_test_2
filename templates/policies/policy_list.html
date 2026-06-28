@@ -27,17 +27,32 @@
     </div>
   </div>
 
+  <!-- Quick stats + module jump-nav (task 13) -->
+  <div class="policy-toolbar">
+    <div class="policy-stats">
+      <span class="stat-chip"><strong>{{ configured_policies }}</strong> configured</span>
+      <span class="stat-chip muted"><strong>{{ total_policies }}</strong> total</span>
+    </div>
+    <div class="module-nav">
+      {% for m in modules %}
+        <a href="#mod-{{ m.key }}" class="module-nav-chip">{{ m.title }}
+          <span class="chip-count">{{ m.set_count }}/{{ m.count }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+
   <!-- Policies Content -->
-  {% for module, rows in by_module.items %}
-    <div class="module-section" data-module="{{ module }}">
+  {% for m in modules %}
+    <div class="module-section" id="mod-{{ m.key }}" data-module="{{ m.key }}">
       <div class="module-heading">
-        <span class="module-label">{{ module }}</span>
+        <span class="module-label">{{ m.title }}</span>
+        {% if m.description %}<span class="module-desc">{{ m.description }}</span>{% endif %}
         <div class="module-divider"></div>
-        <span class="module-count">{{ rows|length }}</span>
+        <span class="module-count">{{ m.set_count }}/{{ m.count }}</span>
       </div>
-      
+
       <div class="policy-grid">
-        {% for row in rows %}
+        {% for row in m.rows %}
           <div class="policy-card {% if row.is_set %}is-set{% else %}not-set{% endif %}"
                data-search="{{ row.policy.name|lower }} {{ row.policy.code|lower }}">
             <div class="policy-info">

@@ -112,22 +112,25 @@ def campaign_api_delete(request, campaign_id):
 
 
 @login_required
-@crm_permission_required("marketing.campaign.create")
-def campaign_create(request):
-    form = CampaignForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        d = form.cleaned_data
-        campaign = CampaignCreationService.create_campaign(
-            company=request.company, actor=request.user, name=d["name"],
-            description=d["description"], start_date=d["start_date"],
-            end_date=d["end_date"], target_type=d["target_type"],
-            selected_types=d["selected_types"],
-            request_meta=getattr(request, "request_meta", None),
+@crm_permission_required("marketing.campaign.update")
+@require_POST
+def event_api_attendance(request, event_id):
+    """Set/clear an event's real attendance. Editable regardless of approval
+    (no restrict_editing gate) — the event must already exist."""
+    from .models import EventRecord
+    try:
+        CampaignPayloadService.set_event_attendance(
+            company=request.company, event_id=event_id,
+            actual_attendees=json.loads(request.body).get("actualAttendees"),
+            actor=request.user, request_meta=getattr(request, "request_meta", None),
         )
-        messages.success(request, "Campaign created.")
-        return redirect("marketing:campaign_detail", campaign_id=campaign.id)
-    return render(request, "form.html", {"title": "New campaign", "form": form,
-                                         "submit_label": "Create"})
+    except EventRecord.DoesNotExist:
+        return JsonResponse({"error": "Event not found."}, status=404)
+    except ValidationError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    return JsonResponse({"ok": True})
+
+
 
 
 @login_required

@@ -57,6 +57,9 @@
     .kpi-label { font-size: .72rem; color: var(--clr-text-sub); letter-spacing: .05em; text-transform: uppercase; margin-top: 4px; font-weight: 500; }
 
     /* ── Buttons ── */
+    .btn-primary { display: flex; align-items: center; gap: 8px; background: var(--clr-orange); color: #fff; border: 1.5px solid var(--clr-orange); padding: 10px 18px; border-radius: var(--radius); font-family: 'Times New Roman', Times, serif; font-size: .85rem; font-weight: 500; cursor: pointer; letter-spacing: .03em; transition: background var(--transition); text-decoration: none; box-shadow: 0 2px 8px rgba(224,123,32,.3); white-space: nowrap; }
+    .btn-primary:hover { background: var(--clr-orange-dk); }
+    .btn-primary svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .btn-secondary { display: flex; align-items: center; gap: 8px; background: var(--clr-surface); color: var(--clr-orange); border: 1.5px solid rgba(224,123,32,.35); padding: 10px 18px; border-radius: var(--radius); font-family: 'Times New Roman', Times, serif; font-size: .85rem; font-weight: 500; cursor: pointer; letter-spacing: .03em; transition: background var(--transition); text-decoration: none; box-shadow: 0 2px 8px rgba(224,123,32,.12); white-space: nowrap; }
     .btn-secondary:hover { background: rgba(224,123,32,.06); }
     .btn-secondary svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -293,6 +296,24 @@
     .next-action-opt input[type="radio"] { accent-color: var(--clr-orange); width: 15px; height: 15px; flex-shrink: 0; }
     .datetime-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
     .field-hidden { display: none !important; }
+    /* ── Date / time pickers (task 11): tidy native controls ── */
+    .form-input[type="date"], .form-input[type="time"] {
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+      accent-color: var(--clr-orange); padding-right: 10px; min-height: 42px;
+      display: flex; align-items: center;
+    }
+    .form-input[type="date"]::-webkit-datetime-edit,
+    .form-input[type="time"]::-webkit-datetime-edit { color: var(--clr-text); padding: 0; }
+    .form-input[type="date"]::-webkit-calendar-picker-indicator,
+    .form-input[type="time"]::-webkit-calendar-picker-indicator {
+      cursor: pointer; opacity: .6; padding: 3px; border-radius: 5px;
+      filter: invert(48%) sepia(72%) saturate(1100%) hue-rotate(355deg) brightness(95%);
+      transition: opacity var(--transition), background var(--transition);
+    }
+    .form-input[type="date"]:hover::-webkit-calendar-picker-indicator,
+    .form-input[type="time"]:hover::-webkit-calendar-picker-indicator { opacity: 1; background: rgba(224,123,32,.1); }
+    .form-input[type="date"]::-webkit-inner-spin-button,
+    .form-input[type="time"]::-webkit-inner-spin-button { display: none; }
 
     /* ── Date tree filter ── */
     .date-tree-year { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; cursor: pointer; font-size: .83rem; font-weight: 600; color: var(--clr-text); transition: background .12s; user-select: none; }

@@ -1,0 +1,52 @@
+/* Clean custom-role landing (task 7): a calm, branded home with no data. */
+.welcome-page {
+  margin-top: var(--header-h, 64px);
+  min-height: calc(100vh - var(--header-h, 64px) - 40px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.welcome-card {
+  background: var(--clr-surface, #fff);
+  border: 1px solid var(--clr-border, #e0ddd8);
+  border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(224, 123, 32, 0.10);
+  padding: 48px 44px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+}
+.welcome-logo {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 18px;
+  background: linear-gradient(135deg, rgba(224, 123, 32, 0.12), rgba(224, 123, 32, 0.04));
+  border: 1.5px solid rgba(224, 123, 32, 0.22);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.welcome-logo svg { width: 44px; height: 44px; }
+.welcome-card h1 {
+  font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--clr-text, #1e1c1a);
+  letter-spacing: 0.01em;
+}
+.welcome-sub {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--clr-orange, #e07b20);
+  margin-top: 4px;
+  font-weight: 600;
+}
+.welcome-msg {
+  margin-top: 18px;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--clr-text-sub, #7a7570);
+}

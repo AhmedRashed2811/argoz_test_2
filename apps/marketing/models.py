@@ -133,6 +133,10 @@ class EventRecord(BaseModel):
         CampaignAsset, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     target_attendees = models.PositiveIntegerField(default=0)
+    # Real headcount of people who actually attended. Entered/edited only AFTER
+    # the event row exists (never at campaign creation); always editable
+    # regardless of approval. null = not yet recorded.
+    actual_attendees = models.PositiveIntegerField(null=True, blank=True)
     lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
 
     class Meta:

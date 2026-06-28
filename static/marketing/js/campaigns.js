@@ -1,107 +1,3 @@
-/* ═══════════════════════════════════════════════════════
-   DATA & STORAGE
-═══════════════════════════════════════════════════════ */
-const LS_KEY    = 'prometheus_campaigns';
-const LS_KEY_ID = 'prometheus_campaigns_nextId';
-const LS_KEY_IMGS = 'prometheus_campaigns_images';
-const LS_KEY_VERSION = 'prometheus_campaigns_version';
-const DATA_VERSION = 'v10';
-
-const _defaults = [
-  {
-    id:1, name:'Zed Launch Phase1',
-    description:'',
-    startDate:'2026-06-20', endDate:'2026-07-20',
-    campaignTypes:['events','social'], leads:1,
-    typeLeads:{events:1,social:1},
-    approval:'pending', approvalReason:'Awaiting CFO sign-off. Celebrity fee for Amr Diab exceeds the pre-approved entertainment budget cap. Finance team has requested a revised cost breakdown before final approval.',
-    eventsMulti:[{ name: 'Zed East Launch Party', budget: 200000, celebrities:[{name:'Amr Diab',budget:250000}], giveaways:[{name:'Branded Bags',budget:15000}], catering:[{name:'Kempinski',budget:35000}] }],
-    socialMulti:[{ adName: 'Social Campaign', platformBudgets:[{platform:'Meta',budget:35000},{platform:'TikTok',budget:20000},{platform:'LinkedIn',budget:25000}], budget:80000 }],
-    extraBudget:0, extraNote:'', otherCosts:[{reason:'Photography & Video',value:50000},{reason:'Event Logistics',value:30000}]
-  },
-  {
-    id:2, name:'Badya Ramadan Campaign',
-    description:'',
-    startDate:'2026-02-15', endDate:'2026-04-10',
-    campaignTypes:['tv','street'], leads:2,
-    typeLeads:{tv:1,street:1},
-    approval:'approved', approvalReason:'Budget reviewed and approved by the Finance Committee on 10 Feb 2026. TV slots and outdoor placements are within the allocated Q1 marketing budget. All vendor contracts have been reviewed.',
-    tvMulti:[{ name: 'Ramadan TV Spot', budget: 300000, channels:[{channelName:'CBC Sofra',budget:180000},{channelName:'MBC Masr',budget:120000}] }],
-    streetMulti:[{ name: 'Badya Outdoor', budget: 200000, adTypes:[{type:'Billboard',count:5,budget:120000},{type:'LED Screen',count:3,budget:80000}] }],
-    extraBudget:0, extraNote:'', otherCosts:[{reason:'Agency Fees',value:100000},{reason:'Production',value:100000}]
-  },
-  {
-    id:3, name:'Sodic Social Summer',
-    description:'',
-    startDate:'2026-06-14', endDate:'2026-08-31',
-    campaignTypes:['social'], leads:2,
-    typeLeads:{social:2},
-    approval:'semi', approvalReason:'Digital media spend on Meta and Google Ads is approved. TikTok budget is on hold pending legal review of the new influencer content policy. Campaign may proceed with approved platforms in the meantime.',
-    socialMulti:[{ adName: 'Summer Campaign', platformBudgets:[{platform:'Meta',budget:80000},{platform:'TikTok',budget:60000},{platform:'Google Ads (Website)',budget:40000}], budget:180000 }],
-    extraBudget:0, extraNote:'', otherCosts:[{reason:'Content Creation',value:60000},{reason:'Influencer Fees',value:40000}]
-  },
-  {
-    id:4, name:'New Cairo Billboard Q2',
-    description:'',
-    startDate:'2026-03-25', endDate:'2026-06-30',
-    campaignTypes:['street'], leads:2,
-    typeLeads:{street:2},
-    approval:'not-approved', approvalReason:'Total campaign budget of EGP 560,000 significantly exceeds the Q2 outdoor advertising ceiling of EGP 350,000. The number of lamp post units (20) was flagged as excessive for the target area. Please revise the scope and resubmit.',
-    streetMulti:[{ name: 'New Cairo Outdoor', budget: 380000, adTypes:[{type:'Billboard',count:8,budget:200000},{type:'Banner',count:12,budget:80000},{type:'Lamp Post',count:20,budget:100000}] }],
-    extraBudget:0, extraNote:'', otherCosts:[{reason:'Design & Production',value:80000},{reason:'Installation Fees',value:100000}]
-  }
-];
-
-function stripAndStoreImages(c) {
-  const lean = JSON.parse(JSON.stringify(c));
-  const imgStore = {};
-  function strip(obj, path) {
-    if (!obj) return;
-    ['logo','images'].forEach(field => {
-      if (Array.isArray(obj[field]) && obj[field].length) { imgStore[path+'.'+field]=obj[field]; obj[field]=[]; }
-    });
-  }
-  function stripTvChannels(tvObj, path) {
-    if (!tvObj) return;
-    strip(tvObj, path);
-    (tvObj.channels||[]).forEach((ch,ci) => {
-      const chPath=path+'.channels.'+ci;
-      if (Array.isArray(ch.media)&&ch.media.length) { imgStore[chPath+'.media']=ch.media; ch.media=[]; }
-    });
-  }
-  strip(lean.events,'events');
-  (lean.eventsMulti||[]).forEach((ev,i)=>strip(ev,'eventsMulti.'+i));
-  stripTvChannels(lean.tv,'tv');
-  (lean.tvMulti||[]).forEach((tv,i)=>stripTvChannels(tv,'tvMulti.'+i));
-  strip(lean.street,'street');
-  (lean.streetMulti||[]).forEach((st,i)=>strip(st,'streetMulti.'+i));
-  strip(lean.social,'social');
-  (lean.socialMulti||[]).forEach((sm,i)=>strip(sm,'socialMulti.'+i));
-  (lean.exhibitionMulti||[]).forEach((ex,i)=>strip(ex,'exhibitionMulti.'+i));
-  return {lean,imgStore};
-}
-
-function rehydrateImages(c, imgStore) {
-  function rehydrate(obj, path) {
-    if (!obj) return;
-    ['logo','images'].forEach(field => { const key=path+'.'+field; if(imgStore[key]) obj[field]=imgStore[key]; });
-  }
-  function rehydrateTv(tvObj, path) {
-    if (!tvObj) return;
-    rehydrate(tvObj, path);
-    (tvObj.channels||[]).forEach((ch,ci)=>{ const key=path+'.channels.'+ci+'.media'; if(imgStore[key]) ch.media=imgStore[key]; });
-  }
-  rehydrate(c.events,'events');
-  (c.eventsMulti||[]).forEach((ev,i)=>rehydrate(ev,'eventsMulti.'+i));
-  rehydrateTv(c.tv,'tv');
-  (c.tvMulti||[]).forEach((tv,i)=>rehydrateTv(tv,'tvMulti.'+i));
-  rehydrate(c.street,'street');
-  (c.streetMulti||[]).forEach((st,i)=>rehydrate(st,'streetMulti.'+i));
-  rehydrate(c.social,'social');
-  (c.socialMulti||[]).forEach((sm,i)=>rehydrate(sm,'socialMulti.'+i));
-  (c.exhibitionMulti||[]).forEach((ex,i)=>rehydrate(ex,'exhibitionMulti.'+i));
-}
-
 /* ── Server-backed data layer (replaces localStorage; see marketing views) ── */
 function _cfg() { return window.CAMPAIGN_CFG || {}; }
 function _headers() { return {'Content-Type':'application/json','X-CSRFToken':_cfg().csrf||''}; }
@@ -124,27 +20,10 @@ async function apiSend(url, method, body) {
 function loadCampaigns() { return campaigns; }
 function saveCampaigns() { /* persisted server-side per mutation */ }
 
-function syncSocialAdFromCampaign(c) {
-  if (!c.social) return;
-  try {
-    const smRaw=localStorage.getItem('prometheus_social_media'); if(!smRaw) return;
-    const ads=JSON.parse(smRaw); const idx=ads.findIndex(a=>a.campaignId==c.id); if(idx<0) return;
-    const ad=ads[idx]; ad.platforms=c.social.platforms||[]; ad.start=c.social.start||''; ad.end=c.social.end||''; ad.budget=Number(c.social.budget||0); ad.leads=Number(c.social.leads||0); ad.audience=c.social.audience||''; ad.campaignName=c.name;
-    localStorage.setItem('prometheus_social_media',JSON.stringify(ads));
-  } catch(e) {}
-}
-
-function getLinkedTvAdFromLS(campaignId) {
-  try { const raw=localStorage.getItem('prometheus_tv_ads'); if(!raw) return null; return JSON.parse(raw).find(a=>a.campaignId==campaignId)||null; } catch(e){ return null; }
-}
-function getLinkedEventsFromLS(campaignId) {
-  try { const raw=localStorage.getItem('prometheus_events'); if(!raw) return []; return JSON.parse(raw).filter(e=>e.campaignId==campaignId); } catch(e){ return []; }
-}
-
 let campaigns = [];
 let nextId = 1;
 let sortField=null, sortAscMap={}, searchQuery=(new URLSearchParams(window.location.search)).get('search') || '', editingIndex=null;
-const PAGE_SIZE=5; let currentPage=1, totalPages=1;
+const PAGE_SIZE=20; let currentPage=1, totalPages=1;
 let activeNameFilters=new Set(), activeTypeFilters=new Set(), activeStartFilters=new Set(), activeEndFilters=new Set(), activeStatusFilters=new Set(), activeApprovalFilters=new Set();
 let filterNameOpen=false, filterTypeOpen=false, filterStartOpen=false, filterEndOpen=false, filterBudgetOpen=false, filterLeadsOpen=false, filterStatusOpen=false, filterApprovalOpen=false;
 const _storedImages={};
@@ -157,6 +36,7 @@ let _skipNextReload=false;
 ═══════════════════════════════════════════════════════ */
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtBudget(n) { return n ? Number(n).toLocaleString('en-US') : '—'; }
+function fmtInt(n) { return (n||n===0) ? Number(n).toLocaleString('en-US') : ''; }
 function fmtDate(d) {
   if (!d) return '—';
   const [y,m,day]=d.split('-');
@@ -197,10 +77,7 @@ function calcBudget(c) {
   // Other costs
   (c.otherCosts||[]).forEach(oc=>{ t+=Number(oc.value||0); });
   t+=Number(c.extraBudget||0);
-  // Events from LS (include celebrities/giveaways/catering)
-  const linkedEvs=getLinkedEventsFromLS(c.id);
-  if (linkedEvs.length) linkedEvs.forEach(ev=>{ t+=calcEvSubBudget(ev); });
-  else if ((c.campaignTypes||[]).includes('events')) {
+  if ((c.campaignTypes||[]).includes('events')) {
     (c.eventsMulti||(c.events?[c.events]:[])).forEach(ev=>{ t+=calcEvSubBudget(ev); });
   }
   return t;
@@ -212,9 +89,7 @@ function calcLeads(c) {
   }
   let total=(c.campaignTypes||[]).reduce((s,t)=>{ if(t==='events') return s; return s+Number(c[t]?.leads||0); },0);
   total+=Number(c.leads||0);
-  const linkedEvs=getLinkedEventsFromLS(c.id);
-  total+=linkedEvs.reduce((s,ev)=>s+Number(ev.leads||0),0);
-  if (!linkedEvs.length&&(c.campaignTypes||[]).includes('events')&&c.events?.leads) total+=Number(c.events.leads||0);
+  if ((c.campaignTypes||[]).includes('events')&&c.events?.leads) total+=Number(c.events.leads||0);
   return total;
 }
 function getTypeLeadsBreakdown(c) {
@@ -241,10 +116,10 @@ function getDisplayList() {
   if (activeEndFilters.size) list=list.filter(d=>activeEndFilters.has((d.c.endDate||'').slice(0,7)));
   if (activeStatusFilters.size) list=list.filter(d=>activeStatusFilters.has(getStatus(d.c)));
   if (activeApprovalFilters.size) list=list.filter(d=>activeApprovalFilters.has(d.c.approval||'pending'));
-  const bMin=Number(document.getElementById('budgetMin')?.value||0), bMax=Number(document.getElementById('budgetMax')?.value||0);
+  const bMin=Number((document.getElementById('budgetMin')?.value || '').replace(/,/g, '')||0), bMax=Number((document.getElementById('budgetMax')?.value || '').replace(/,/g, '')||0);
   if (bMin>0) list=list.filter(d=>calcBudget(d.c)>=bMin);
   if (bMax>0) list=list.filter(d=>calcBudget(d.c)<=bMax);
-  const lMin=Number(document.getElementById('leadsMin')?.value||0), lMax=Number(document.getElementById('leadsMax')?.value||0);
+  const lMin=Number((document.getElementById('leadsMin')?.value || '').replace(/,/g, '')||0), lMax=Number((document.getElementById('leadsMax')?.value || '').replace(/,/g, '')||0);
   if (lMin>0) list=list.filter(d=>calcLeads(d.c)>=lMin);
   if (lMax>0) list=list.filter(d=>calcLeads(d.c)<=lMax);
   if (searchQuery.trim()) { const q=searchQuery.trim().toLowerCase(); list=list.filter(d=>d.c.name.toLowerCase().includes(q) || String(d.c.id).toLowerCase() === q); }
@@ -294,9 +169,8 @@ function renderTable() {
   const typeSet=new Set(); campaigns.forEach(c=>(c.campaignTypes||[]).forEach(t=>typeSet.add(t)));
   document.getElementById('kpiTypes').textContent=typeSet.size;
   document.getElementById('kpiBudget').textContent=campaigns.reduce((s,c)=>s+calcBudget(c),0).toLocaleString('en-US');
-  const campaignLeadsFromRecords=(()=>{ try { const all=JSON.parse(localStorage.getItem('prometheus_leads')||'[]'); return all.filter(l=>['event','callcenter','walkin','vip'].includes(l.source)).length+all.filter(l=>l.source==='broker').length; } catch(e){ return 0; } })();
   const campaignLeadsFromData=campaigns.reduce((s,c)=>s+calcLeads(c),0);
-  document.getElementById('kpiLeads').textContent=Math.max(campaignLeadsFromRecords,campaignLeadsFromData).toLocaleString('en-US');
+  document.getElementById('kpiLeads').textContent=campaignLeadsFromData.toLocaleString('en-US');
   document.getElementById('searchHint').textContent=searchQuery.trim()||activeNameFilters.size?`${list.length} result${list.length!==1?'s':''} found`:`${campaigns.length} campaign${campaigns.length!==1?'s':''}`;
   renderPagination(list.length);
   if (!list.length) { tbody.innerHTML=`<tr class="no-results-row"><td colspan="9"><div class="no-results-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>No campaigns found</span></div></td></tr>`; return; }
@@ -307,10 +181,7 @@ function renderTable() {
   tbody.innerHTML=pageData.map(({c,origIndex})=>{
     const status=getStatus(c);
     const _ownTypes=(c.campaignTypes||[]);
-    const _hasLinkedEvs=getLinkedEventsFromLS(c.id).length>0;
-    const _hasLinkedTv=!_ownTypes.includes('tv')&&!!getLinkedTvAdFromLS(c.id);
-    let _allChipTypes=(_hasLinkedEvs&&!_ownTypes.includes('events'))?['events',..._ownTypes]:[..._ownTypes];
-    if (_hasLinkedTv) _allChipTypes.push('tv');
+    let _allChipTypes=[..._ownTypes];
     const chips=_allChipTypes.map(t=>`<span class="type-chip">${_typeLabels[t]||t} (${c.typeLeads ? (c.typeLeads[t] || 0) : 0})</span>`).join('');
     const leadsVal=calcLeads(c).toLocaleString('en-US');
     const appr=c.approval||'pending';
@@ -621,10 +492,10 @@ function addCrEvent(prefill, ctx) {
     </div>
     <div class="form-row">
       <div><label class="form-label">Event Date</label><input type="date" class="form-input cr-ev-date" value="${prefill?.date||''}"></div>
-      <div><label class="form-label">Budget <span style="color:#c0392b">*</span></label><input type="number" class="form-input cr-ev-budget" placeholder="e.g. 25,000" min="0" oninput="recalcTotal(ctx='${isEdit?'edit':'create'}')" value="${prefill?.budget||''}"></div>
+      <div><label class="form-label">Budget <span style="color:#c0392b">*</span></label><input type="text" class="form-input cr-ev-budget" placeholder="e.g. 25,000" min="0" oninput="recalcTotal(ctx='${isEdit?'edit':'create'}')" value="${fmtInt(prefill?.budget)}"></div>
     </div>
     <div class="form-row">
-      <div><label class="form-label">Target Attendees</label><input type="number" class="form-input cr-ev-attendees" placeholder="e.g. 500" min="0" value="${prefill?.targetAttendees||''}"></div>
+      <div><label class="form-label">Target Attendees</label><input type="text" class="form-input cr-ev-attendees" placeholder="e.g. 500" min="0" value="${fmtInt(prefill?.targetAttendees)}"></div>
       <div></div>
     </div>
     <div class="form-group"><label class="form-label">Description / Notes <span class="optional">(optional)</span></label><textarea class="form-textarea cr-ev-desc" rows="2" placeholder="Any notes about this event…">${escHtml(prefill?.description||'')}</textarea></div>
@@ -673,7 +544,7 @@ function addCrEvPerson(listId, label, prefill, ctx) {
   const div=document.createElement('div'); div.className='person-item';
   div.innerHTML=`
     <div><label class="form-label">${label} Name</label><input type="text" class="form-input cr-person-name" placeholder="e.g. ${label==='Celebrity'?'Ahmed Helmy':'Branded Bags'}" value="${escHtml(prefill?.name||'')}"></div>
-    <div><label class="form-label">Budget </label><input type="number" class="form-input cr-person-budget" placeholder="0" min="0" value="${prefill?.budget||''}" oninput="recalcTotal('${ctx||'create'}')"></div>
+    <div><label class="form-label">Budget </label><input type="text" class="form-input cr-person-budget" placeholder="0" min="0" value="${fmtInt(prefill?.budget)}" oninput="recalcTotal('${ctx||'create'}')"></div>
     <button type="button" class="btn-remove-small" onclick="this.closest('.person-item').remove();recalcTotal('${ctx||'create'}')" title="Remove"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
   list.appendChild(div);
   recalcTotal(ctx||'create');
@@ -733,7 +604,7 @@ function addCrTvChannel(listId, prefill) {
     </div>
     <div class="form-row">
       <div><label class="form-label">Channel / Network Name</label><input type="text" class="form-input cr-tvc-name" placeholder="e.g. CBC, MBC, ON E, cbc Drama" value="${escHtml(prefill?.channelName||'')}"></div>
-      <div><label class="form-label">Budget for this Channel</label><input type="number" class="form-input cr-tvc-budget" placeholder="e.g. 10,000" min="0" value="${escHtml(String(prefill?.budget||''))}" oninput="recalcTvAdTotal(this)"></div>
+      <div><label class="form-label">Budget for this Channel</label><input type="text" class="form-input cr-tvc-budget" placeholder="e.g. 10,000" min="0" value="${fmtInt(prefill?.budget)}" oninput="recalcTvAdTotal(this)"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Images / Video for this channel <span class="optional">(upload the ad creative)</span></label>
@@ -760,7 +631,7 @@ function addCrTvSlot(listId, prefill) {
   const list=document.getElementById(listId); if(!list) return;
   const div=document.createElement('div'); div.className='slot-item';
   div.innerHTML=`
-    <div><label class="form-label">Number of Times</label><input type="number" class="form-input cr-tvs-count" placeholder="e.g. 5" min="1" value="${prefill?.count||''}"></div>
+    <div><label class="form-label">Number of Times</label><input type="text" class="form-input cr-tvs-count" placeholder="e.g. 5" min="1" value="${fmtInt(prefill?.count)}"></div>
     <div><label class="form-label">Broadcast Time</label><input type="text" class="form-input cr-tvs-time" placeholder="e.g. 8:00 PM, Prime Time, 7–9 AM" value="${escHtml(prefill?.time||'')}"></div>
     <button type="button" class="btn-remove-small" onclick="this.closest('.slot-item').remove()" title="Remove slot"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
   list.appendChild(div);
@@ -773,7 +644,7 @@ function recalcTvAdTotal(channelBudgetInput) {
   const dashEl = card.querySelector('.cr-tv-budget');
   if (!dashEl) return;
   let sum = 0;
-  card.querySelectorAll('.cr-tvc-budget').forEach(inp => { sum += Number(inp.value || 0); });
+  card.querySelectorAll('.cr-tvc-budget').forEach(inp => { sum += Number(inp.value.replace(/,/g, '') || 0); });
   dashEl.dataset.value = sum;
   dashEl.textContent = sum > 0 ? 'EGP ' + sum.toLocaleString('en-US') : '—';
   // Trigger global recalc — detect context from card's parent list id
@@ -855,10 +726,10 @@ function toggleStreetAdType(stId, typeVal, hasLocation, checked, prefill) {
   div.innerHTML=`
     <div class="ad-type-detail-header">📍 ${typeVal} — Details</div>
     <div class="form-row">
-      <div><label class="form-label">Total Number of ${typeVal}s</label><input type="number" class="form-input cr-at-count" min="1" placeholder="e.g. 10" value="${prefill?.count||''}"></div>
+      <div><label class="form-label">Total Number of ${typeVal}s</label><input type="text" class="form-input cr-at-count" min="1" placeholder="e.g. 10" value="${fmtInt(prefill?.count)}"></div>
       <div>${hasLocation
         ? `<label class="form-label">Budget for ${typeVal} <span style="font-size:.68rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--clr-gray)">(auto-calculated)</span></label><div class="form-input cr-at-budget" style="background:rgba(224,123,32,.06);border-color:rgba(224,123,32,.25);color:var(--clr-orange-dk);font-weight:700;cursor:default;display:flex;align-items:center;" data-value="${prefill?.budget||0}">${prefill?.budget?('EGP '+Number(prefill.budget).toLocaleString('en-US')):'—'}</div>`
-        : `<label class="form-label">Budget for ${typeVal} </label><input type="number" class="form-input cr-at-budget" min="0" placeholder="e.g. 10,000" value="${prefill?.budget||''}" oninput="recalcStreetAdTotal('${stId}')">`}</div>
+        : `<label class="form-label">Budget for ${typeVal} </label><input type="text" class="form-input cr-at-budget" min="0" placeholder="e.g. 10,000" value="${fmtInt(prefill?.budget)}" oninput="recalcStreetAdTotal('${stId}')">`}</div>
     </div>
     ${hasLocation?`
       <div class="sub-section-label">📍 Locations </div>
@@ -877,7 +748,7 @@ function addCrStLocation(listId, prefill) {
   const div=document.createElement('div'); div.className='location-item';
   div.innerHTML=`
     <div><label class="form-label">Location / Area Name</label><input type="text" class="form-input cr-stloc-name" placeholder="e.g. Tahrir Square, 6th October" value="${escHtml(prefill?.name||'')}"></div>
-    <div><label class="form-label">Budget</label><input type="number" class="form-input cr-stloc-budget" placeholder="0" min="0" value="${prefill?.budget||''}" oninput="recalcStreetAdTypeFromPanel(this.closest('.ad-type-detail'))"></div>
+    <div><label class="form-label">Budget</label><input type="text" class="form-input cr-stloc-budget" placeholder="0" min="0" value="${fmtInt(prefill?.budget)}" oninput="recalcStreetAdTypeFromPanel(this.closest('.ad-type-detail'))"></div>
     <button type="button" class="btn-remove-small" onclick="(function(b){const p=b.closest('.ad-type-detail');b.closest('.location-item').remove();recalcStreetAdTypeFromPanel(p);})(this)" title="Remove"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
   list.appendChild(div);
   recalcStreetAdTypeFromPanel(div.closest('.ad-type-detail'));
@@ -889,7 +760,7 @@ function recalcStreetAdTypeFromPanel(panel) {
   const dash = panel.querySelector('.cr-at-budget');
   if (!dash) return;
   let sum = 0;
-  panel.querySelectorAll('.cr-stloc-budget').forEach(i => { sum += Number(i.value || 0); });
+  panel.querySelectorAll('.cr-stloc-budget').forEach(i => { sum += Number(i.value.replace(/,/g, '') || 0); });
   dash.dataset.value = sum;
   if (dash.tagName !== 'INPUT') dash.textContent = sum > 0 ? 'EGP ' + sum.toLocaleString('en-US') : '—';
   const card = panel.closest('.multi-item-card');
@@ -903,7 +774,7 @@ function recalcStreetAdTotal(stId) {
   const dashEl = card.querySelector('.cr-st-budget');
   if (!dashEl) return;
   let sum = 0;
-  card.querySelectorAll('.cr-at-budget').forEach(el => { sum += Number(el.value || el.dataset.value || 0); });
+  card.querySelectorAll('.cr-at-budget').forEach(el => { sum += Number((el.value || '').replace(/,/g, '') || el.dataset.value || 0); });
   dashEl.dataset.value = sum;
   dashEl.textContent = sum > 0 ? 'EGP ' + sum.toLocaleString('en-US') : '—';
   // Also trigger global recalc
@@ -995,7 +866,7 @@ function refreshSocialEventLinks(pfx) {
 function recalcSocialAdCard(smId) {
   const card=document.getElementById(smId); if(!card) return;
   const dash=card.querySelector('.cr-sm-budget');
-  let sum=0; card.querySelectorAll('.cr-sm-plat-budget').forEach(i=>sum+=Number(i.value||0));
+  let sum=0; card.querySelectorAll('.cr-sm-plat-budget').forEach(i=>sum+=Number(i.value.replace(/,/g, '')||0));
   if (dash) { dash.dataset.value=sum; dash.textContent=sum>0?'EGP '+sum.toLocaleString('en-US'):'—'; }
   recalcTotal(smId.startsWith('edit_')?'edit':'create');
 }
@@ -1009,7 +880,7 @@ function toggleSocialPlatform(smId, platform, checked, prefillBudget) {
   if (existingRow) return;
   const row=document.createElement('div'); row.className='platform-budget-row'; row.dataset.platform=platform;
   row.innerHTML=`<span style="flex:1;font-size:.84rem;font-weight:600;color:var(--clr-text)">${platform}</span>
-    <div style="width:180px"><label class="form-label" style="margin-bottom:4px">Budget </label><input type="number" class="form-input cr-sm-plat-budget" min="0" placeholder="0" oninput="recalcSocialAdCard('${smId}')" value="${prefillBudget||''}" style="padding:8px 12px"></div>`;
+    <div style="width:180px"><label class="form-label" style="margin-bottom:4px">Budget </label><input type="text" class="form-input cr-sm-plat-budget" min="0" placeholder="0" oninput="recalcSocialAdCard('${smId}')" value="${fmtInt(prefillBudget)}" style="padding:8px 12px"></div>`;
   budgetContainer.appendChild(row);
   recalcSocialAdCard(smId);
 }
@@ -1034,7 +905,7 @@ function addCrExhibition(prefill, ctx) {
       <div><label class="form-label">End Date</label><input type="date" class="form-input cr-ex-end" value="${prefill?.end||''}"></div>
     </div>
     <div class="form-row">
-      <div><label class="form-label">Budget</label><input type="number" class="form-input cr-ex-budget" min="0" placeholder="e.g. 20,000" oninput="recalcTotal('${isEdit?'edit':'create'}')" value="${prefill?.budget||''}"></div>
+      <div><label class="form-label">Budget</label><input type="text" class="form-input cr-ex-budget" min="0" placeholder="e.g. 20,000" oninput="recalcTotal('${isEdit?'edit':'create'}')" value="${fmtInt(prefill?.budget)}"></div>
       <div></div>
     </div>`;
   document.getElementById(listId).appendChild(el);
@@ -1061,7 +932,7 @@ function addOtherCost(prefill) {
       <button type="button" class="btn-remove-item" onclick="document.getElementById('${id}').remove();recalcTotal()" title="Remove"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="form-row" style="margin-bottom:0">
-      <div><label class="form-label">Amount (EGP)</label><input type="number" class="form-input cr-oc-value" min="0" placeholder="e.g. 5,000" oninput="recalcTotal()" value="${prefill?.value||''}"></div>
+      <div><label class="form-label">Amount (EGP)</label><input type="text" class="form-input cr-oc-value" min="0" placeholder="e.g. 5,000" oninput="recalcTotal()" value="${fmtInt(prefill?.value)}"></div>
       <div><label class="form-label">Reason / Description</label><input type="text" class="form-input cr-oc-reason" placeholder="e.g. Agency fees, Printing" value="${escHtml(prefill?.reason||'')}"></div>
     </div>`;
   list.appendChild(div);
@@ -1093,8 +964,8 @@ function recalcTotal(ctx) {
   let total=0; const breakdown={};
   // Events: event budget + celebrities + giveaways + catering
   document.querySelectorAll(`#${pfx}cr_events_list .multi-item-card`).forEach(card=>{
-    let evTotal=Number(card.querySelector('.cr-ev-budget')?.value||0);
-    card.querySelectorAll('.cr-person-budget').forEach(el=>{ evTotal+=Number(el.value||0); });
+    let evTotal=Number(card.querySelector('.cr-ev-budget')?.value.replace(/,/g, '')||0);
+    card.querySelectorAll('.cr-person-budget').forEach(el=>{ evTotal+=Number(el.value.replace(/,/g, '')||0); });
     total+=evTotal; breakdown['Events']=(breakdown['Events']||0)+evTotal;
   });
   // TV — read from auto-calculated dash display (data-value)
@@ -1110,12 +981,12 @@ function recalcTotal(ctx) {
     total+=val; breakdown['Street Ads']=(breakdown['Street Ads']||0)+val;
   });
   // Social — sum platform budgets
-  document.querySelectorAll(`#${pfx}cr_social_list .cr-sm-plat-budget`).forEach(el=>{ total+=Number(el.value||0); breakdown['Social Media']=(breakdown['Social Media']||0)+Number(el.value||0); });
+  document.querySelectorAll(`#${pfx}cr_social_list .cr-sm-plat-budget`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Social Media']=(breakdown['Social Media']||0)+val; });
   // Exhibition
-  document.querySelectorAll(`#${pfx}cr_exhibition_list .cr-ex-budget`).forEach(el=>{ total+=Number(el.value||0); breakdown['Exhibition']=(breakdown['Exhibition']||0)+Number(el.value||0); });
+  document.querySelectorAll(`#${pfx}cr_exhibition_list .cr-ex-budget`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Exhibition']=(breakdown['Exhibition']||0)+val; });
   // Other costs
   const ocListId=(pfx==='edit_'?'edit_':'')+'otherCostsList';
-  document.querySelectorAll(`#${ocListId} .cr-oc-value`).forEach(el=>{ total+=Number(el.value||0); breakdown['Other Costs']=(breakdown['Other Costs']||0)+Number(el.value||0); });
+  document.querySelectorAll(`#${ocListId} .cr-oc-value`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Other Costs']=(breakdown['Other Costs']||0)+val; });
   const valEl=document.getElementById(pfx+'totalBudgetVal');
   if (valEl) valEl.textContent='EGP '+total.toLocaleString('en-US');
   const bdEl=document.getElementById(pfx+'budgetBreakdown');
@@ -1135,15 +1006,15 @@ function collectCrEvents(pfx) {
     function collectPersonList(listId) {
       return Array.from(document.getElementById(listId)?.querySelectorAll('.person-item')||[]).map(row=>({
         name:row.querySelector('.cr-person-name')?.value.trim()||'',
-        budget:Number(row.querySelector('.cr-person-budget')?.value||0)
+        budget:Number(row.querySelector('.cr-person-budget')?.value.replace(/,/g, '')||0)
       }));
     }
     return {
       name:card.querySelector('.cr-ev-name')?.value.trim()||'',
       place:card.querySelector('.cr-ev-place')?.value.trim()||'',
       date:card.querySelector('.cr-ev-date')?.value||'',
-      budget:Number(card.querySelector('.cr-ev-budget')?.value||0),
-      targetAttendees:Number(card.querySelector('.cr-ev-attendees')?.value||0),
+      budget:Number(card.querySelector('.cr-ev-budget')?.value.replace(/,/g, '')||0),
+      targetAttendees:Number(card.querySelector('.cr-ev-attendees')?.value.replace(/,/g, '')||0),
       description:card.querySelector('.cr-ev-desc')?.value.trim()||'',
       logo:_storedImages[id+'_logo_prev']||[],
       images:_storedImages[id+'_imgs_prev']||[],
@@ -1161,11 +1032,11 @@ function collectCrTvAds(pfx) {
     const channels=Array.from(document.getElementById(channelListId)?.querySelectorAll('.channel-item')||[]).map((ch,ci)=>{
       const slotListId=ch.id+'_slots';
       const slots=Array.from(document.getElementById(slotListId)?.querySelectorAll('.slot-item')||[]).map(sl=>({
-        count:Number(sl.querySelector('.cr-tvs-count')?.value||0),
+        count:Number(sl.querySelector('.cr-tvs-count')?.value.replace(/,/g, '')||0),
         time:sl.querySelector('.cr-tvs-time')?.value.trim()||''
       }));
       const prevId=ch.id+'_prev';
-      return {channelName:ch.querySelector('.cr-tvc-name')?.value.trim()||'',budget:Number(ch.querySelector('.cr-tvc-budget')?.value||0),media:_storedImages[prevId]||[],slots};
+      return {channelName:ch.querySelector('.cr-tvc-name')?.value.trim()||'',budget:Number(ch.querySelector('.cr-tvc-budget')?.value.replace(/,/g, '')||0),media:_storedImages[prevId]||[],slots};
     });
     return {name:card.querySelector('.cr-tv-name')?.value.trim()||'',description:card.querySelector('.cr-tv-desc')?.value.trim()||'',start:card.querySelector('.cr-tv-start')?.value||'',end:card.querySelector('.cr-tv-end')?.value||'',budget:Number(card.querySelector('.cr-tv-budget')?.dataset.value||0),channels,channel:channels.map(c=>c.channelName).filter(Boolean).join(', ')};
   });
@@ -1178,9 +1049,9 @@ function collectCrStreetAds(pfx) {
     const adTypes=Array.from(card.querySelectorAll('#'+stId+'_adtype_panels .ad-type-detail')).map(panel=>{
       const type=panel.dataset.type;
       const locList=panel.querySelectorAll('.location-item');
-      const locations=Array.from(locList).map(loc=>({name:loc.querySelector('.cr-stloc-name')?.value.trim()||'',budget:Number(loc.querySelector('.cr-stloc-budget')?.value||0)}));
+      const locations=Array.from(locList).map(loc=>({name:loc.querySelector('.cr-stloc-name')?.value.trim()||'',budget:Number(loc.querySelector('.cr-stloc-budget')?.value.replace(/,/g, '')||0)}));
       const budgetEl=panel.querySelector('.cr-at-budget');
-      return {type,count:Number(panel.querySelector('.cr-at-count')?.value||0),budget:Number(budgetEl?.value||budgetEl?.dataset.value||0),locations};
+      return {type,count:Number(panel.querySelector('.cr-at-count')?.value.replace(/,/g, '')||0),budget:Number(budgetEl?.value?.replace(/,/g, '')||budgetEl?.dataset.value||0),locations};
     });
     return {name:card.querySelector('.cr-st-name')?.value.trim()||'',description:card.querySelector('.cr-st-desc')?.value.trim()||'',start:card.querySelector('.cr-st-start')?.value||'',end:card.querySelector('.cr-st-end')?.value||'',budget:Number(card.querySelector('.cr-st-budget')?.dataset.value||0),adTypes,images:_storedImages[stId+'_imgs_prev']||[]};
   });
@@ -1191,7 +1062,7 @@ function collectCrSocialAds(pfx) {
     const n=card.dataset.cardnum||(i+1);
     const smId=(pfx?pfx.replace(/_$/,'')+'_':'')+'crsm'+n;
     const platforms=Array.from(card.querySelectorAll('.cr-sm-plat:checked')).map(c=>c.value);
-    const platformBudgets=Array.from(card.querySelectorAll('#'+smId+'_plat_budgets .platform-budget-row')).map(row=>({platform:row.dataset.platform,budget:Number(row.querySelector('.cr-sm-plat-budget')?.value||0)}));
+    const platformBudgets=Array.from(card.querySelectorAll('#'+smId+'_plat_budgets .platform-budget-row')).map(row=>({platform:row.dataset.platform,budget:Number(row.querySelector('.cr-sm-plat-budget')?.value.replace(/,/g, '')||0)}));
     const totalBudget=platformBudgets.reduce((s,pb)=>s+pb.budget,0);
     return {adName:card.querySelector('.cr-sm-name')?.value.trim()||'',platforms,platformBudgets,budget:totalBudget,start:card.querySelector('.cr-sm-start')?.value||'',end:card.querySelector('.cr-sm-end')?.value||'',targetKpi:card.querySelector('.cr-sm-kpi')?.value.trim()||'',linkedEventId:card.querySelector('.cr-sm-event-link')?.value||'',images:_storedImages[smId+'_imgs_prev']||[]};
   });
@@ -1203,13 +1074,13 @@ function collectCrExhibitions(pfx) {
     place:card.querySelector('.cr-ex-place')?.value.trim()||'',
     start:card.querySelector('.cr-ex-start')?.value||'',
     end:card.querySelector('.cr-ex-end')?.value||'',
-    budget:Number(card.querySelector('.cr-ex-budget')?.value||0)
+    budget:Number(card.querySelector('.cr-ex-budget')?.value.replace(/,/g, '')||0)
   }));
 }
 
 function collectOtherCosts() {
   return Array.from(document.getElementById('otherCostsList')?.querySelectorAll('.cost-item')||[]).map(item=>({
-    value:Number(item.querySelector('.cr-oc-value')?.value||0),
+    value:Number(item.querySelector('.cr-oc-value')?.value.replace(/,/g, '')||0),
     reason:item.querySelector('.cr-oc-reason')?.value.trim()||''
   }));
 }
@@ -1305,7 +1176,7 @@ function openEdit(index) {
             const icons={events:'🎪',tv:'📺',street:'🏙️',social:'📱',exhibition:'🏛️'};
             const names={events:'Events',tv:'TV Ads',street:'Street Ads',social:'Social Media',exhibition:'Exhibition'};
             const val=Number((c.typeLeads||{})[t]||0);
-            return `<div><label class="form-label" style="font-size:.68rem">${icons[t]||''} ${names[t]||t}</label><input type="number" class="form-input edit-type-lead-input" data-type="${t}" min="0" placeholder="0" value="${val}" oninput="recalcEditLeadsTotal()"></div>`;
+            return `<div><label class="form-label" style="font-size:.68rem">${icons[t]||''} ${names[t]||t}</label><input type="text" class="form-input edit-type-lead-input" data-type="${t}" min="0" placeholder="0" value="${fmtInt(val)}" oninput="recalcEditLeadsTotal()"></div>`;
           }).join('')}
         </div>
         <div style="margin-top:10px;padding:8px 12px;background:rgba(39,174,96,.07);border:1px solid rgba(39,174,96,.2);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
@@ -1572,9 +1443,9 @@ function applyEditRestrictions(c) {
 function recalcEditLeadsTotal() {
   const inputs = document.querySelectorAll('.edit-type-lead-input');
   let total = 0;
-  inputs.forEach(inp => { total += Number(inp.value||0); });
+  inputs.forEach(inp => { total += Number(inp.value.replace(/,/g, '')||0); });
   const el = document.getElementById('edit_leads_total');
-  if (el) el.textContent = total;
+  if (el) el.textContent = total.toLocaleString('en-US');
 }
 
 function toggleEditOtherCosts() {
@@ -1592,7 +1463,7 @@ function addEditOtherCost(prefill) {
   const list=document.getElementById('edit_otherCostsList'); if(!list) return;
   const div=document.createElement('div'); div.className='cost-item'; div.id=id;
   div.innerHTML=`<div class="cost-item-header"><span class="cost-item-label">Other Cost #${n}</span><button type="button" class="btn-remove-item" onclick="document.getElementById('${id}').remove();recalcTotal('edit')" title="Remove"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="form-row" style="margin-bottom:0"><div><label class="form-label">Amount (EGP)</label><input type="number" class="form-input cr-oc-value" min="0" placeholder="e.g. 5,000" oninput="recalcTotal('edit')" value="${prefill?.value||''}"></div><div><label class="form-label">Reason</label><input type="text" class="form-input cr-oc-reason" placeholder="e.g. Agency fees" value="${escHtml(prefill?.reason||'')}"></div></div>`;
+    <div class="form-row" style="margin-bottom:0"><div><label class="form-label">Amount (EGP)</label><input type="text" class="form-input cr-oc-value" min="0" placeholder="e.g. 5,000" oninput="recalcTotal('edit')" value="${fmtInt(prefill?.value)}"></div><div><label class="form-label">Reason</label><input type="text" class="form-input cr-oc-reason" placeholder="e.g. Agency fees" value="${escHtml(prefill?.reason||'')}"></div></div>`;
   list.appendChild(div);
   recalcTotal('edit');
 }
@@ -1731,8 +1602,13 @@ function openView(index) {
         <div><div class="view-kv-label">📍 Venue</div><div class="view-kv-val">${escHtml(ev.place||'—')}</div></div>
         <div><div class="view-kv-label">📅 Date</div><div class="view-kv-val date-val">${fmtDate(ev.date)}</div></div>
         <div><div class="view-kv-label">💰 Event Budget</div><div class="view-kv-val accent"> ${fmtBudget(ev.budget)}</div></div>
-        <div><div class="view-kv-label">👥 Target Attendees</div><div class="view-kv-val">${ev.targetAttendees||'—'}</div></div>
-        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${ev.leads||0}</div></div>
+        <div><div class="view-kv-label">👥 Target Attendees</div><div class="view-kv-val">${fmtInt(ev.targetAttendees)||'—'}</div></div>
+        <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${fmtInt(ev.leads||0)}</div></div>
+        ${ev.id?`<div style="grid-column:1/-1"><div class="view-kv-label">✅ Actual Attendees (real headcount)</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <input type="text" inputmode="numeric" data-thousands class="form-input ev-actual-input" data-event-id="${ev.id}" placeholder="Not recorded yet" value="${ev.actualAttendees!=null?fmtInt(ev.actualAttendees):''}" ${_cfg().canUpdate?'':'disabled'} style="max-width:180px">
+            ${_cfg().canUpdate?`<button type="button" class="btn btn-outline ev-actual-save" data-event-id="${ev.id}" style="padding:6px 14px">Save</button>`:''}
+          </div></div>`:''}
         ${evTotal!==Number(ev.budget||0)?`<div style="grid-column:1/-1"><div class="view-kv-label">🏷️ Total Event Cost (incl. extras)</div><div class="view-kv-val" style="color:var(--clr-orange-dk);font-weight:700;font-size:1rem"> ${fmtBudget(evTotal)}</div></div>`:''}
       </div>
       ${ev.description?`<div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:6px;font-size:.83rem;color:var(--clr-text-sub);line-height:1.5">${escHtml(ev.description)}</div>`:''}
@@ -1807,6 +1683,32 @@ function openView(index) {
   document.getElementById('viewModalBody').innerHTML=html;
   document.getElementById('viewModal').classList.add('open');
   document.body.style.overflow='hidden';
+  wireAttendanceSaves();
+}
+
+/* Real attendance: editable only on already-created events (those with an id),
+   always allowed regardless of approval. Posts to the dedicated endpoint. */
+function wireAttendanceSaves() {
+  document.querySelectorAll('.ev-actual-save').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.eventId;
+      const input = document.querySelector('.ev-actual-input[data-event-id="'+id+'"]');
+      const raw = (input.value||'').replace(/,/g,'').trim();
+      btn.disabled = true;
+      try {
+        await apiSend(_campUrl(_cfg().attendanceTmpl, id), 'POST',
+          { actualAttendees: raw === '' ? null : Number(raw) });
+        const c = campaigns.find(c => (c.eventsMulti||[]).some(e => e.id === id));
+        const ev = c && (c.eventsMulti||[]).find(e => e.id === id);
+        if (ev) ev.actualAttendees = raw === '' ? null : Number(raw);
+        input.value = raw === '' ? '' : fmtInt(raw);
+        if (window.Swal) Swal.fire({icon:'success',title:'Attendance saved',timer:1200,showConfirmButton:false});
+      } catch(e) {
+        if (window.Swal) Swal.fire({icon:'error',title:'Could not save',text:e.message});
+        else alert(e.message);
+      } finally { btn.disabled = false; }
+    };
+  });
 }
 function closeView(){document.getElementById('viewModal').classList.remove('open');document.body.style.overflow='';}
 document.getElementById('viewModalClose').addEventListener('click',closeView);
@@ -1925,6 +1827,40 @@ if (searchQuery) {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = searchQuery;
 }
+document.addEventListener('input', function(e) {
+  if (e.target.classList.contains('cr-ev-budget') ||
+      e.target.classList.contains('cr-ev-attendees') ||
+      e.target.classList.contains('cr-person-budget') ||
+      e.target.classList.contains('cr-tvc-budget') ||
+      e.target.classList.contains('cr-tvs-count') ||
+      e.target.classList.contains('cr-at-count') ||
+      e.target.classList.contains('cr-at-budget') ||
+      e.target.classList.contains('cr-stloc-budget') ||
+      e.target.classList.contains('cr-sm-plat-budget') ||
+      e.target.classList.contains('cr-ex-budget') ||
+      e.target.classList.contains('cr-oc-value') ||
+      e.target.classList.contains('edit-type-lead-input') ||
+      e.target.id === 'budgetMin' ||
+      e.target.id === 'budgetMax' ||
+      e.target.id === 'leadsMin' ||
+      e.target.id === 'leadsMax') {
+    
+    let cursor = e.target.selectionStart;
+    const originalLen = e.target.value.length;
+    
+    let val = e.target.value.replace(/[^\d]/g, '');
+    if (val === '') {
+      e.target.value = '';
+    } else {
+      let formatted = Number(val).toLocaleString('en-US');
+      e.target.value = formatted;
+      let newLen = formatted.length;
+      cursor = cursor + (newLen - originalLen);
+      e.target.setSelectionRange(cursor, cursor);
+    }
+  }
+});
+
 fetchCampaigns().then(()=>{ renderTable(); });
 
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ fetchCampaigns().then(renderTable); } });

@@ -27,6 +27,13 @@ class MeetingService:
         lead = Lead.objects.select_for_update().select_related(
             "company", "assigned_salesman"
         ).get(id=lead_id)
+        from .sales_action_policy_service import (
+            enforce_action_limit, enforce_max_duration,
+        )
+        enforce_action_limit(lead=lead, salesman=lead.assigned_salesman,
+                             actor=actor, action="meeting")
+        enforce_max_duration(company=lead.company, actor=actor, action="meeting",
+                             scheduled_at=scheduled_start)
         meeting = Meeting.objects.create(
             lead=lead, assigned_salesman=lead.assigned_salesman,
             scheduled_start=scheduled_start, scheduled_end=scheduled_end,

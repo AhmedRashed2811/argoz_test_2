@@ -394,4 +394,19 @@
   } else {
     setInterval(fetchNotifs, 60000);
   }
+
+  /* ── Sidebar Navigation Group Accordion ── */
+  window.toggleNavGroup = function(btn) {
+    const group = btn.closest('.nav-group');
+    if (group) {
+      group.classList.toggle('open');
+    }
+  };
+
+  // Auto-expand any nav-group containing an active sub-item
+  document.querySelectorAll('.nav-group').forEach(group => {
+    if (group.querySelector('.nav-child-item.active') || group.querySelector('.nav-group-toggle.active')) {
+      group.classList.add('open');
+    }
+  });
  })();

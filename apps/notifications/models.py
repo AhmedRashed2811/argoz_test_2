@@ -41,32 +41,3 @@ class NotificationDelivery(BaseModel):
     status = models.CharField(max_length=20, default="PENDING")
     sent_at = models.DateTimeField(null=True, blank=True)
     error = models.TextField(blank=True)
-
-
-class EmailTemplate(BaseModel, CompanyOwnedModel):
-    code = models.CharField(max_length=60)
-    subject_template = models.CharField(max_length=255)
-    body_template = models.TextField()
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["company", "code"], name="uniq_company_email_template"
-            )
-        ]
-
-
-class EmailOutbox(BaseModel, CompanyOwnedModel):
-    """Outbox pattern for reliable async email (docs §16, §12)."""
-
-    to_email = models.EmailField()
-    subject = models.CharField(max_length=255)
-    body = models.TextField()
-    status = models.CharField(max_length=20, default="PENDING")
-    attempts = models.IntegerField(default=0)
-    last_error = models.TextField(blank=True)
-    send_after = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        indexes = [models.Index(fields=["status", "send_after"])]

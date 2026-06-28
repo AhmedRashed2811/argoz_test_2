@@ -266,6 +266,25 @@
     .next-action-opt input[type="radio"] { accent-color: var(--clr-orange); width: 15px; height: 15px; flex-shrink: 0; }
     .datetime-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
     .field-hidden { display: none !important; }
+    /* ── Date / time pickers (task 11): tidy native controls ── */
+    .form-input[type="date"], .form-input[type="time"] {
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+      accent-color: var(--clr-orange); padding-right: 10px; min-height: 42px;
+      display: flex; align-items: center;
+    }
+    .form-input[type="date"]::-webkit-datetime-edit,
+    .form-input[type="time"]::-webkit-datetime-edit { color: var(--clr-text); padding: 0; }
+    .form-input[type="date"]::-webkit-calendar-picker-indicator,
+    .form-input[type="time"]::-webkit-calendar-picker-indicator {
+      cursor: pointer; opacity: .6; padding: 3px; border-radius: 5px;
+      /* tint the native icon toward the brand orange */
+      filter: invert(48%) sepia(72%) saturate(1100%) hue-rotate(355deg) brightness(95%);
+      transition: opacity var(--transition), background var(--transition);
+    }
+    .form-input[type="date"]:hover::-webkit-calendar-picker-indicator,
+    .form-input[type="time"]:hover::-webkit-calendar-picker-indicator { opacity: 1; background: rgba(224,123,32,.1); }
+    .form-input[type="date"]::-webkit-inner-spin-button,
+    .form-input[type="time"]::-webkit-inner-spin-button { display: none; }
 
     /* ── Date tree filter ── */
     .date-tree-year { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; cursor: pointer; font-size: .83rem; font-weight: 600; color: var(--clr-text); transition: background .12s; user-select: none; }

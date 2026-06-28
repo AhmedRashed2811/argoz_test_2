@@ -24,6 +24,24 @@ def _duration_to_timedelta(value, default_minutes: int = 60) -> timedelta:
     return timedelta(minutes=default_minutes)
 
 
+def _apply_weekend_freeze(company, start, end):
+    """Push `end` forward so configured weekend day(s) don't count against the
+    SLA (task 16e). No-op unless the policy is enabled with weekend days."""
+    cfg = PolicyResolver.value(company, PolicyCode.WEEKEND_SLA_FREEZE, default=None)
+    if not (isinstance(cfg, dict) and cfg.get("enabled")):
+        return end
+    weekend = {int(d) for d in (cfg.get("weekend_days") or [])}
+    if not weekend:
+        return end
+    new_end = end
+    day = start.date()
+    while day <= new_end.date():
+        if day.weekday() in weekend:
+            new_end += timedelta(days=1)
+        day += timedelta(days=1)
+    return new_end
+
+
 class SLAService:
     @staticmethod
     def stage_duration(company, stage_code: str) -> timedelta | None:
@@ -66,7 +84,9 @@ class SLAService:
             if delta is None:
                 delta = timedelta(0)
             delta += (scheduled_time - now)
-        return (now + delta) if delta else None
+        if not delta:
+            return None
+        return _apply_weekend_freeze(company, now, now + delta)
 
     @staticmethod
     def schedule_warnings(now) -> int:

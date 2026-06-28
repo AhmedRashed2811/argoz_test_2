@@ -27,6 +27,7 @@ from apps.policies.services import PolicyResolver
 
 from ..constants import ActiveStatus, Origin, SourceCode, StageCode
 from ..models import Lead
+from ..phone import validate_phone
 from .duplicate_service import DuplicateService
 from .lead_creation_service import LeadCreationService
 
@@ -67,6 +68,14 @@ class BulkLeadImportService:
         if rows is None:
             return {"error": "Could not read the CSV file. Save it as UTF-8 CSV."}
 
+        # Broker self-import: if the uploader is themselves a broker, every row is
+        # a broker lead owned by their brokerage — no source/broker_name columns,
+        # just name, country_code, phone, email, language, notes (§8.5).
+        from apps.accounts.models import BrokerStatus
+        self_broker = Broker.objects.filter(
+            company=company, linked_user=actor, status=BrokerStatus.ACTIVE
+        ).first()
+
         method = (PolicyResolver.option_code(
             company, PolicyCode.BULK_IMPORT_DISTRIBUTION, default="MANUAL") or "MANUAL").upper()
         auto = method == "AUTO"
@@ -77,10 +86,11 @@ class BulkLeadImportService:
         seen_phones: set[str] = set()
 
         for raw in rows:
-            row = {k: (v or "").strip() for k, v in raw.items()}
+            row = {k: (v or "").strip() for k, v in raw.items() if k is not None and isinstance(v, str)}
             phone = _normalize_phone(row.get("phone", ""))
             try:
-                clean = BulkLeadImportService._validate_row(company, row, phone)
+                clean = BulkLeadImportService._validate_row(
+                    company, row, phone, self_broker=self_broker)
             except _RowError as exc:
                 rejected_rows.append({**row, "error": str(exc)})
                 continue
@@ -157,17 +167,19 @@ class BulkLeadImportService:
         return list(reader)
 
     @staticmethod
-    def _validate_row(company, row, phone) -> dict:
+    def _validate_row(company, row, phone, self_broker=None) -> dict:
         name = row.get("name", "")
         if not name:
             raise _RowError("Name is required.")
         if not phone:
             raise _RowError("Phone is required.")
-        if not phone.isdigit() or not (6 <= len(phone) <= 15):
-            raise _RowError("Phone must be 6-15 digits (no spaces or symbols).")
         country = row.get("country_code") or DEFAULT_COUNTRY_CODE
         if not country.startswith("+") or not country[1:].isdigit():
             raise _RowError("Country code must look like +20.")
+        # Country-aware length check (same rules as the Add-Lead form).
+        phone_err = validate_phone(country, phone)
+        if phone_err:
+            raise _RowError(phone_err)
         email = row.get("email", "")
         if email:
             try:
@@ -175,18 +187,21 @@ class BulkLeadImportService:
             except DjangoValidationError:
                 raise _RowError("Email is not valid.")
 
+        language = _resolve_language(row.get("language", ""))
+
+        # Broker self-import: simplified template, lead owned by the uploader's
+        # brokerage; no source/broker_name/campaign columns required.
+        if self_broker is not None:
+            return dict(
+                source=SourceCode.BROKER, name=name, phone=phone,
+                country_code=country, email=email, language=language,
+                notes=row.get("notes", ""), broker=self_broker,
+            )
+
         source = _SOURCE_ALIASES.get(row.get("source", "").lower())
         if source is None:
             raise _RowError(
                 "Source must be one of: campaign, broker, referral, call_center.")
-
-        language = None
-        lang_code = row.get("language", "")
-        if lang_code:
-            language = Language.objects.filter(
-                code=lang_code, is_active=True).first()
-            if language is None:
-                raise _RowError(f"Language '{lang_code}' is not in the system.")
 
         clean = dict(
             source=source, name=name, phone=phone, country_code=country,
@@ -280,3 +295,13 @@ def _norm_header(h: str) -> str:
 
 def _normalize_phone(phone: str) -> str:
     return "".join(ch for ch in (phone or "") if ch.isdigit())
+
+
+def _resolve_language(lang_code: str):
+    lang_code = (lang_code or "").strip()
+    if not lang_code:
+        return None
+    language = Language.objects.filter(code=lang_code, is_active=True).first()
+    if language is None:
+        raise _RowError(f"Language '{lang_code}' is not in the system.")
+    return language

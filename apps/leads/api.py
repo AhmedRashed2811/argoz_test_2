@@ -501,8 +501,13 @@ def _lead_history_items(lead):
         "type": "created", "ts": _ms(lead.created_at), "label": "Lead Created",
         "feedback": "Lead added to the system.", "by": _actor_name(lead.created_by),
     }]
+    from .constants import StageCode
     for h in lead.stage_history.all():
         if h.from_stage_id == h.to_stage_id:
+            continue
+        # Meeting/Follow-up stage moves already surface as their own timeline
+        # item (below); skip the redundant "Stage changed to …" entry.
+        if h.to_stage_id and h.to_stage.code in (StageCode.MEETING, StageCode.FOLLOW_UP):
             continue
         to_name = h.to_stage.name if h.to_stage_id else ""
         clean_reason = h.reason

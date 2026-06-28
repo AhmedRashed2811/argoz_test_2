@@ -1,0 +1,13 @@
+name,country_code,phone,email,language,notes
+Ahmed Valid Full,+20,010123000,ahmed@example.com,ar,VALID: all fields filled
+Sara No Email,20,01023456789,,,VALID: email optional
+Mohamed No Language,20,01034567890,mo@example.com,,VALID: language optional
+Layla No Notes,20,01045678901,,,VALID: email+language+notes all optional
+Omar Default Country,, 01056789002,,,VALID: no country_code defaults to +20
+,20,01067890123,,,ERROR: name is required
+No Phone,20,,,,ERROR: phone is required
+Bad Country,20,01078901234,,,ERROR: country_code must start with +
+Bad Email,20,01089012345,not-an-email,,ERROR: invalid email
+Bad Language,20,01090123456,,xx,ERROR: language code not in system
+Duplicate A,20,01099999999,,,VALID: first occurrence accepted
+Duplicate B,20,01099999999,,,ERROR: duplicate phone within this file

@@ -82,6 +82,18 @@ function initPage() {
         showToast('error', 'Validation Error', 'Code value is required.');
         return;
       }
+    } else if (valType === 'COMPOSITE') {
+      payload.enabled = !!document.getElementById('composite-enabled')?.checked;
+      document.querySelectorAll('.composite-int').forEach(inp => {
+        const v = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 0) { inp.value = 0; }
+        payload[inp.dataset.key] = Math.max(0, isNaN(v) ? 0 : v);
+      });
+      document.querySelectorAll('.weekday-grid').forEach(grid => {
+        payload[grid.dataset.key] = Array.from(
+          grid.querySelectorAll('.composite-weekday:checked')
+        ).map(cb => parseInt(cb.value, 10));
+      });
     } else if (valType === 'JSON') {
       const jsonTextarea = document.querySelector('textarea[name="value_json"]');
       payload.value_json = jsonTextarea ? jsonTextarea.value.trim() : '';
@@ -149,6 +161,19 @@ function showToast(type, title, msg) {
   setTimeout(() => el.remove(), 4000);
 }
 
+function initComposite() {
+  const toggle = document.getElementById('composite-enabled');
+  const fields = document.getElementById('composite-fields');
+  if (!toggle || !fields) return;
+  const sync = () => { fields.style.opacity = toggle.checked ? '1' : '.45';
+                       fields.style.pointerEvents = toggle.checked ? 'auto' : 'none'; };
+  toggle.addEventListener('change', sync); sync();
+  document.querySelectorAll('.weekday-chip input').forEach(cb => {
+    cb.addEventListener('change', () => cb.closest('.weekday-chip').classList.toggle('selected', cb.checked));
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initPage();
+  initComposite();
 });

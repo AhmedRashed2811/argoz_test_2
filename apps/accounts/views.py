@@ -473,7 +473,8 @@ def broker_api_list(request):
             "id": str(b.id),
             "name": b.name,
             "email": b.email,
-            "agency": b.company_name,
+            "agency": b.agency.name if b.agency_id else b.company_name,
+            "agencyId": str(b.agency_id) if b.agency_id else None,
             "phone": b.phone,
             "location": b.location,
             "commission": float(b.commission_rate) if b.commission_rate is not None else None,
@@ -518,6 +519,7 @@ def broker_api_create(request):
             email=email,
             password=password,
             company_name=data.get("agency", ""),
+            agency_id=data.get("agencyId") or None,
             phone=data.get("phone", ""),
             location=data.get("location", ""),
             commission_rate=commission,
@@ -557,6 +559,7 @@ def broker_api_edit(request, broker_id):
             email=data.get("email", "").strip(),
             password=data.get("password", ""),
             company_name=data.get("agency", ""),
+            agency_id=data.get("agencyId") or None,
             phone=data.get("phone", ""),
             location=data.get("location", ""),
             commission_rate=commission,
@@ -582,6 +585,78 @@ def broker_api_delete(request, broker_id):
             actor=request.user,
             request_meta=request.request_meta,
         )
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+# ── Agencies (task 1): brokerage CRUD, separate from broker users ──
+def _agency_payload(request):
+    import json
+    data = json.loads(request.body)
+    commission = data.get("commission")
+    return dict(
+        name=data.get("name", "").strip(), phone=data.get("phone", ""),
+        email=data.get("email", "").strip(), location=data.get("location", ""),
+        commission_rate=commission if commission not in ("", None) else None,
+        contract_start_date=data.get("startDate") or None,
+        contract_end_date=data.get("endDate") or None,
+        status=data.get("status", ""), notes=data.get("notes", ""),
+    )
+
+
+@login_required
+@crm_permission_required("admin.brokers.access")
+def agency_api_list(request):
+    from .models import Agency
+    data = [{
+        "id": str(a.id), "name": a.name, "phone": a.phone, "email": a.email,
+        "location": a.location,
+        "commission": float(a.commission_rate) if a.commission_rate is not None else None,
+        "startDate": a.contract_start_date.isoformat() if a.contract_start_date else None,
+        "endDate": a.contract_end_date.isoformat() if a.contract_end_date else None,
+        "status": a.status, "notes": a.notes, "brokerCount": a.brokers.count(),
+    } for a in Agency.objects.filter(company=request.company).order_by("name")]
+    return JsonResponse({"agencies": data})
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def agency_api_create(request):
+    from .services import AgencyService
+    try:
+        agency = AgencyService.create_agency(
+            company=request.company, actor=request.user,
+            request_meta=request.request_meta, **_agency_payload(request))
+        return JsonResponse({"ok": True, "agency_id": str(agency.id)})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def agency_api_edit(request, agency_id):
+    from .services import AgencyService
+    try:
+        AgencyService.update_agency(
+            agency_id=agency_id, actor=request.user,
+            request_meta=request.request_meta, **_agency_payload(request))
+        return JsonResponse({"ok": True})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+
+@login_required
+@crm_permission_required("admin.brokers.create")
+@require_POST
+def agency_api_delete(request, agency_id):
+    from .services import AgencyService
+    try:
+        AgencyService.delete_agency(
+            agency_id=agency_id, actor=request.user,
+            request_meta=request.request_meta)
         return JsonResponse({"ok": True})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

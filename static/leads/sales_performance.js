@@ -652,7 +652,7 @@ function renderLeaderboard(sales){
       <div class="lb-metrics">
         <div class="lb-metric"><div class="lb-metric-val">${s.conv.toFixed(1)}%</div><div class="lb-metric-label">Conv.</div></div>
         <div class="lb-metric"><div class="lb-metric-val">${s.sla.toFixed(0)}%</div><div class="lb-metric-label">SLA</div></div>
-        <div class="lb-metric"><div class="lb-metric-val">${s.interested}</div><div class="lb-metric-label">Interested</div></div>
+        <div class="lb-metric"><div class="lb-metric-val">${s.interested.toLocaleString()}</div><div class="lb-metric-label">Interested</div></div>
       </div>
     </div>`;
   }).join('');
@@ -703,7 +703,7 @@ function renderSalesTable(sales){
       <td>${s.interested.toLocaleString()}</td>
       <td><div class="progress-wrap"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${Math.min(s.conv*3,100)}%;background:${s.conv>=25?'#10b981':s.conv>=20?'#f59e0b':'#f43f5e'};"></div></div><span class="progress-pct">${s.conv.toFixed(1)}%</span></div></td>
       <td><div class="progress-wrap"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${s.sla}%;background:${s.sla>=90?'#10b981':s.sla>=75?'#f59e0b':'#f43f5e'};"></div></div><span class="progress-pct">${s.sla.toFixed(0)}%</span></div></td>
-      <td>${s.response} mins</td>
+      <td>${s.response.toLocaleString()} mins</td>
     </tr>`;
   }).join('');
 }

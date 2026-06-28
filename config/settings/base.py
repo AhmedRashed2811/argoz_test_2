@@ -143,6 +143,8 @@ CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", default=False, cas
 CELERY_TIMEZONE = TIME_ZONE
 
 # Celery Beat periodic jobs (docs §12.1). Cadences are conservative defaults.
+from celery.schedules import crontab  # noqa: E402
+
 CELERY_BEAT_SCHEDULE = {
     "check_lead_sla_expiry": {
         "task": "apps.leads.tasks.check_lead_sla_expiry",
@@ -152,10 +154,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.leads.tasks.send_due_reminders",
         "schedule": 60.0,
     },
-    "send_email_outbox": {
-        "task": "apps.notifications.tasks.send_email_outbox",
-        "schedule": 60.0,
-    },
     "retry_failed_webhooks": {
         "task": "apps.integrations.tasks.retry_failed_webhooks",
         "schedule": 600.0,  # every 10 min (docs: 5-15 min)
@@ -163,6 +161,17 @@ CELERY_BEAT_SCHEDULE = {
     "recalculate_campaign_metrics": {
         "task": "apps.marketing.tasks.recalculate_campaign_metrics",
         "schedule": 3600.0,  # hourly reconciliation (docs §12.1)
+    },
+    # Task 16c — prune old notifications per company policy (daily 02:00).
+    "cleanup_old_notifications": {
+        "task": "apps.notifications.tasks.cleanup_old_notifications",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    # Task 16d — daily task-reminder emails to sales / heads (daily 07:00;
+    # the task itself skips the company's configured weekend day(s)).
+    "send_daily_task_emails": {
+        "task": "apps.notifications.tasks.send_daily_task_emails",
+        "schedule": crontab(hour=7, minute=0),
     },
 }
 

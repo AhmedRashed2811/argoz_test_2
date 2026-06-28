@@ -173,6 +173,30 @@ class BrokerStatus:
     ]
 
 
+class Agency(BaseModel, CompanyOwnedModel):
+    """Brokerage agency — the organisation a broker user belongs to (task 1).
+    Separate from the individual Broker (the lead's broker_owner), so the leads
+    report analysis that keys on Broker is preserved."""
+
+    name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=32, blank=True)
+    email = models.EmailField(blank=True)
+    location = models.CharField(max_length=150, blank=True)
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    contract_start_date = models.DateField(null=True, blank=True)
+    contract_end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=BrokerStatus.CHOICES, default=BrokerStatus.ACTIVE
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name_plural = "Agencies"
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Broker(BaseModel, CompanyOwnedModel):
     """External broker/intermediary. Broker ownership is kept strictly separate
     from internal salesman assignment (docs §8.5)."""
@@ -183,6 +207,10 @@ class Broker(BaseModel, CompanyOwnedModel):
         null=True,
         blank=True,
         related_name="broker_profile",
+    )
+    agency = models.ForeignKey(
+        "accounts.Agency", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="brokers",
     )
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=32, blank=True)

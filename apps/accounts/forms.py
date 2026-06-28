@@ -23,7 +23,7 @@ class UserCreateForm(forms.Form):
         if company is not None:
             self.fields["default_role"].queryset = RoleGroup.objects.filter(
                 company=company, is_active=True
-            )
+            ).exclude(code="BROKERS")
 
     def clean_email(self):
         email = self.cleaned_data["email"]
@@ -49,7 +49,7 @@ class UserEditForm(forms.Form):
         if company is not None:
             self.fields["default_role"].queryset = RoleGroup.objects.filter(
                 company=company, is_active=True
-            )
+            ).exclude(code="BROKERS")
 
     def clean_email(self):
         email = self.cleaned_data["email"]

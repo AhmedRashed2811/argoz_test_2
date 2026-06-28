@@ -43,4 +43,8 @@ urlpatterns = [
     path("brokers/api/create/", views.broker_api_create, name="broker_api_create"),
     path("brokers/<uuid:broker_id>/api/edit/", views.broker_api_edit, name="broker_api_edit"),
     path("brokers/<uuid:broker_id>/api/delete/", views.broker_api_delete, name="broker_api_delete"),
+    path("agencies/api/", views.agency_api_list, name="agency_api_list"),
+    path("agencies/api/create/", views.agency_api_create, name="agency_api_create"),
+    path("agencies/<uuid:agency_id>/api/edit/", views.agency_api_edit, name="agency_api_edit"),
+    path("agencies/<uuid:agency_id>/api/delete/", views.agency_api_delete, name="agency_api_delete"),
 ]

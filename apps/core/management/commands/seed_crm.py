@@ -242,6 +242,18 @@ class Command(BaseCommand):
              ValueType.BOOLEAN, []),
             (PolicyCode.WEBHOOK_MAPPING_POLICY, "Webhook Mapping Policy", "integration",
              ValueType.JSON, []),
+            # Composite On/Off policies (task 16) — default Off, configured in the
+            # policy editor; schema in apps/policies/composite.py.
+            (PolicyCode.SALES_ACTION_LIMITS,
+             "Per-Lead Action Limits (Sales)", "leads", ValueType.COMPOSITE, []),
+            (PolicyCode.SALES_ACTION_MAX_DURATION,
+             "Per-Lead Action Time Limits (Sales)", "leads", ValueType.COMPOSITE, []),
+            (PolicyCode.NOTIFICATION_AUTO_CLEANUP,
+             "Old Notification Cleanup", "notifications", ValueType.COMPOSITE, []),
+            (PolicyCode.DAILY_TASK_EMAIL,
+             "Daily Task Reminder Email", "notifications", ValueType.COMPOSITE, []),
+            (PolicyCode.WEEKEND_SLA_FREEZE,
+             "Weekend SLA Freeze", "leads", ValueType.COMPOSITE, []),
         ]
         # Per-stage SLA durations.
         for stage in (StageCode.FRESH, StageCode.INTERESTED, StageCode.FOLLOW_UP,
@@ -309,36 +321,57 @@ class Command(BaseCommand):
         from apps.authorization.models import PageDefinition
 
         # (module, code, name, url_name, menu_order)
+        # menu_order is now a single global sequence (nav orders by menu_order),
+        # grouped for UX: daily lead work → marketing → finance → admin.
         pages = [
-            ("dashboard", "main", "Dashboard", "dashboard:index", 0),
-            ("leads", "dashboard", "Leads", "leads:list", 1),
-            ("leads", "create", "Add Lead", "leads:create", 2),
+            ("dashboard", "main", "Dashboard", "dashboard:index", 0, None),
+            # — Leads workspace —
+            ("leads", "dashboard", "Leads", "leads:list", 10, None),
+            ("leads", "create", "Add Lead", "leads:create", 11, "leads.dashboard"),
             ("leads", "manual_distribution", "Manual Distribution",
-             "leads:manual_distribution", 2),
-            ("marketing", "campaigns", "Campaigns", "marketing:campaign_list", 2),
-            ("marketing", "marketing_report", "Marketing Reports",
-             "marketing:marketing_report", 3),
+             "leads:manual_distribution", 12, "leads.dashboard"),
             ("leads", "sales_performance", "Sales Performance",
-             "leads:sales_performance", 3),
+             "leads:sales_performance", 13, "leads.dashboard"),
             ("leads", "leads_analysis", "Leads Analysis",
-             "leads:leads_analysis", 3),
-            ("finance", "dashboard", "Finance Approvals", "finance:campaign_approval", 3),
-            ("notifications", "view_own", "Notifications", "notifications:list", 4),
-            ("admin", "users", "Users", "accounts:user_list", 10),
-            ("admin", "teams", "Sales Teams", "accounts:team_list", 11),
-            ("admin", "brokers", "Brokers", "accounts:broker_list", 12),
+             "leads:leads_analysis", 14, "leads.dashboard"),
+            # — Marketing —
+            ("marketing", "campaigns", "Campaigns", "marketing:campaign_list", 20, None),
+            ("marketing", "marketing_report", "Marketing Reports",
+             "marketing:marketing_report", 21, "marketing.campaigns"),
+            # — Finance —
+            ("finance", "dashboard", "Finance Approvals", "finance:campaign_approval", 30, None),
+            # — Notifications —
+            ("notifications", "view_own", "Notifications", "notifications:list", 40, None),
+            # — Administration —
+            ("admin", "users", "Users", "accounts:user_list", 50, None),
+            ("admin", "teams", "Sales Teams", "accounts:team_list", 51, None),
+            ("admin", "brokers", "Brokers", "accounts:broker_list", 52, None),
             ("authorization", "roles", "Roles & Permissions",
-             "authorization:role_list", 11),
-            ("policies", "company", "Policies", "policies:list", 12),
-            ("audit", "view_all", "Audit Log", "audit:list", 13),
-            ("integrations", "webhooks", "Webhooks", "integrations:webhook_list", 14),
+             "authorization:role_list", 53, None),
+            ("policies", "company", "Policies", "policies:list", 54, None),
+            ("audit", "view_all", "Audit Log", "audit:list", 55, None),
+            ("integrations", "webhooks", "Webhooks", "integrations:webhook_list", 56, None),
         ]
-        for module, code, name, url_name, order in pages:
+        valid_codes = {f"{m}.{c}" for m, c, *_ in pages}
+        for module, code, name, url_name, order, _ in pages:
             PageDefinition.objects.update_or_create(
                 code=f"{module}.{code}",
                 defaults=dict(module=module, name=name, url_name=url_name,
                               menu_order=order, is_menu_item=(module != "notifications")),
             )
+        for module, code, _, _, _, parent_code in pages:
+            page = PageDefinition.objects.filter(code=f"{module}.{code}").first()
+            if page:
+                if parent_code:
+                    page.parent = PageDefinition.objects.filter(code=parent_code).first()
+                else:
+                    page.parent = None
+                page.save()
+        # Prune stale top-level menu rows (e.g. a duplicate "Marketing Reports"
+        # left over from an earlier seed) so the sidebar matches this list.
+        PageDefinition.objects.filter(parent__isnull=True).exclude(
+            code__in=valid_codes
+        ).delete()
         self.stdout.write(f"  pages: {len(pages)}")
 
     def _permissions(self):

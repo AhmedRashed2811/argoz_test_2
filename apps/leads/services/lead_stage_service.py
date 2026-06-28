@@ -132,6 +132,15 @@ class LeadStageService:
         from datetime import timedelta
 
         from .reminder_service import ReminderService
+        from .sales_action_policy_service import (
+            enforce_action_limit, enforce_max_duration,
+        )
+
+        locked = Lead.objects.select_related("company", "assigned_salesman").get(id=lead_id)
+        enforce_action_limit(lead=locked, salesman=locked.assigned_salesman,
+                             actor=actor, action="freeze")
+        enforce_max_duration(company=locked.company, actor=actor, action="freeze",
+                             days=days)
 
         lead = LeadStageService.change_stage(
             lead_id=lead_id, to_stage_code=StageCode.FROZEN, actor=actor,

@@ -113,14 +113,38 @@
     <nav class="sidebar-nav">
       <div class="nav-section">
         {% for item in nav_items %}
-          {% if item.url_name %}
-            {% url item.url_name as item_url %}
-            <a href="{{ item_url }}" class="nav-item {% if request.path == item_url %}active{% endif %}">
-              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-              {{ item.name }}
-            </a>
+          {% if item.allowed_children %}
+            <div class="nav-group">
+              <button class="nav-item nav-group-toggle" onclick="toggleNavGroup(this)">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>{{ item.name }}</span>
+                <svg class="nav-group-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="nav-group-children">
+                {% if item.url_name %}
+                  {% url item.url_name as item_url %}
+                  <a href="{{ item_url }}" class="nav-child-item {% if request.path == item_url %}active{% endif %}">
+                    Overview
+                  </a>
+                {% endif %}
+                {% for child in item.allowed_children %}
+                  {% url child.url_name as child_url %}
+                  <a href="{{ child_url }}" class="nav-child-item {% if request.path == child_url %}active{% endif %}">
+                    {{ child.name }}
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
           {% else %}
-            <a href="#" class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>{{ item.name }}</a>
+            {% if item.url_name %}
+              {% url item.url_name as item_url %}
+              <a href="{{ item_url }}" class="nav-item {% if request.path == item_url %}active{% endif %}">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>{{ item.name }}</span>
+              </a>
+            {% else %}
+              <a href="#" class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>{{ item.name }}</span></a>
+            {% endif %}
           {% endif %}
         {% endfor %}
       </div>

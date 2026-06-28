@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.db import transaction
 
-from .models import Language, Team, TeamMember, User, UserLanguage, UserProfile, Broker
+from .models import Agency, Language, Team, TeamMember, User, UserLanguage, UserProfile, Broker
 
 
 class UserService:
@@ -232,7 +232,7 @@ class UserService:
         import json
         from apps.authorization.models import RoleGroup, PermissionDefinition, RolePermission
 
-        roles = RoleGroup.objects.filter(company=company, is_active=True)
+        roles = RoleGroup.objects.filter(company=company, is_active=True).exclude(code="BROKERS")
         permissions = PermissionDefinition.objects.filter(is_active=True).order_by("module", "code")
         
         role_permissions_map = {}
@@ -507,6 +507,7 @@ class BrokerService:
         email="",
         password=None,
         company_name="",
+        agency_id=None,
         phone="",
         location="",
         commission_rate=None,
@@ -518,6 +519,13 @@ class BrokerService:
     ) -> Broker:
         from apps.audit.services import AuditService
         from apps.core.constants import AuditAction
+
+        agency = None
+        if agency_id:
+            agency = Agency.objects.filter(company=company, id=agency_id).first()
+            if agency is None:
+                raise ValueError("Selected agency was not found.")
+            company_name = agency.name  # keep denormalized name in sync
 
         # A broker logs in as a regular user: create the account here (with the
         # BROKERS role so it inherits all broker permissions) instead of from the
@@ -538,6 +546,7 @@ class BrokerService:
             name=name,
             email=email,
             linked_user=linked_user,
+            agency=agency,
             company_name=company_name,
             phone=phone,
             location=location,
@@ -571,6 +580,7 @@ class BrokerService:
         email="",
         password=None,
         company_name="",
+        agency_id=None,
         phone="",
         location="",
         commission_rate=None,
@@ -585,6 +595,14 @@ class BrokerService:
         from apps.core.constants import AuditAction
 
         broker = Broker.objects.select_for_update().get(id=broker_id)
+        if agency_id:
+            agency = Agency.objects.filter(company=broker.company, id=agency_id).first()
+            if agency is None:
+                raise ValueError("Selected agency was not found.")
+            broker.agency = agency
+            company_name = agency.name
+        else:
+            broker.agency = None
         before_data = DiffService.snapshot(broker, fields=["name", "company_name", "phone", "location", "commission_rate", "contract_start_date", "contract_end_date", "leads_count", "notes"])
 
         # Keep the linked login account in sync (or create one if missing).
@@ -675,3 +693,88 @@ class BrokerService:
             broker.linked_user.save(update_fields=["is_active"])
 
         broker.delete()
+
+
+class AgencyService:
+    """CRUD for brokerage agencies (task 1). Agencies group broker users; the
+    lead's broker_owner still points at the individual Broker, so leads reports
+    are unaffected."""
+
+    _FIELDS = ["name", "phone", "email", "location", "commission_rate",
+               "contract_start_date", "contract_end_date", "status", "notes"]
+
+    @staticmethod
+    @transaction.atomic
+    def create_agency(*, company, actor=None, request_meta=None, **data) -> Agency:
+        from apps.audit.services import AuditService, DiffService
+        from apps.core.constants import AuditAction
+
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise ValueError("Agency name is required.")
+        agency = Agency.objects.create(
+            company=company, name=name,
+            phone=data.get("phone", ""), email=data.get("email", ""),
+            location=data.get("location", ""),
+            commission_rate=data.get("commission_rate"),
+            contract_start_date=data.get("contract_start_date") or None,
+            contract_end_date=data.get("contract_end_date") or None,
+            notes=data.get("notes", ""),
+        )
+        AuditService.log(
+            action=AuditAction.CREATE, instance=agency, actor=actor,
+            company=company, module="accounts", request_meta=request_meta,
+            after=DiffService.snapshot(agency, fields=AgencyService._FIELDS),
+            entity_display=agency.name,
+        )
+        return agency
+
+    @staticmethod
+    @transaction.atomic
+    def update_agency(*, agency_id, actor=None, request_meta=None, **data) -> Agency:
+        from apps.audit.services import AuditService, DiffService
+        from apps.core.constants import AuditAction
+
+        agency = Agency.objects.select_for_update().get(id=agency_id)
+        before = DiffService.snapshot(agency, fields=AgencyService._FIELDS)
+        name = (data.get("name") or "").strip()
+        if not name:
+            raise ValueError("Agency name is required.")
+        agency.name = name
+        agency.phone = data.get("phone", "")
+        agency.email = data.get("email", "")
+        agency.location = data.get("location", "")
+        agency.commission_rate = data.get("commission_rate")
+        agency.contract_start_date = data.get("contract_start_date") or None
+        agency.contract_end_date = data.get("contract_end_date") or None
+        if data.get("status"):
+            agency.status = data["status"]
+        agency.notes = data.get("notes", "")
+        agency.save()
+        # Keep the denormalized company_name on member brokers in sync (display
+        # + leads report grouping).
+        agency.brokers.update(company_name=agency.name)
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=agency, actor=actor,
+            company=agency.company, module="accounts", request_meta=request_meta,
+            before=before, after=DiffService.snapshot(agency, fields=AgencyService._FIELDS),
+            entity_display=agency.name,
+        )
+        return agency
+
+    @staticmethod
+    @transaction.atomic
+    def delete_agency(*, agency_id, actor=None, request_meta=None) -> None:
+        from apps.audit.services import AuditService
+        from apps.core.constants import AuditAction
+
+        agency = Agency.objects.select_for_update().get(id=agency_id)
+        # Detach brokers (their leads/ownership history are untouched); the
+        # agency FK is SET_NULL so this is safe.
+        agency.brokers.update(agency=None)
+        AuditService.log(
+            action=AuditAction.DELETE, instance=agency, actor=actor,
+            company=agency.company, module="accounts", request_meta=request_meta,
+            entity_display=agency.name,
+        )
+        agency.delete()

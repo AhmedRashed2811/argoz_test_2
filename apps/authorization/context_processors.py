@@ -18,12 +18,19 @@ def nav_menu(request):
     items = []
     pages = PageDefinition.objects.filter(
         is_menu_item=True, is_active=True, parent__isnull=True
-    ).order_by("module", "menu_order")
+    ).order_by("menu_order", "name")
     for page in pages:
         if page.module == "notifications":
             continue
         access_code = f"{page.code}.access"
         if user.is_superuser or access_code in codes or _page_allowed(page, codes):
+            # Resolve allowed children
+            allowed_children = []
+            for child in page.children.filter(is_menu_item=True, is_active=True).order_by("menu_order", "name"):
+                child_access = f"{child.code}.access"
+                if user.is_superuser or child_access in codes or _page_allowed(child, codes):
+                    allowed_children.append(child)
+            page.allowed_children = allowed_children
             items.append(page)
     return {"nav_items": items}
 

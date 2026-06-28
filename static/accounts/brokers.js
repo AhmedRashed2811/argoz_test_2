@@ -517,11 +517,18 @@ function dismissToast(el) {
    CREATE
    ═══════════════════════════════════ */
 function resetCreateForm() {
-  ['c_name','c_email','c_password','c_agency','c_phone','c_location','c_commission','c_startDate','c_endDate','c_notes'].forEach(id => {
+  ['c_name','c_email','c_password','c_agency_id','c_phone','c_location','c_commission','c_startDate','c_endDate','c_notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
 }
-function openCreate() { resetCreateForm(); document.getElementById('createModal').classList.add('open'); }
+function openCreate() {
+  resetCreateForm();
+  populateAgencySelect('c_agency_id');
+  document.getElementById('createModal').classList.add('open');
+
+  clearBrowserRestoredFieldsSoon(false);
+}
+
 function closeCreate() { document.getElementById('createModal').classList.remove('open'); }
 
 if (document.getElementById('btnCreate')) {
@@ -543,7 +550,8 @@ document.getElementById('createSave').addEventListener('click', async () => {
     name,
     email,
     password,
-    agency:     document.getElementById('c_agency').value.trim(),
+    agencyId:   document.getElementById('c_agency_id').value || '',
+    agency:     agencyNameById(document.getElementById('c_agency_id').value),
     phone:      document.getElementById('c_phone').value.trim(),
     location:   document.getElementById('c_location').value.trim(),
     commission: document.getElementById('c_commission').value.trim(),
@@ -570,6 +578,7 @@ document.getElementById('createSave').addEventListener('click', async () => {
       name:       payload.name,
       email:      payload.email,
       agency:     payload.agency,
+      agencyId:   payload.agencyId || null,
       phone:      payload.phone,
       location:   payload.location,
       commission: payload.commission,
@@ -604,10 +613,28 @@ function openEdit(index) {
     <div class="form-group"><label class="form-label">Broker Name *</label><input type="text" class="form-input" id="ed_name" value="${escHtml(b.name)}"></div>
     <div class="form-row">
       <div><label class="form-label">Login Email</label><input type="email" class="form-input" id="ed_email" value="${escHtml(b.email||'')}"></div>
-      <div><label class="form-label">New Password</label><input type="password" class="form-input" id="ed_password" placeholder="Leave blank to keep current"></div>
+      <div><label class="form-label">New Password</label>
+      <input
+  type="password"
+  class="form-input"
+  id="ed_password"
+  name="broker_edit_password_no_autofill"
+  placeholder="Leave blank to keep current"
+  value=""
+  autocomplete="new-password"
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
+  readonly
+  data-autofill-guard="clear"
+  data-lpignore="true"
+  data-1p-ignore="true"
+>
+
+      </div>
     </div>
     <div class="form-row">
-      <div><label class="form-label">Agency / Company</label><input type="text" class="form-input" id="ed_agency" value="${escHtml(b.agency||'')}"></div>
+      <div><label class="form-label">Agency</label><select class="form-input" id="ed_agency_id">${agencyOptions(b.agencyId)}</select></div>
       <div><label class="form-label">Phone</label><input type="tel" class="form-input" id="ed_phone" value="${escHtml(b.phone||'')}"></div>
     </div>
     <div class="form-row">
@@ -624,6 +651,7 @@ function openEdit(index) {
     </div>
     <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="ed_notes">${escHtml(b.notes||'')}</textarea></div>`;
   document.getElementById('editModal').classList.add('open');
+  clearBrowserRestoredFieldsSoon(false);
 }
 function closeEdit() { document.getElementById('editModal').classList.remove('open'); editingIndex = null; }
 
@@ -643,7 +671,8 @@ document.getElementById('editSave').addEventListener('click', async () => {
     name,
     email:      document.getElementById('ed_email').value.trim(),
     password:   document.getElementById('ed_password').value,
-    agency:     document.getElementById('ed_agency').value.trim(),
+    agencyId:   document.getElementById('ed_agency_id').value || '',
+    agency:     agencyNameById(document.getElementById('ed_agency_id').value),
     phone:      document.getElementById('ed_phone').value.trim(),
     location:   document.getElementById('ed_location').value.trim(),
     commission: document.getElementById('ed_commission').value.trim(),
@@ -670,6 +699,7 @@ document.getElementById('editSave').addEventListener('click', async () => {
     b.name       = payload.name;
     b.email      = payload.email;
     b.agency     = payload.agency;
+    b.agencyId   = payload.agencyId || null;
     b.phone      = payload.phone;
     b.location   = payload.location;
     b.commission = payload.commission;
@@ -792,6 +822,283 @@ function highlight(id) {
 }
 
 /* ═══════════════════════════════════
+   AGENCIES (task 1)
+   ═══════════════════════════════════ */
+let agencies = [];
+let editingAgencyId = null;
+
+function _agHeaders() { return { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }; }
+function agencyNameById(id) { const a = agencies.find(a => a.id === id); return a ? a.name : ''; }
+function agencyOptions(selectedId) {
+  return ['<option value="">— Independent (no agency) —</option>']
+    .concat(agencies.map(a =>
+      `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${escHtml(a.name)}</option>`
+    )).join('');
+}
+function populateAgencySelect(selectId, selectedId) {
+  const el = document.getElementById(selectId);
+  if (el) el.innerHTML = agencyOptions(selectedId);
+}
+async function loadAgencies() {
+  try {
+    const r = await fetch(window.BROKERS_CFG.agencyListUrl);
+    if (r.ok) agencies = (await r.json()).agencies || [];
+  } catch (e) { console.error('loadAgencies failed', e); }
+}
+
+function renderAgencyList() {
+  const wrap = document.getElementById('agencyList');
+  if (!wrap) return;
+  if (!agencies.length) { wrap.innerHTML = '<p style="color:var(--clr-text-sub);font-size:.84rem">No agencies yet.</p>'; return; }
+  wrap.innerHTML = agencies.map(a => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--clr-border);border-radius:8px;margin-bottom:8px">
+      <div>
+        <div style="font-weight:600">${escHtml(a.name)}</div>
+        <div style="font-size:.76rem;color:var(--clr-text-sub)">${escHtml(a.location||'—')} · ${a.brokerCount} broker(s)${a.commission!=null?' · '+a.commission+'%':''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="action-btn edit" onclick="startEditAgency('${a.id}')">Edit</button>
+        <button class="action-btn deactivate" onclick="deleteAgency('${a.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function _agFormVals() {
+  const c = document.getElementById('a_commission').value.trim();
+  return {
+    name: document.getElementById('a_name').value.trim(),
+    phone: document.getElementById('a_phone').value.trim(),
+    email: document.getElementById('a_email').value.trim(),
+    location: document.getElementById('a_location').value.trim(),
+    commission: c === '' ? '' : c,
+    status: document.getElementById('a_status').value,
+    startDate: document.getElementById('a_startDate').value,
+    endDate: document.getElementById('a_endDate').value,
+    notes: document.getElementById('a_notes').value.trim(),
+  };
+}
+function resetAgencyForm() {
+  editingAgencyId = null;
+  ['a_name','a_phone','a_email','a_location','a_commission','a_startDate','a_endDate','a_notes']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('a_status').value = 'ACTIVE';
+  document.getElementById('agencySave').textContent = 'Add Agency';
+  document.getElementById('agencyFormReset').style.display = 'none';
+}
+function startEditAgency(id) {
+  const a = agencies.find(a => a.id === id); if (!a) return;
+  editingAgencyId = id;
+  document.getElementById('a_name').value = a.name || '';
+  document.getElementById('a_phone').value = a.phone || '';
+  document.getElementById('a_email').value = a.email || '';
+  document.getElementById('a_location').value = a.location || '';
+  document.getElementById('a_commission').value = a.commission != null ? a.commission : '';
+  document.getElementById('a_status').value = a.status || 'ACTIVE';
+  document.getElementById('a_startDate').value = a.startDate || '';
+  document.getElementById('a_endDate').value = a.endDate || '';
+  document.getElementById('a_notes').value = a.notes || '';
+  document.getElementById('agencySave').textContent = 'Save Changes';
+  document.getElementById('agencyFormReset').style.display = 'inline-flex';
+}
+async function deleteAgency(id) {
+  const a = agencies.find(a => a.id === id); if (!a) return;
+  if (window.Swal) {
+    const res = await Swal.fire({ icon: 'warning', title: `Delete "${a.name}"?`,
+      text: 'Brokers in this agency become independent; their leads are unchanged.',
+      showCancelButton: true, confirmButtonColor: '#c0392b', confirmButtonText: 'Delete' });
+    if (!res.isConfirmed) return;
+  }
+  const url = window.BROKERS_CFG.agencyDeleteTmplUrl.replace('00000000-0000-0000-0000-000000000000', id);
+  try {
+    const r = await fetch(url, { method: 'POST', headers: _agHeaders() });
+    if (!r.ok) throw new Error((await r.json()).error || 'Delete failed');
+    await loadAgencies(); renderAgencyList(); await loadBrokers();
+    showToast('success', 'Agency Deleted', `"${a.name}" removed.`);
+  } catch (e) { showToast('error', 'Error', e.message); }
+}
+
+async function saveAgency() {
+  const vals = _agFormVals();
+  if (!vals.name) { highlight('a_name'); return; }
+  const isEdit = !!editingAgencyId;
+  const url = isEdit
+    ? window.BROKERS_CFG.agencyEditTmplUrl.replace('00000000-0000-0000-0000-000000000000', editingAgencyId)
+    : window.BROKERS_CFG.agencyCreateUrl;
+  try {
+    const r = await fetch(url, { method: 'POST', headers: _agHeaders(), body: JSON.stringify(vals) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Save failed');
+    await loadAgencies(); renderAgencyList(); resetAgencyForm(); await loadBrokers();
+    showToast('success', isEdit ? 'Agency Updated' : 'Agency Created', `"${vals.name}" saved.`);
+  } catch (e) { showToast('error', 'Error', e.message); }
+}
+
+function openAgencyModal() { resetAgencyForm(); renderAgencyList(); document.getElementById('agencyModal').classList.add('open'); }
+function closeAgencyModal() { document.getElementById('agencyModal').classList.remove('open'); }
+
+if (document.getElementById('btnAgencies')) {
+  document.getElementById('btnAgencies').addEventListener('click', openAgencyModal);
+  document.getElementById('agencyModalClose').addEventListener('click', closeAgencyModal);
+  document.getElementById('agencyModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAgencyModal(); });
+  document.getElementById('agencySave').addEventListener('click', saveAgency);
+  document.getElementById('agencyFormReset').addEventListener('click', resetAgencyForm);
+}
+
+/* ═══════════════════════════════════
    INIT
    ═══════════════════════════════════ */
-loadBrokers();
+
+const AUTOFILL_CLEAR_IDS = [
+  'searchInput',
+  'filterNameSearch',
+  'filterAgencySearch',
+  'commMin',
+  'commMax',
+  'leadsMin',
+  'leadsMax',
+  'c_password',
+  'ed_password'
+];
+
+function clearBrowserRestoredFields(shouldRender = false) {
+  AUTOFILL_CLEAR_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.value = '';
+    el.defaultValue = '';
+  });
+
+  searchQuery = '';
+
+  if (shouldRender && typeof renderTable === 'function') {
+    renderTable();
+  }
+}
+
+function clearBrowserRestoredFieldsSoon(shouldRender = false) {
+  clearBrowserRestoredFields(shouldRender);
+
+  requestAnimationFrame(() => clearBrowserRestoredFields(shouldRender));
+  setTimeout(() => clearBrowserRestoredFields(shouldRender), 50);
+  setTimeout(() => clearBrowserRestoredFields(shouldRender), 250);
+  setTimeout(() => clearBrowserRestoredFields(shouldRender), 750);
+}
+
+// Clear immediately.
+clearBrowserRestoredFieldsSoon(false);
+
+// Handles normal load and browser back/forward cache restores.
+window.addEventListener('load', () => clearBrowserRestoredFieldsSoon(true));
+window.addEventListener('pageshow', () => clearBrowserRestoredFieldsSoon(true));
+
+
+
+/* ═══════════════════════════════════
+   STRONG AUTOFILL / HISTORY GUARD
+   ═══════════════════════════════════ */
+
+const GUARDED_EMPTY_FIELDS = [
+  'searchInput',
+  'c_password',
+  'ed_password'
+];
+
+let searchWasTypedByUser = false;
+
+function clearFieldById(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.value = '';
+  el.defaultValue = '';
+
+  if (id === 'searchInput') {
+    searchQuery = '';
+  }
+}
+
+function clearGuardedEmptyFields() {
+  GUARDED_EMPTY_FIELDS.forEach(clearFieldById);
+
+  if (typeof renderTable === 'function') {
+    renderTable();
+  }
+}
+
+function clearGuardedEmptyFieldsSoon() {
+  clearGuardedEmptyFields();
+
+  requestAnimationFrame(clearGuardedEmptyFields);
+  setTimeout(clearGuardedEmptyFields, 50);
+  setTimeout(clearGuardedEmptyFields, 150);
+  setTimeout(clearGuardedEmptyFields, 400);
+  setTimeout(clearGuardedEmptyFields, 900);
+}
+
+function unlockGuardedField(el) {
+  if (!el) return;
+
+  el.removeAttribute('readonly');
+
+  // Chrome/password managers sometimes inject exactly on focus,
+  // so clear shortly after unlocking.
+  setTimeout(() => {
+    if (el.id === 'searchInput' && searchWasTypedByUser) return;
+    el.value = '';
+    el.defaultValue = '';
+
+    if (el.id === 'searchInput') {
+      searchQuery = '';
+      renderTable();
+    }
+  }, 80);
+}
+
+document.addEventListener('focusin', e => {
+  const el = e.target;
+  if (!el || !el.matches('[data-autofill-guard="clear"]')) return;
+
+  unlockGuardedField(el);
+});
+
+document.addEventListener('mousedown', e => {
+  const el = e.target;
+  if (!el || !el.matches('[data-autofill-guard="clear"]')) return;
+
+  unlockGuardedField(el);
+});
+
+document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'searchInput') {
+    searchWasTypedByUser = true;
+  }
+});
+
+// Some autofill/history injections happen after random clicks/actions.
+document.addEventListener('click', () => {
+  setTimeout(() => {
+    const searchInput = document.getElementById('searchInput');
+
+    if (searchInput && !searchWasTypedByUser && searchInput.value) {
+      clearFieldById('searchInput');
+      renderTable();
+    }
+
+    ['c_password', 'ed_password'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value && document.activeElement !== el) {
+        clearFieldById(id);
+      }
+    });
+  }, 120);
+}, true);
+
+window.addEventListener('load', clearGuardedEmptyFieldsSoon);
+window.addEventListener('pageshow', clearGuardedEmptyFieldsSoon);
+
+
+// Load data, then clear again in case browser autofill ran late.
+loadAgencies()
+  .then(loadBrokers)
+  .then(() => clearBrowserRestoredFieldsSoon(true));

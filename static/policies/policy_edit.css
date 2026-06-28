@@ -185,3 +185,20 @@
   .page-header {margin-top: 11%; }
 }
 
+
+/* ── Composite On/Off policies (task 16) ── */
+.composite-toggle { display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 6px; }
+.composite-toggle input { display: none; }
+.composite-toggle-track { width: 46px; height: 26px; border-radius: 14px; background: var(--clr-border, #e0ddd8); position: relative; transition: background .2s; flex-shrink: 0; }
+.composite-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); transition: transform .2s; }
+.composite-toggle input:checked + .composite-toggle-track { background: var(--clr-orange, #e07b20); }
+.composite-toggle input:checked + .composite-toggle-track .composite-toggle-thumb { transform: translateX(20px); }
+.composite-toggle-label { font-size: .9rem; font-weight: 600; color: var(--clr-text, #1e1c1a); line-height: 1.4; }
+.composite-note { font-size: .8rem; color: var(--clr-text-sub, #7a7570); line-height: 1.6; margin: 4px 0 18px; }
+.composite-fields { display: flex; flex-direction: column; gap: 16px; transition: opacity .2s; }
+.composite-field .field-label { margin-bottom: 6px; }
+.composite-int { max-width: 160px; }
+.weekday-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.weekday-chip { display: inline-flex; align-items: center; padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--clr-border, #e0ddd8); font-size: .8rem; cursor: pointer; color: var(--clr-text-sub, #7a7570); transition: all .15s; user-select: none; }
+.weekday-chip input { display: none; }
+.weekday-chip.selected { background: var(--clr-orange, #e07b20); border-color: var(--clr-orange, #e07b20); color: #fff; }

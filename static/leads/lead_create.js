@@ -564,6 +564,10 @@ document.addEventListener('DOMContentLoaded', init);
 const BULK_COLUMNS = ['name','country_code','phone','email','source','broker_name',
   'campaign_name','event','tv_ad','street_ad','social_media_ad','exhibition',
   'referrer_name','language','notes'];
+// Brokers upload a simplified template — every row is auto-owned by their
+// brokerage on the backend, so no source/broker/campaign columns are needed.
+const BROKER_BULK_COLUMNS = ['name','country_code','phone','email','language','notes'];
+function _uploaderIsBroker() { return (window.LEAD_CFG||{}).createMode === 'broker'; }
 let _bulkDuplicates = [];
 
 function _bulkShow(id) {
@@ -592,6 +596,11 @@ function _downloadCsv(filename, text) {
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
 }
 function downloadBulkTemplate() {
+  if (_uploaderIsBroker()) {
+    const example = ['Ahmed Ali','+20','1001234567','ahmed@example.com','ar','VIP lead'];
+    _downloadCsv('broker_leads_template.csv', _csv([BROKER_BULK_COLUMNS, example]));
+    return;
+  }
   const example = ['Ahmed Ali','+20','1001234567','ahmed@example.com','campaign',
     '','Summer Launch','Opening Event','','','','','','ar','VIP lead'];
   _downloadCsv('leads_import_template.csv', _csv([BULK_COLUMNS, example]));

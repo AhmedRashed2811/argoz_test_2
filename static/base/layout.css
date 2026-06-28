@@ -229,6 +229,33 @@
       color: var(--clr-orange-dk); font-size: .62rem; font-weight: 600;
       padding: 2px 7px; border-radius: 10px; letter-spacing: .03em;
     }
+    .nav-group { margin-bottom: 2px; }
+    .nav-group-toggle {
+      width: 100%; border: none; background: transparent; cursor: pointer; text-align: left;
+    }
+    .nav-group-chevron {
+      margin-left: auto; width: 14px !important; height: 14px !important;
+      transition: transform var(--transition);
+    }
+    .nav-group.open .nav-group-chevron {
+      transform: rotate(180deg);
+    }
+    .nav-group-children {
+      display: none; padding-left: 20px; border-left: 1.5px solid var(--clr-border); margin: 2px 0 6px 17px;
+    }
+    .nav-group.open .nav-group-children {
+      display: block;
+    }
+    .nav-child-item {
+      display: flex; align-items: center; height: 34px; padding: 0 10px;
+      text-decoration: none; color: var(--clr-gray-lt); border-radius: var(--radius);
+      font-size: .8rem; transition: background var(--transition), color var(--transition);
+      margin-bottom: 2px;
+    }
+    .nav-child-item:hover { background: #f7f3ee; color: var(--clr-text); }
+    .nav-child-item.active {
+      color: var(--clr-orange); font-weight: 500; background: rgba(224,123,32,.06);
+    }
     .sidebar-footer {
       padding: 14px 12px; border-top: 1px solid var(--clr-border); flex-shrink: 0;
     }

@@ -777,9 +777,9 @@ function renderFunnel(events){
 // UTILS
 // ═══════════════════════════════════════════
 function fmtNum(n){
-  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
-  if(n>=1000) return (n/1000).toFixed(0)+'K';
-  return n.toLocaleString();
+  if(n>=1000000) return (n/1000000).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1})+'M';
+  if(n>=1000) return Math.round(n/1000).toLocaleString('en-US')+'K';
+  return n.toLocaleString('en-US');
 }
 
 function toast(msg){

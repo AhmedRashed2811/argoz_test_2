@@ -1,0 +1,27 @@
+name,country_code,phone,email,source,broker_name,campaign_name,event,tv_ad,street_ad,social_media_ad,exhibition,referrer_name,language,notes
+Ahmed Valid Broker,+20,01012345678,ahmed@example.com,broker,Nile Brokers,,,,,,,,,"VALID: broker lead with known broker_name"
+Sara Valid Referral,+20,01023456789,,referral,,,,,,,,,Ahmed Rashed,"VALID: referral lead with referrer_name"
+Mohamed Valid Campaign Event,+20,01034567890,mo@example.com,campaign,,Summer 2025,Cairo Expo,,,,,,,VALID: campaign lead via event channel
+Fatma Valid Campaign TV,+20,01045678901,,campaign,,Summer 2025,,Channel1 Ad,,,,,,"VALID: campaign lead via tv_ad"
+Layla Valid Campaign Street,+20,01056789012,,campaign,,Summer 2025,,,Billboard A,,,,,"VALID: campaign lead via street_ad"
+Youssef Valid Campaign Social,+20,01067890123,,campaign,,Summer 2025,,,,Facebook Ad1,,,,,"VALID: campaign lead via social_media_ad"
+Nadia Valid Campaign Exhibition,+20,01078901234,,campaign,,Summer 2025,,,,,Cityscape 2025,,,"VALID: campaign lead via exhibition channel"
+Omar Valid CallCenter,+20,01089012345,,call_center,,,,,,,,,,VALID: call_center lead no campaign
+Hassan CallCenter With Campaign,+20,01090123456,,call_center,,Summer 2025,Cairo Expo,,,,,,,"VALID: call_center lead with optional campaign attribution"
+,+20,01001234567,,broker,Nile Brokers,,,,,,,,,"ERROR: name is required"
+No Phone Guy,+20,,,broker,Nile Brokers,,,,,,,,,"ERROR: phone is required"
+Bad Country Code,20,01012300001,,broker,Nile Brokers,,,,,,,,,"ERROR: country_code must start with +"
+Bad Country Alpha,+XX,01012300002,,broker,Nile Brokers,,,,,,,,,"ERROR: country_code digits-only after +"
+Bad Email Person,+20,01012300003,not-an-email,broker,Nile Brokers,,,,,,,,,"ERROR: invalid email format"
+Bad Source Person,+20,01012300004,,walk_in,,,,,,,,,,ERROR: source not in allowed list
+Broker No Name,+20,01012300005,,broker,,,,,,,,,,"ERROR: broker source but broker_name empty"
+Broker Unknown,+20,01012300006,,broker,Ghost Agency Inc.,,,,,,,,,"ERROR: broker_name not found in system"
+Referral No Referrer,+20,01012300007,,referral,,,,,,,,,,"ERROR: referral source but referrer_name empty"
+Campaign No Name,+20,01012300008,,campaign,,,Cairo Expo,,,,,,,ERROR: campaign source but campaign_name empty
+Campaign No Channel,+20,01012300009,,campaign,,Summer 2025,,,,,,,,ERROR: campaign_name filled but zero channel columns
+Campaign Multi Channel,+20,01012300010,,campaign,,Summer 2025,Cairo Expo,Channel1 Ad,,,,,,"ERROR: more than one channel column filled"
+Campaign Unknown,+20,01012300011,,campaign,,Ghost Campaign 2099,Cairo Expo,,,,,,,ERROR: campaign_name not found in system
+Campaign Bad Record,+20,01012300012,,campaign,,Summer 2025,Nonexistent Event,,,,,,,ERROR: event record not in this campaign
+Channel No Campaign,+20,01012300013,,call_center,,,Cairo Expo,,,,,,,"ERROR: channel filled but campaign_name missing"
+Duplicate Phone A,+20,01099999999,,call_center,,,,,,,,,,VALID: first occurrence – accepted
+Duplicate Phone B,+20,01099999999,,call_center,,,,,,,,,,ERROR: duplicate phone within this file

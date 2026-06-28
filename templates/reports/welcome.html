@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Home · Argoz CRM{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'reports/welcome.css' %}">{% endblock %}
+{% block content %}
+<main class="welcome-page">
+  <div class="welcome-card">
+    <div class="welcome-logo">
+      <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" fill="none">
+        <rect x="4" y="16" width="28" height="18" rx="1.5" fill="#fff5ec" stroke="#e07b20" stroke-width="1.6"/>
+        <path d="M2 17 L18 4 L34 17" stroke="#e07b20" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <rect x="14" y="24" width="8" height="10" rx="1" fill="#e07b20" opacity=".85"/>
+        <rect x="6" y="20" width="6" height="5.5" rx=".8" fill="#fff" stroke="#e07b20" stroke-width="1.2"/>
+        <rect x="24" y="20" width="6" height="5.5" rx=".8" fill="#fff" stroke="#e07b20" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <h1>Welcome{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
+    <p class="welcome-sub">Argoz Real Estate CRM</p>
+    <p class="welcome-msg">Use the navigation menu to get to your work. Everything you have
+       access to is one click away.</p>
+  </div>
+</main>
+{% endblock %}

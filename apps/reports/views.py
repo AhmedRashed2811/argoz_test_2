@@ -14,8 +14,6 @@ def dashboard_index(request):
     landing = RoleService.default_landing(request.user)
     if landing:
         return redirect(landing)
-    company = request.company
-    return render(request, "reports/dashboard.html", {
-        "counts": active_lead_counts(company) if company else {},
-        "my_leads": leads_for_user(request.user, company)[:10] if company else [],
-    })
+
+    return render(request, "reports/welcome.html", {})
+

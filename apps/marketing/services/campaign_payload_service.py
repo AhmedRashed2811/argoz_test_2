@@ -483,6 +483,32 @@ class CampaignPayloadService:
         )
         campaign.delete()
 
+    @staticmethod
+    @transaction.atomic
+    def set_event_attendance(*, company, event_id, actual_attendees, actor,
+                             request_meta=None):
+        """Record real headcount for an already-created event. Always allowed
+        regardless of campaign approval; only existing events qualify (the row
+        must exist first). null/blank clears the figure."""
+        event = EventRecord.objects.select_for_update().select_related(
+            "campaign"
+        ).get(id=event_id, campaign__company=company)
+        if actual_attendees in (None, ""):
+            value = None
+        else:
+            value = int(actual_attendees)
+            if value < 0:
+                raise ValidationError("Attendance cannot be negative.")
+        before = event.actual_attendees
+        event.actual_attendees = value
+        event.save(update_fields=["actual_attendees", "updated_at"])
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=event, actor=actor,
+            company=company, module="marketing", request_meta=request_meta,
+            before={"actual_attendees": before}, after={"actual_attendees": value},
+        )
+        return event
+
     # ── target project (free-text name <-> Project FK) ────────────────────
     @staticmethod
     def _target_fields(company, payload):
@@ -495,6 +521,12 @@ class CampaignPayloadService:
     # ── child records ─────────────────────────────────────────────────────
     @staticmethod
     def _rebuild_children(campaign, actor, payload):
+        # Real attendance is captured on its own control after creation; preserve
+        # it across the child rebuild by matching on event name (like media URLs).
+        attendance_by_name = {
+            e.name: e.actual_attendees
+            for e in campaign.events.all() if e.actual_attendees is not None
+        }
         for related in ("events", "tv_ads", "street_ads", "exhibitions",
                         "social_ads", "other_costs"):
             getattr(campaign, related).all().delete()
@@ -516,6 +548,7 @@ class CampaignPayloadService:
                 venue=(ev.get("place") or "").strip(), event_date=_date(ev.get("date")),
                 budget=_d(ev.get("budget")), description=(ev.get("description") or "").strip(),
                 target_attendees=int(ev.get("targetAttendees") or 0),
+                actual_attendees=attendance_by_name.get((ev.get("name") or "").strip()),
             )
             events_by_name[record.name] = record
             _save_assets(campaign, "event_logo", record.id, ev.get("logo"), actor, existing_by_url, claimed)
@@ -670,6 +703,8 @@ class CampaignPayloadService:
             "name": e.name, "place": e.venue,
             "date": e.event_date.isoformat() if e.event_date else "",
             "budget": float(e.budget), "targetAttendees": e.target_attendees,
+            "actualAttendees": e.actual_attendees,
+            "id": str(e.id),
             "description": e.description,
             "logo": assets.get(("event_logo", str(e.id)), []),
             "images": assets.get(("event_image", str(e.id)), []),

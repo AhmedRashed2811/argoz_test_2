@@ -153,6 +153,34 @@
                placeholder="e.g. ar"
                value="{% if cpv and cpv.value_json %}{{ cpv.value_json.code|default:'' }}{% endif %}">
 
+      {# ── COMPOSITE (On/Off + fields, task 16) ── #}
+      {% elif policy.value_type == "COMPOSITE" %}
+        <label class="composite-toggle">
+          <input type="checkbox" id="composite-enabled" {% if composite.enabled %}checked{% endif %}>
+          <span class="composite-toggle-track"><span class="composite-toggle-thumb"></span></span>
+          <span class="composite-toggle-label">{{ composite.toggle_label }}</span>
+        </label>
+        {% if composite.note %}<p class="composite-note">{{ composite.note }}</p>{% endif %}
+        <div class="composite-fields" id="composite-fields">
+          {% for f in composite.fields %}
+            <div class="composite-field">
+              <label class="field-label">{{ f.label }}</label>
+              {% if f.type == "weekdays" %}
+                <div class="weekday-grid" data-key="{{ f.key }}">
+                  {% for c in f.choices %}
+                    <label class="weekday-chip {% if c.selected %}selected{% endif %}">
+                      <input type="checkbox" class="composite-weekday" value="{{ c.num }}" {% if c.selected %}checked{% endif %}>
+                      <span>{{ c.name }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <input type="number" min="0" class="int-input composite-int" data-key="{{ f.key }}" value="{{ f.value }}">
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
       {# ── JSON ── #}
       {% else %}
         <div class="field-label">Raw JSON value</div>

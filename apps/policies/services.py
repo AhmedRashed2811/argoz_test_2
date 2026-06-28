@@ -80,6 +80,8 @@ def _format_current(cpv: CompanyPolicyValue | None, value_type: str) -> str:
             return " ".join(parts) or "0h"
         if value_type == ValueType.BOOLEAN:
             return "Yes" if v else "No"
+        if value_type == ValueType.COMPOSITE and isinstance(v, dict):
+            return "On" if v.get("enabled") else "Off"
         return json.dumps(v)
     return ""
 
@@ -109,7 +111,29 @@ class PolicyManagementService:
                     cpv.selected_option_id is not None or cpv.value_json is not None
                 ),
             })
-        return {"by_module": by_module}
+        # Ordered, display-friendly module groups for the policies page (task 13).
+        meta = {
+            "leads": ("Leads & Distribution", "Assignment, SLA and per-lead rules"),
+            "marketing": ("Marketing", "Campaign budgets and approvals"),
+            "notifications": ("Notifications", "Reminders and cleanup jobs"),
+            "integration": ("Integrations", "Webhooks and external mappings"),
+        }
+        order = ["leads", "marketing", "notifications", "integration"]
+        modules = []
+        for key in order + [m for m in by_module if m not in order]:
+            rows = by_module.get(key)
+            if not rows:
+                continue
+            title, desc = meta.get(key, (key.title(), ""))
+            modules.append({
+                "key": key, "title": title, "description": desc, "rows": rows,
+                "count": len(rows),
+                "set_count": sum(1 for r in rows if r["is_set"]),
+            })
+        total = sum(m["count"] for m in modules)
+        configured = sum(m["set_count"] for m in modules)
+        return {"by_module": by_module, "modules": modules,
+                "total_policies": total, "configured_policies": configured}
 
     @staticmethod
     def get_edit_context(*, policy_id: Any, company: Any) -> dict:
@@ -122,7 +146,14 @@ class PolicyManagementService:
             .select_related("selected_option")
             .first()
         )
-        return {"policy": policy, "cpv": cpv, "value_type": policy.value_type}
+        composite = None
+        if policy.value_type == ValueType.COMPOSITE:
+            from .composite import schema_for_template
+            composite = schema_for_template(
+                policy.code, cpv.value_json if cpv else None
+            )
+        return {"policy": policy, "cpv": cpv, "value_type": policy.value_type,
+                "composite": composite}
 
     @staticmethod
     def set_value(*, company, code: str, option=None, value_json=None,
@@ -200,6 +231,10 @@ class PolicyManagementService:
         elif vtype == ValueType.JSON:
             raw = post_data.get("value_json", "").strip()
             value_json = json.loads(raw) if raw else None
+
+        elif vtype == ValueType.COMPOSITE:
+            from .composite import parse_post
+            value_json = parse_post(policy.code, post_data)
 
         PolicyManagementService.set_value(
             company=company, code=policy.code,
