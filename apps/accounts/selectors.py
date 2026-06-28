@@ -69,3 +69,9 @@ def brokers_for_company(company):
 
 def broker_detail(company, broker_id):
     return Broker.objects.filter(company=company, id=broker_id).first()
+
+
+def agencies_for_company(company):
+    from .models import Agency
+
+    return Agency.objects.filter(company=company).order_by("name")

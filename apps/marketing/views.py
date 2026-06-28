@@ -14,7 +14,7 @@ from apps.authorization.decorators import crm_permission_required
 from apps.core.exceptions import ValidationError
 
 from .forms import CampaignForm, OtherCostForm
-from .models import Campaign, OtherCost
+from .models import Campaign
 from .selectors import campaigns_for_company, campaigns_for_user
 from .services import (
     CampaignApprovalService,
@@ -168,11 +168,12 @@ def campaign_budget(request, campaign_id):
     if request.method == "POST":
         form = OtherCostForm(request.POST)
         if form.is_valid():
-            OtherCost.objects.create(
+            total = CampaignBudgetService.add_other_cost(
                 campaign=campaign, value=form.cleaned_data["value"],
-                reason=form.cleaned_data["reason"], created_by=request.user,
+                reason=form.cleaned_data["reason"], actor=request.user,
             )
-        total = CampaignBudgetService.recalculate(campaign=campaign, actor=request.user)
+        else:
+            total = CampaignBudgetService.recalculate(campaign=campaign, actor=request.user)
         messages.success(request, f"Budget recalculated: {total}")
         return redirect("marketing:campaign_detail", campaign_id=campaign.id)
     CampaignBudgetService.recalculate(campaign=campaign, actor=request.user)

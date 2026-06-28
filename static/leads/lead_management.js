@@ -540,6 +540,19 @@ function getLeadsExcluding(excludeField){
   return list;
 }
 
+// A lead is "due today" if it has a follow-up/call-back/meeting scheduled for
+// today, or its SLA deadline falls today.
+function isDueToday(l){
+  const isToday=ms=>{ if(!ms)return false; const t=new Date(ms),n=new Date(); return t.toDateString()===n.toDateString(); };
+  if(isToday(l.slaDeadline)) return true;
+  return (l.history||[]).some(h=>{
+    if(h.type==='followup'&&h.reminderDate) return isToday(new Date(h.reminderDate));
+    if(h.type==='followup'&&h.callbackDate) return isToday(new Date(h.callbackDate));
+    if(h.type==='meeting'&&h.meetingDate)   return isToday(new Date(h.meetingDate));
+    return false;
+  });
+}
+
 // Actually: we need global filter too. Let's build getDisplayList properly.
 function applyGlobalFilter(list){
   const now=Date.now();
@@ -547,23 +560,7 @@ function applyGlobalFilter(list){
   if(globalFilter==='meetings')   return list.filter(l=>l.stage==='Meeting');
   if(globalFilter==='active')     return list.filter(l=>l.active!==false);
   if(globalFilter==='inactive')   return list.filter(l=>l.active===false);
-  if(globalFilter==='today'){
-    return list.filter(l=>{
-      const hist=l.history||[];
-      return hist.some(h=>{
-        if(h.type==='followup'&&h.reminderDate){
-          const t=new Date(h.reminderDate); const n=new Date(); return t.toDateString()===n.toDateString();
-        }
-        if(h.type==='followup'&&h.callbackDate){
-          const t=new Date(h.callbackDate); const n=new Date(); return t.toDateString()===n.toDateString();
-        }
-        if(h.type==='meeting'&&h.meetingDate){
-          const t=new Date(h.meetingDate); const n=new Date(); return t.toDateString()===n.toDateString();
-        }
-        return false;
-      });
-    });
-  }
+  if(globalFilter==='today') return list.filter(isDueToday);
   if(globalFilter.startsWith('kpi:')) return list.filter(l=>l.stage===globalFilter.slice(4));
   return list;
 }
@@ -790,7 +787,7 @@ function renderTable(){
   // Global filter counts
   const followupCount=leads.filter(l=>l.stage==='Follow-up').length;
   const meetingCount=leads.filter(l=>l.stage==='Meeting').length;
-  const todayCount=leads.filter(l=>(l.history||[]).some(h=>{ if(h.type==='followup'&&h.reminderDate){const t=new Date(h.reminderDate);const n=new Date();return t.toDateString()===n.toDateString();} if(h.type==='followup'&&h.callbackDate){const t=new Date(h.callbackDate);const n=new Date();return t.toDateString()===n.toDateString();} if(h.type==='meeting'&&h.meetingDate){const t=new Date(h.meetingDate);const n=new Date();return t.toDateString()===n.toDateString();}return false;})).length;
+  const todayCount=leads.filter(isDueToday).length;
   const fc=document.getElementById('gfFollowupsCount'); if(fc)fc.textContent=followupCount||'';
   const mc=document.getElementById('gfMeetingsCount'); if(mc)mc.textContent=meetingCount||'';
   const tc=document.getElementById('gfTodayCount'); if(tc)tc.textContent=todayCount||'';
@@ -930,8 +927,8 @@ setInterval(()=>{
 ═══════════════════════════════════════════════════ */
 document.getElementById('btnExport').addEventListener('click',()=>{
   const list=getDisplayList();
-  const headers=['Name','Phone','Source','Stage','Status','Created','Last Updated'];
-  const rows=list.map(l=>[l.name,l.phone,l.source,l.stage,l.active===false?'Inactive':'Active',fmtDate(l.createdAt),fmtDate(l.updatedAt||l.createdAt)]);
+  const headers=['Name','Phone','Source','Campaign','Specific Source','Source Type','Broker','Stage','Status','Created','Last Updated'];
+  const rows=list.map(l=>[l.name,l.phone,l.source,l.campaign||'',l.specificSource||'',l.campaign_child_type||'',l.broker||'',l.stage,l.active===false?'Inactive':'Active',fmtDate(l.createdAt),fmtDate(l.updatedAt||l.createdAt)]);
   const csv=[headers,...rows].map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download='sales-leads.csv'; a.click(); URL.revokeObjectURL(url);

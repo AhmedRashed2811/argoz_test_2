@@ -133,7 +133,7 @@ function fmtDatetime(ts){ if(!ts)return '—'; const d=new Date(ts); return d.to
 /* SLA is the server-provided deadline (epoch ms). */
 function getSlaMs(l){ if(!l.slaDeadline) return -1; return l.slaDeadline-Date.now(); }
 function fmtSla(ms){
-  if(ms<=0) return {html:'<span class="sla-expired">Expired</span>',cls:'expired'};
+  if(ms<=0) return {html:'<span class="sla-expired">-</span>',cls:'expired'};
   const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);
   const txt=h>0?`${h}h ${m}m`:`${m}m`;
   if(ms<3600000)   return {html:`<span class="sla-urgent">${txt}</span>`,cls:'urgent'};

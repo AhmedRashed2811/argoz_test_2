@@ -206,7 +206,9 @@
       let actionUrl = '';
       if (item.code !== 'SLA_BREACHED') {
         if (item.code === 'MANUAL_DISTRIBUTION_REQUIRED') {
-          actionUrl = `/leads/manual-distribution/?search=${item.related_id}`;
+          actionUrl = item.lead_phone
+            ? `/leads/manual-distribution/?search=${encodeURIComponent(item.lead_phone)}`
+            : '/leads/manual-distribution/';
         } else if (item.related_type === 'Lead') {
           actionUrl = `/leads/?search=${item.related_id}`;
         } else if (item.related_type === 'Campaign') {

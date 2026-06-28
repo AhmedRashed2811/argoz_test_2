@@ -49,6 +49,11 @@ def active_campaigns(company):
     )
 
 
+def campaign_for_company(company, campaign_id):
+    """A single campaign scoped to the company, or None."""
+    return Campaign.objects.filter(pk=campaign_id, company=company).first()
+
+
 def campaign_available_channels(campaign):
     """Frontend channels this campaign actually selected (docs §10). Only these
     appear in the channel picker — e.g. an events-only campaign won't offer

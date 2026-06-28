@@ -788,8 +788,8 @@ setInterval(()=>{
 ═══════════════════════════════════════════════════ */
 document.getElementById('btnExport').addEventListener('click',()=>{
   const list=getDisplayList();
-  const headers=['ID','Name','Phone','Source','Stage','Status','Lifecycle','Assigned To','Created By','Team','SLA (hrs left)','Created','Last Updated'];
-  const rows=list.map(l=>[l.id,l.name,l.phone,l.source,l.stage,l.active===false?'Inactive':'Active',l.lifecycle||'New',l.assignedTo||'',l.createdBy||'',l.team||'',Math.max(0,Math.floor(getSlaMs(l)/3600000)),fmtDate(l.createdAt),fmtDate(l.updatedAt||l.createdAt)]);
+  const headers=['ID','Name','Phone','Source','Campaign','Specific Source','Source Type','Broker','Stage','Status','Lifecycle','Assigned To','Created By','Team','SLA (hrs left)','Created','Last Updated'];
+  const rows=list.map(l=>[l.id,l.name,l.phone,l.source,l.campaign||'',l.specificSource||'',l.campaign_child_type||'',l.broker||'',l.stage,l.active===false?'Inactive':'Active',l.lifecycle||'New',l.assignedTo||'',l.createdBy||'',l.team||'',Math.max(0,Math.floor(getSlaMs(l)/3600000)),fmtDate(l.createdAt),fmtDate(l.updatedAt||l.createdAt)]);
   const csv=[headers,...rows].map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='all-leads.csv';a.click();URL.revokeObjectURL(url);

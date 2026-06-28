@@ -608,7 +608,7 @@ def _agency_payload(request):
 @login_required
 @crm_permission_required("admin.brokers.access")
 def agency_api_list(request):
-    from .models import Agency
+    from .selectors import agencies_for_company
     data = [{
         "id": str(a.id), "name": a.name, "phone": a.phone, "email": a.email,
         "location": a.location,
@@ -616,7 +616,7 @@ def agency_api_list(request):
         "startDate": a.contract_start_date.isoformat() if a.contract_start_date else None,
         "endDate": a.contract_end_date.isoformat() if a.contract_end_date else None,
         "status": a.status, "notes": a.notes, "brokerCount": a.brokers.count(),
-    } for a in Agency.objects.filter(company=request.company).order_by("name")]
+    } for a in agencies_for_company(request.company)]
     return JsonResponse({"agencies": data})
 
 

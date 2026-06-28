@@ -5,7 +5,9 @@ from .existing_client_service import ExistingClientService
 from .lead_admin_service import LeadAdminService
 from .followup_service import FollowUpService
 from .lead_creation_service import LeadCreationService
+from .lead_serialization_service import LeadSerializationService
 from .lead_stage_service import LeadStageService
+from .manual_distribution_service import ManualDistributionService
 from .meeting_service import MeetingService
 from .reactivation_service import ReactivationService
 from .reminder_service import ReminderService
@@ -20,7 +22,9 @@ __all__ = [
     "FollowUpService",
     "LeadAdminService",
     "LeadCreationService",
+    "LeadSerializationService",
     "LeadStageService",
+    "ManualDistributionService",
     "MeetingService",
     "ReactivationService",
     "ReminderService",

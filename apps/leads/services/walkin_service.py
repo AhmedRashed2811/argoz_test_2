@@ -109,6 +109,20 @@ class WalkInService:
         return p.current_index
 
     @staticmethod
+    def advance_for_policy(company, policy):
+        """Advance the cursor for the receptionist 'skip / pass' action: full
+        rotation skips a salesman, team turn passes to the next team."""
+        if policy == FULL_ROTATION:
+            WalkInService.advance_pointer(
+                company, ROT_FULL, len(WalkInService.available_members(company)))
+        elif policy == TEAM_TURN:
+            from apps.accounts.models import Team
+
+            WalkInService.advance_pointer(
+                company, ROT_TEAM,
+                Team.objects.filter(company=company, is_active=True).count())
+
+    @staticmethod
     def rotation_state(company, policy):
         """Snapshot the receptionist needs: whose turn it is, plus the pool."""
         from apps.accounts.models import Team

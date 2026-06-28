@@ -112,19 +112,9 @@ def manual_distribution(request):
 
 @login_required
 def lead_detail(request, lead_id):
-    lead = get_object_or_404(
-        Lead.objects.select_related(
-            "source", "current_stage", "assigned_salesman", "assigned_team",
-            "language", "broker_owner", "campaign", "created_by", "company",
-        ).prefetch_related(
-            "followups", "meetings", "lead_notes", "activities",
-            "stage_history__from_stage", "stage_history__to_stage",
-            "assignment_history__to_salesman", "assignment_history__from_salesman",
-            "broker_ownership_history",
-        ),
-        id=lead_id,
-        company=request.company,
-    )
+    from .selectors import lead_detail_qs
+
+    lead = get_object_or_404(lead_detail_qs(), id=lead_id, company=request.company)
     return render(request, "leads/lead_detail.html", {
         "lead": lead,
         "assign_form": ManualAssignmentForm(company=request.company),

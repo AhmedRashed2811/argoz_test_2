@@ -50,6 +50,47 @@ class LeadAdminService:
 
     @staticmethod
     @transaction.atomic
+    def edit(*, lead, name, phone="", note="", salesman_id="", stage_code="",
+             actor=None, request_meta=None):
+        """All-Leads edit: contact fields + optional reassignment + optional stage
+        change. Reassignment/stage delegate to their own services so SLA/rotation/
+        notification side-effects stay centralised."""
+        from apps.accounts.models import User
+        from apps.core.exceptions import ValidationError
+        from apps.distribution.services import ManualAssignmentService
+        from .lead_stage_service import LeadStageService
+
+        LeadAdminService.update_basic(
+            lead_id=lead.id, name=name, phone=phone, note=note, actor=actor,
+            request_meta=request_meta,
+        )
+        # Reassignment, when a different salesman was picked.
+        if salesman_id and str(lead.assigned_salesman_id) != salesman_id:
+            salesman = User.objects.filter(
+                id=salesman_id, profile__company=lead.company_id, is_active=True
+            ).first()
+            if salesman is None:
+                raise ValidationError("Unknown salesman.")
+            # Move the lead to the new salesman's team (membership in this company).
+            membership = salesman.team_memberships.filter(
+                team__company=lead.company_id, team__is_active=True
+            ).select_related("team").first()
+            ManualAssignmentService.assign_to_salesman(
+                lead_id=lead.id, salesman=salesman,
+                team=membership.team if membership else None,
+                actor=actor, reason="Edited via All Leads", request_meta=request_meta,
+            )
+        # Stage change, when a different stage was picked.
+        stage_code = (stage_code or "").upper()
+        if stage_code and (lead.current_stage is None
+                           or lead.current_stage.code != stage_code):
+            LeadStageService.change_stage(
+                lead_id=lead.id, to_stage_code=stage_code, actor=actor,
+                reason="Edited via All Leads", request_meta=request_meta,
+            )
+
+    @staticmethod
+    @transaction.atomic
     def set_active(*, lead_id, active: bool, reason="", actor=None,
                    request_meta=None) -> Lead:
         """Deactivate or reactivate a lead. Reactivation routes through

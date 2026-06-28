@@ -86,6 +86,56 @@ def expired_sla_instances(now, company=None, limit=100):
     return qs.order_by("deadline_at")[:limit]
 
 
+def existing_client(company, phone):
+    """The Client row for a phone in this company, salesman eager-loaded."""
+    from .models import Client
+
+    phone = (phone or "").strip()
+    if not phone:
+        return None
+    return (
+        Client.objects.filter(company=company, phone=phone)
+        .select_related("original_salesman").first()
+    )
+
+
+def active_brokers(company):
+    from apps.accounts.models import Broker, BrokerStatus
+
+    return Broker.objects.filter(
+        company=company, status=BrokerStatus.ACTIVE
+    ).order_by("name")
+
+
+def active_teams(company):
+    from apps.accounts.models import Team
+
+    return Team.objects.filter(
+        company=company, is_active=True
+    ).order_by("order_index", "name")
+
+
+def head_team_members(user, company):
+    """Active members of the team(s) the user is sales head of."""
+    from apps.accounts.models import Team
+
+    teams = Team.objects.filter(company=company, sales_head=user)
+    return [m for t in teams for m in t.members.select_related("user", "team")
+            if m.user.is_active]
+
+
+def call_center_agents(company):
+    """Users in the CALL_CENTER role for this company (§4.2g)."""
+    from apps.accounts.models import User
+    from apps.authorization.services import RoleService
+
+    users = User.objects.filter(
+        is_active=True, profile__company=company
+    ).select_related("profile")
+    return [u for u in users
+            if RoleService.CALL_CENTER_CODE in RoleService.role_codes(u)]
+
+
 def leads_list_for_user(user, company, search_q="") -> list[Lead]:
     from apps.reports.selectors import leads_for_user
     import uuid

@@ -36,6 +36,15 @@ def _sum_field(items, field="budget") -> Decimal:
 class CampaignBudgetService:
     @staticmethod
     @transaction.atomic
+    def add_other_cost(*, campaign: Campaign, value, reason, actor=None) -> Decimal:
+        """Record an ad-hoc Other Cost and return the recalculated total."""
+        OtherCost.objects.create(
+            campaign=campaign, value=value, reason=reason, created_by=actor,
+        )
+        return CampaignBudgetService.recalculate(campaign=campaign, actor=actor)
+
+    @staticmethod
+    @transaction.atomic
     def recalculate(*, campaign: Campaign, actor=None) -> Decimal:
         breakdown = {}
         total = ZERO
