@@ -132,14 +132,30 @@ class SLAService:
         return count
 
     @staticmethod
+    def _revoke_expiry(task_id: str) -> None:
+        if not task_id:
+            return
+        from config.celery import app
+        app.control.revoke(task_id)
+
+    @staticmethod
     def open_instance(*, lead: Lead, stage: LeadStageDefinition, deadline, salesman=None):
-        """Close any active SLA, open a fresh one (idempotent rotation helper)."""
+        """Close any active SLA, open a fresh one (idempotent rotation helper).
+        Revokes the outgoing SLA's eta expiry job and schedules a new one at the
+        new deadline (docs §12.2)."""
+        from apps.leads.tasks import expire_sla_instance
+
+        # Revoke any pending eta expiry job(s) before closing the old SLA(s).
+        for old_task_id in SLAInstance.objects.filter(
+            lead=lead, status=SLAStatus.ACTIVE
+        ).exclude(expiry_task_id="").values_list("expiry_task_id", flat=True):
+            SLAService._revoke_expiry(old_task_id)
         SLAInstance.objects.filter(lead=lead, status=SLAStatus.ACTIVE).update(
             status=SLAStatus.COMPLETED
         )
         if deadline is None:
             return None
-        return SLAInstance.objects.create(
+        instance = SLAInstance.objects.create(
             lead=lead,
             stage=stage,
             assigned_salesman=salesman or lead.assigned_salesman,
@@ -147,3 +163,15 @@ class SLAService:
             deadline_at=deadline,
             status=SLAStatus.ACTIVE,
         )
+        # Schedule expiry exactly at the deadline. Defer enqueue to after commit
+        # so the worker can never pick up the instance before it's visible.
+        from django.db import transaction
+
+        def _schedule():
+            result = expire_sla_instance.apply_async(
+                args=[str(instance.id)], eta=instance.deadline_at
+            )
+            SLAInstance.objects.filter(id=instance.id).update(expiry_task_id=result.id)
+
+        transaction.on_commit(_schedule)
+        return instance

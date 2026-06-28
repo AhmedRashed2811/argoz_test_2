@@ -20,51 +20,51 @@ _REMINDER_MAP = {
 
 
 @shared_task(bind=True)
-def check_lead_sla_expiry(self, batch_size: int = 100):
-    """Beat every 1-5 min: rotate/reassign/escalate expired SLAs, and schedule
-    SLA_WARNING reminders for near-expiry instances (docs §12.2).
-    Each SLA is processed in its own savepoint so one failure never blocks others."""
+def expire_sla_instance(self, sla_instance_id):
+    """Fired by an eta scheduled at the SLA deadline (docs §12.2): rotate /
+    reassign / escalate this one expired SLA. process_instance is idempotent —
+    a stale/revoked-but-still-fired run that finds the instance non-active is a
+    harmless no-op. Each run gets its own savepoint."""
     from apps.audit.models import JobExecutionLog
-    from apps.distribution.locks import expired_sla_batch
     from apps.distribution.services import SLAExpiryService
-    from apps.leads.services.sla_service import SLAService
+    from apps.leads.models import SLAInstance
+    from apps.leads.constants import SLAStatus
 
     task_id = getattr(self.request, "id", "") or ""
-    now = timezone.now()
-    processed = 0
-
-    print(f"\n⏰ [CELERY SLA TASK START] Task ID: {task_id} | Batch Size Limit: {batch_size}")
-
-    with transaction.atomic():
-        expired_slas = list(expired_sla_batch(now, limit=batch_size))
-        print(f"📊 Found {len(expired_slas)} expired SLA instances to process.")
-        for sla in expired_slas:
-            try:
-                with transaction.atomic():
-                    print(f"👉 Processing SLA instance {sla.id} for Lead {sla.lead_id}...")
-                    if SLAExpiryService.process_instance(sla, task_id=task_id):
-                        processed += 1
-                        print(f"✅ Successfully processed SLA instance {sla.id}.")
-                    else:
-                        print(f"⚠️ SLA instance {sla.id} was not active or skipped.")
-            except Exception as exc:
-                print(f"❌ Error processing SLA instance {sla.id}: {str(exc)}")
-                JobExecutionLog.objects.create(
-                    task_name="check_lead_sla_expiry", task_id=task_id,
-                    status="ERROR", finished_at=timezone.now(), error=str(exc)[:500],
-                )
-
-    print(f"🕒 Scheduling warnings...")
-    warned = SLAService.schedule_warnings(now)
-    print(f"📢 Scheduled {warned} SLA warnings.")
-
-    JobExecutionLog.objects.create(
-        task_name="check_lead_sla_expiry", task_id=task_id, status="DONE",
-        finished_at=timezone.now(), processed_count=processed,
-        metadata={"sla_warnings_scheduled": warned},
+    print(f"\n⏰ [CELERY SLA EXPIRY START] Task ID: {task_id} | SLA Instance: {sla_instance_id}")
+    sla = (
+        SLAInstance.objects.select_related("lead", "lead__company", "lead__assigned_salesman")
+        .filter(id=sla_instance_id, status=SLAStatus.ACTIVE)
+        .first()
     )
-    print(f"🏁 [CELERY SLA TASK DONE] Processed: {processed} | Warned: {warned}\n")
-    return processed
+    if sla is None:
+        print(f"⚠️ SLA instance {sla_instance_id} not active (rotated/revoked) — skipping.\n")
+        return False
+    try:
+        with transaction.atomic():
+            print(f"👉 Processing expired SLA instance {sla.id} for Lead {sla.lead_id}...")
+            result = bool(SLAExpiryService.process_instance(sla, task_id=task_id))
+            print(f"🏁 [CELERY SLA EXPIRY DONE] SLA {sla.id} processed: {result}\n")
+            return result
+    except Exception as exc:
+        print(f"❌ Error processing SLA instance {sla_instance_id}: {str(exc)}\n")
+        JobExecutionLog.objects.create(
+            task_name="expire_sla_instance", task_id=task_id,
+            status="ERROR", finished_at=timezone.now(), error=str(exc)[:500],
+        )
+        raise
+
+
+@shared_task
+def schedule_sla_warnings():
+    """Beat every ~minute: create SLA_WARNING reminders for near-expiry SLAs
+    (docs §12.2). Expiry itself is now eta-scheduled per instance, not polled."""
+    from apps.leads.services.sla_service import SLAService
+
+    print(f"\n⏰ [CELERY SLA WARNINGS START]")
+    warned = SLAService.schedule_warnings(timezone.now())
+    print(f"🏁 [CELERY SLA WARNINGS DONE] Scheduled {warned} SLA warnings.\n")
+    return warned
 
 
 @shared_task

@@ -214,6 +214,9 @@ class SLAInstance(BaseModel):
     )
     breached_at = models.DateTimeField(null=True, blank=True)
     policy_snapshot = models.JSONField(null=True, blank=True)
+    # Celery task id of the eta-scheduled expiry job, so it can be revoked when
+    # the SLA is rotated or its deadline changes (docs §12.2).
+    expiry_task_id = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         indexes = [

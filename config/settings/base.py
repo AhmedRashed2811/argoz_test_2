@@ -146,9 +146,11 @@ CELERY_TIMEZONE = TIME_ZONE
 from celery.schedules import crontab  # noqa: E402
 
 CELERY_BEAT_SCHEDULE = {
-    "check_lead_sla_expiry": {
-        "task": "apps.leads.tasks.check_lead_sla_expiry",
-        "schedule": 120.0,  # every 2 min (docs: 1-5 min)
+    # SLA expiry itself is eta-scheduled per instance (apps.leads.tasks.
+    # expire_sla_instance); only near-expiry warnings still need polling.
+    "schedule_sla_warnings": {
+        "task": "apps.leads.tasks.schedule_sla_warnings",
+        "schedule": 60.0,
     },
     "send_due_reminders": {
         "task": "apps.leads.tasks.send_due_reminders",
