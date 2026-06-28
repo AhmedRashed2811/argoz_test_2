@@ -59,6 +59,9 @@ MIDDLEWARE = [
     # CRM cross-cutting context: resolves request.company and request_meta.
     "apps.companies.middleware.CurrentCompanyMiddleware",
     "apps.audit.middleware.RequestMetaMiddleware",
+    # Replays cached responses for repeated idempotency keys (double-submit /
+    # network-retry protection). Last so it wraps the resolved view.
+    "apps.core.middleware.IdempotencyMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -97,6 +100,9 @@ DATABASES = {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
         },
+        # Wrap every request in a transaction so a mid-write network drop can
+        # never leave partial/corrupt rows across related models.
+        "ATOMIC_REQUESTS": True,
     }
 }
 

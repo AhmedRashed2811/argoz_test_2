@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden, JsonResponse, StreamingHttpResponse
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -51,6 +52,8 @@ def notification_api_mark_all_read(request):
     return JsonResponse({"ok": True, "marked": count})
 
 
+# Async streaming view: ATOMIC_REQUESTS can't wrap it, and it's read-only anyway.
+@transaction.non_atomic_requests
 async def notification_sse(request):
     from asgiref.sync import sync_to_async
     from django.contrib.auth import get_user

@@ -10,7 +10,7 @@
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 0 16px; flex-shrink: 0;
-  border-bottom: 1px solid var(--clr-border); margin-bottom: 20px;
+  border-bottom: 1px solid var(--clr-border); margin-bottom: 20px; margin-top: 6%;
 }
 .page-header-left { display: flex; align-items: flex-start; gap: 16px; }
 .page-icon {
@@ -178,3 +178,10 @@
   .bool-options { flex-direction: column; }
   .duration-row { flex-direction: column; }
 }
+
+@media (max-width: 960px) {
+  .bool-options { flex-direction: column; }
+  .duration-row { flex-direction: column; }
+  .page-header {margin-top: 11%; }
+}
+

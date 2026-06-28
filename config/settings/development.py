@@ -13,6 +13,7 @@ if not config("USE_MYSQL", default=False, cast=bool):
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            "ATOMIC_REQUESTS": True,
         }
     }
 

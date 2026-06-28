@@ -141,6 +141,10 @@
 {% include "includes/messages.html" %}
 {% block content %}{% endblock %}
 
+{# Global resilience layer: idempotency keys, fetch retry, loading spinners.
+   Loaded for everyone (incl. the login form) and before page scripts. #}
+<script src="{% static 'base/crm_utils.js' %}"></script>
+
 {% if user.is_authenticated %}
 <script>
   window.LAYOUT_CFG = {

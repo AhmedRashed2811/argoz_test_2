@@ -18,7 +18,7 @@
 .page-body { padding: 16px 24px; }
 
 /* ── Header ── */
-.page-header { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; margin-bottom: 14px; flex-wrap: wrap; gap: 12px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-top: 5%; margin-bottom: 14px; flex-wrap: wrap; gap: 12px; }
 .page-header-left { display: flex; align-items: center; gap: 16px; }
 .page-icon { width: 52px; height: 52px; background: linear-gradient(135deg,rgba(224,123,32,.12),rgba(224,123,32,.06)); border: 1.5px solid rgba(224,123,32,.25); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .page-icon svg { width: 26px; height: 26px; stroke: var(--clr-orange); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -299,6 +299,9 @@ tbody tr:hover td:first-child { background: #faf9f7; }
   .page-body { padding: 10px 16px; }
   .kpi-grid { grid-template-columns: repeat(3,1fr); }
   .detail-grid { grid-template-columns: 1fr; }
+  .page-header {
+    margin-top: 15%;
+  }
 }
 @media (max-width: 640px) {
   .page-body { padding: 8px 10px; }

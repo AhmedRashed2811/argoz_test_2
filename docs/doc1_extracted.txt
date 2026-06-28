@@ -305,7 +305,7 @@ All company configuration and administration pages.
 admin.users.*, authorization.roles.*, authorization.permissions.*, policies.*, audit.view_all, audit.export, companies.settings.manage, teams.manage, languages.manage, integrations.webhooks.manage, notifications.templates.manage, reports.view_all. Finance approval can be added or removed as a direct permission depending on governance.
 Sales
 Own lead workspace.
-leads.dashboard.access, leads.lead.create_self_generated, leads.lead.view_own, leads.lead.update_own, leads.stage.change_own, leads.followup.create_own, leads.followup.update_own, leads.meeting.create_own, leads.note.add_own, notifications.view_own, campaigns.reference.view. No manual all-company distribution by default.
+leads.dashboard.access, leads.lead.create_self_generated, leads.lead.view_own, leads.lead.update_own, leads.stage.change_own, leads.followup.create_own, leads.followup.update_own, leads.meeting.create_own, leads.note.add_own, campaigns.reference.view. No manual all-company distribution by default.
 Sales Head
 Team sales management.
 All Sales defaults + leads.lead.view_team, leads.lead.assign_team_member, leads.distribution.team_manual, leads.distribution.team_auto, leads.stage.change_team, leads.followup.manage_team, leads.meeting.manage_team, reports.team.view, team.members.view. Can assign self-generated leads to self or team member and run automatic distribution within own team only.
@@ -317,16 +317,16 @@ Management visibility and decision monitoring.
 dashboards.executive.access, leads.lead.view_all, marketing.campaign.view_all, finance.approval.view, reports.all.view, reports.export_summary, audit.summary.view, sla.breaches.view, distribution.performance.view. Edit/approve actions are not default unless explicitly granted.
 Call Center
 Phone lead capture and initial qualification.
-leads.callcenter.access, leads.lead.create_callcenter, leads.lead.create_referral, leads.lead.view_created, leads.lead.update_created_before_assignment, leads.source.how_did_you_know.capture, leads.duplicate.check, notifications.view_own. Assignment only if manual distribution permission is added.
+leads.callcenter.access, leads.lead.create_callcenter, leads.lead.create_referral, leads.lead.view_created, leads.lead.update_created_before_assignment, leads.source.how_did_you_know.capture, leads.duplicate.check. Assignment only if manual distribution permission is added.
 Finance Managers
 Campaign budget approval and review.
 finance.dashboard.access, marketing.campaign.view_all, marketing.budget.view, finance.campaign.review, finance.campaign.approve, finance.campaign.semi_approve, finance.campaign.reject, finance.approval.reason.add, finance.approval.history.view, reports.marketing_roi.view, audit.budget.view.
 Receptionists
 Walk-in lead intake and visitor queue.
-reception.walkin.access, leads.lead.create_walkin, leads.source.how_did_you_know.capture, reception.queue.manage, reception.salesman_availability.view, leads.walkin.assign_by_policy, notifications.view_own. No campaign budget or finance approval by default.
+reception.walkin.access, leads.lead.create_walkin, leads.source.how_did_you_know.capture, reception.queue.manage, reception.salesman_availability.view, leads.walkin.assign_by_policy. No campaign budget or finance approval by default.
 Brokers
 Broker portal and own broker leads.
-broker.portal.access, broker.lead.create_own, broker.lead.view_own, broker.lead.status_limited_view, broker.profile.update_own, notifications.view_own. Internal lead notes, sales assignments, and all-company data are hidden by default.
+broker.portal.access, broker.lead.create_own, broker.lead.view_own, broker.lead.status_limited_view, broker.profile.update_own. Internal lead notes, sales assignments, and all-company data are hidden by default.
 Marketing Members
 Campaign creation and execution details.
 marketing.campaigns.access, marketing.campaign.create, marketing.campaign.update_draft, marketing.campaign.select_types, marketing.event.manage, marketing.tv_ad.manage, marketing.street_ad.manage, marketing.social_ad.manage, marketing.exhibition.manage, marketing.assets.upload, marketing.budget.enter, marketing.other_cost.add, marketing.campaign.submit_finance, marketing.roi.view_own_campaigns.
