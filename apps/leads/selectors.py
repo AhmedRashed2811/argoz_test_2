@@ -123,30 +123,40 @@ def calendar_events(user, company, start, end):
     # Never surface past events — clamp the window's lower bound to now.
     lower = max(start, timezone.now())
 
+    # Scheduling a meeting/follow-up also moves the lead's stage, which spawns an
+    # SLA whose deadline equals that scheduled time. Track (lead, time) so the
+    # SLA isn't shown as a duplicate of the meeting/follow-up it mirrors.
+    busy: set[tuple[str, str]] = set()
+
     for f in FollowUp.objects.filter(
         lead_id__in=lead_ids, status="SCHEDULED",
         scheduled_at__gte=lower, scheduled_at__lt=end,
     ).select_related("lead", "lead__current_stage", "assigned_salesman"):
-        events.append(_cal_event("followup", f.scheduled_at, f.lead,
-                                  salesman=f.assigned_salesman,
-                                  extra={"notes": f.notes}))
+        ev = _cal_event("followup", f.scheduled_at, f.lead,
+                        salesman=f.assigned_salesman, extra={"notes": f.notes})
+        busy.add((ev["lead_id"], ev["start"]))
+        events.append(ev)
 
     for m in Meeting.objects.filter(
         lead_id__in=lead_ids, status="SCHEDULED",
         scheduled_start__gte=lower, scheduled_start__lt=end,
     ).select_related("lead", "lead__current_stage", "assigned_salesman"):
-        events.append(_cal_event("meeting", m.scheduled_start, m.lead,
-                                 salesman=m.assigned_salesman,
-                                 extra={"location": m.location}))
+        ev = _cal_event("meeting", m.scheduled_start, m.lead,
+                        salesman=m.assigned_salesman, extra={"location": m.location})
+        busy.add((ev["lead_id"], ev["start"]))
+        events.append(ev)
 
     # Active SLAs only with a future deadline — breached/expired are excluded.
     for s in SLAInstance.objects.filter(
         lead_id__in=lead_ids, status=SLAStatus.ACTIVE,
         deadline_at__gte=lower, deadline_at__lt=end,
     ).select_related("lead", "lead__current_stage", "stage", "assigned_salesman"):
-        events.append(_cal_event("sla", s.deadline_at, s.lead,
-                                 salesman=s.assigned_salesman,
-                                 extra={"stage": s.stage.name if s.stage else ""}))
+        ev = _cal_event("sla", s.deadline_at, s.lead,
+                        salesman=s.assigned_salesman,
+                        extra={"stage": s.stage.name if s.stage else ""})
+        if (ev["lead_id"], ev["start"]) in busy:
+            continue  # mirrors a meeting/follow-up already shown
+        events.append(ev)
 
     for r in Reminder.objects.filter(
         lead_id__in=lead_ids, reminder_type="FROZEN_RETURN",

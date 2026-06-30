@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
   <link rel="stylesheet" href="{% static 'base/layout.css' %}">
   <link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+  <link rel="stylesheet" href="{% static 'notebook/notebook.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -41,6 +42,16 @@
           </svg>
         </div>
         <span class="chat-badge hidden" id="chatBadge">0</span>
+      </button>
+      <button class="nb-btn" id="nbBtn" aria-label="Notebook">
+        <div class="nb-btn-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 4H17.5C18.33 4 19 4.67 19 5.5V18.5C19 19.33 18.33 20 17.5 20H6V4Z" fill="rgba(224,123,32,0.12)" stroke="#e07b20" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 4V20" stroke="#e07b20" stroke-width="1.6" stroke-linecap="round"/>
+            <line x1="9.5" y1="8.5" x2="15.5" y2="8.5" stroke="#e07b20" stroke-width="1.3" stroke-linecap="round"/>
+            <line x1="9.5" y1="12" x2="15.5" y2="12" stroke="#e07b20" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </div>
       </button>
       <button class="notif-btn" id="notifBtn" aria-label="Notifications">
         <div class="notif-btn-icon">
@@ -175,6 +186,54 @@
     </div>
   </div>
 
+  <div class="nb-panel-backdrop" id="nbBackdrop"></div>
+  <div class="nb-panel" id="nbPanel" data-view="list">
+    <!-- ── List view ── -->
+    <div class="nb-list-view">
+      <div class="nb-panel-head">
+        <div class="nb-head-left">
+          <div class="nb-head-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 4H17.5C18.33 4 19 4.67 19 5.5V18.5C19 19.33 18.33 20 17.5 20H6V4Z" stroke="#e07b20" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 4V20" stroke="#e07b20" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </div>
+          <div><div class="nb-panel-title">Notebook</div><div class="nb-panel-sub" id="nbPanelSub">Your private notes</div></div>
+        </div>
+        <div class="nb-panel-actions">
+          <button class="nb-new-btn" id="nbNewBtn" title="New note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="nb-panel-close" data-nb-close><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="nb-search-bar">
+        <svg viewBox="0 0 24 24" class="nb-search-icon" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="nbSearch" placeholder="Search notes...">
+      </div>
+      <div class="nb-body" id="nbListBody"></div>
+    </div>
+
+    <!-- ── Editor view ── -->
+    <div class="nb-editor-view">
+      <div class="nb-panel-head nb-editor-head">
+        <button class="nb-back-btn" data-nb-back><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="nb-editor-title"><div class="nb-panel-title" id="nbEditorLabel">New note</div><div class="nb-panel-sub" id="nbEditorStamp"></div></div>
+        <div class="nb-panel-actions">
+          <button class="nb-del-btn" id="nbDeleteBtn" title="Delete note" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+          <button class="nb-panel-close" data-nb-close><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <form class="nb-editor" id="nbEditor">
+        <input type="text" id="nbTitle" class="nb-title-input" placeholder="Title" maxlength="200" autocomplete="off">
+        <textarea id="nbBodyInput" class="nb-body-input" placeholder="Write your note..."></textarea>
+        <div class="nb-editor-foot">
+          <span class="nb-save-state" id="nbSaveState"></span>
+          <button type="submit" class="nb-save-btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -266,11 +325,18 @@
       readTmpl: "{% url 'chat:mark_read' '00000000-0000-0000-0000-000000000000' %}",
       wsPath: "/ws/chat/",
       meId: "{{ user.id }}"
+    },
+    notebook: {
+      listUrl: "{% url 'notebook:list' %}",
+      createUrl: "{% url 'notebook:create' %}",
+      updateTmpl: "{% url 'notebook:update' '00000000-0000-0000-0000-000000000000' %}",
+      deleteTmpl: "{% url 'notebook:delete' '00000000-0000-0000-0000-000000000000' %}"
     }
   };
 </script>
 <script src="{% static 'base/layout.js' %}"></script>
 <script src="{% static 'chat/chat.js' %}"></script>
+<script src="{% static 'notebook/notebook.js' %}"></script>
 {% endif %}
 {% block extra_js %}{% endblock %}
 </body>

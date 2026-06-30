@@ -303,6 +303,9 @@
   /* ── view + panel control ── */
   function setView(v) { panel.setAttribute('data-view', v); }
   function open() {
+    const nbP = $('nbPanel'), nbB = $('nbBackdrop');     // one bottom-right panel at a time
+    if (nbP) nbP.classList.remove('open');
+    if (nbB) nbB.classList.remove('open');
     panel.classList.add('open'); backdrop.classList.add('open');
     setView('list'); current = null;
     loadList();
