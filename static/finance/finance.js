@@ -88,13 +88,14 @@ function renderTable(){
   const slice = filtered.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
   const tbody = document.getElementById('tableBody');
   if(!slice.length){
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:48px;color:var(--clr-text-sub);font-size:.9rem">No campaigns match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--clr-text-sub);font-size:.9rem">No campaigns match your filters.</td></tr>`;
   } else {
     tbody.innerHTML = slice.map((c)=>`
       <tr>
         <td style="text-align:left"><span class="campaign-name-text">${c.name}</span><div style="font-size:.75rem;color:var(--clr-text-sub);margin-top:2px">${c.target}</div></td>
         <td><div class="type-chips">${typeChips(c.types)}</div></td>
         <td><span class="budget-val">${fmtNumber(c.budget)}</span></td>
+        <td><span class="budget-val">${fmtNumber(c.approvedBudget||0)}</span></td>
         <td style="font-size:.83rem;color:var(--clr-text-sub)">${fmtDate(c.submittedDate)}</td>
         <td>${approvalBadge(c.approval)}</td>
         <td>
@@ -292,17 +293,19 @@ function openReview(id){
       let subListOpen = false;
       section.items.forEach(item=>{
         const isSub = item.label.startsWith('↳');
+        const isRejected = c.rejectedBudgets && c.rejectedBudgets.includes(item.key);
+        const isChecked = !isRejected;
         if(!isSub){
           if(subListOpen) html += `</div>`; // close previous item's sub-list
           html += `<div class="breakdown-item-row" style="display:flex;align-items:center;">
-            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;" title="Check to reject/edit this item">` : ''}
+            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;" ${isChecked ? 'checked' : ''} title="Check to approve this item">` : ''}
             <div class="breakdown-item-name">${item.label}</div>
             <div class="breakdown-item-amount">${fmtBudget(item.amount)}</div>
           </div><div class="breakdown-sub-list">`;
           subListOpen = true;
         } else {
           html += `<div class="breakdown-sub-row" style="display:flex;align-items:center;">
-            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;margin-left:12px;" title="Check to reject/edit this item">` : ''}
+            ${showCheckboxes ? `<input type="checkbox" class="reject-budget-cb" value="${item.key}" style="accent-color:var(--clr-orange);margin-right:8px;margin-left:12px;" ${isChecked ? 'checked' : ''} title="Check to approve this item">` : ''}
             <div class="breakdown-sub-name">${item.label}</div>
             <div class="breakdown-sub-amount">${fmtBudget(item.amount)}</div>
           </div>`;
@@ -368,13 +371,13 @@ async function doApproval(id, action){
   if(requireNote){
     const rejected = [];
     if (action === 'semi') {
-      document.querySelectorAll('.reject-budget-cb:checked').forEach(cb => {
+      document.querySelectorAll('.reject-budget-cb:not(:checked)').forEach(cb => {
         rejected.push(cb.value);
       });
       if (rejected.length === 0) {
         Swal.fire({
           title: 'Rejected Budget Required',
-          text: 'Please select at least one budget item to reject by checking the checkboxes next to the budget items in the breakdown list before semi-approving.',
+          text: 'Please uncheck at least one budget item to reject/exclude it before semi-approving.',
           icon: 'warning',
           confirmButtonColor: 'var(--clr-orange)'
         });

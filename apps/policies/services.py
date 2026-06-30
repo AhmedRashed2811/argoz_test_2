@@ -7,7 +7,7 @@ from typing import Any
 
 from apps.core.exceptions import PolicyError
 
-from .constants import ValueType
+from .constants import PolicyCode, ValueType
 from .models import CompanyPolicyValue, PolicyDefinition
 
 
@@ -71,8 +71,10 @@ def _format_current(cpv: CompanyPolicyValue | None, value_type: str) -> str:
     if cpv.value_json is not None:
         v = cpv.value_json
         if value_type == ValueType.DURATION and isinstance(v, dict):
-            h, m = v.get("hours", 0), v.get("minutes", 0)
+            d, h, m = v.get("days", 0), v.get("hours", 0), v.get("minutes", 0)
             parts = []
+            if d:
+                parts.append(f"{d}d")
             if h:
                 parts.append(f"{h}h")
             if m:
@@ -87,6 +89,105 @@ def _format_current(cpv: CompanyPolicyValue | None, value_type: str) -> str:
 
 
 class PolicyManagementService:
+    MODULE_META = {
+        "leads": ("Leads & Distribution", "Assignment, SLA and daily lead rules"),
+        "marketing": ("Marketing", "Campaign approvals and editing rules"),
+        "notifications": ("Notifications", "Reminders, emails and cleanup jobs"),
+        "integration": ("Integrations", "Webhooks and external mappings"),
+    }
+    MODULE_ORDER = ["leads", "marketing", "notifications", "integration"]
+
+    POLICY_GROUPS = [
+        {
+            "key": "lead-intake",
+            "title": "Lead intake",
+            "description": "Defaults used when a new lead enters the CRM.",
+            "codes": {
+                PolicyCode.LANGUAGE_DEFAULT,
+                PolicyCode.BROKER_ALSO_ASSIGN_SALESMAN,
+                PolicyCode.EXISTING_CLIENT_POLICY,
+            },
+        },
+        {
+            "key": "assignment-routing",
+            "title": "Assignment and routing",
+            "description": "How leads move between teams, salesmen and reception.",
+            "codes": {
+                PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD,
+                PolicyCode.BULK_IMPORT_DISTRIBUTION,
+                PolicyCode.DISTRIBUTION_SCOPE_MODE,
+                PolicyCode.RETRY_ATTEMPTS_PER_TEAM,
+                PolicyCode.SELF_GENERATED_SALESMAN_POLICY,
+                PolicyCode.SELF_GENERATED_HEAD_ASSIGNMENT,
+                PolicyCode.WALKIN_RECEPTION_POLICY,
+            },
+        },
+        {
+            "key": "sla-timing",
+            "title": "SLA timing",
+            "description": "Response windows by origin and lead stage.",
+            "codes": {
+                PolicyCode.DIRECT_SLA,
+                PolicyCode.BROKER_SLA,
+                PolicyCode.WALKIN_SLA,
+                PolicyCode.SLA_EXPIRY_METHOD,
+                PolicyCode.FRESH_REMINDER_SCHEDULE,
+                PolicyCode.WEEKEND_SLA_FREEZE,
+            },
+            "prefixes": [f"{PolicyCode.STAGE_SLA}."],
+        },
+        {
+            "key": "sales-actions",
+            "title": "Sales actions",
+            "description": "Follow-up, meeting, freeze and reminder limits.",
+            "codes": {
+                PolicyCode.NOT_REACHED_REMINDER_MODE,
+                PolicyCode.SALES_ACTION_LIMITS,
+                PolicyCode.SALES_ACTION_MAX_DURATION,
+                PolicyCode.SALES_STAGE_CAPACITY,
+                PolicyCode.SALES_VIEW_INACTIVE,
+            },
+        },
+        {
+            "key": "campaign-controls",
+            "title": "Campaign controls",
+            "description": "Marketing approval and edit rules.",
+            "codes": {
+                PolicyCode.CAMPAIGN_RESTRICT_EDITING,
+                PolicyCode.REQUEST_CAMPAIGN_APPROVAL,
+            },
+        },
+        {
+            "key": "notification-automation",
+            "title": "Notification automation",
+            "description": "Email reminders and notification maintenance.",
+            "codes": {
+                PolicyCode.NOTIFICATION_AUTO_CLEANUP,
+                PolicyCode.DAILY_TASK_EMAIL,
+            },
+        },
+        {
+            "key": "webhook-mapping",
+            "title": "Webhook mapping",
+            "description": "External lead source mapping rules.",
+            "codes": {PolicyCode.WEBHOOK_MAPPING_POLICY},
+        },
+    ]
+
+    @classmethod
+    def _policy_group_meta(cls, code: str) -> tuple[str, str, str]:
+        for group in cls.POLICY_GROUPS:
+            codes = group.get("codes", set())
+            prefixes = group.get("prefixes", [])
+            if code in codes or any(code.startswith(prefix) for prefix in prefixes):
+                return group["key"], group["title"], group["description"]
+        return "other", "Other settings", "Additional company policy settings."
+
+    @staticmethod
+    def _is_set(cpv: CompanyPolicyValue | None) -> bool:
+        return cpv is not None and (
+            cpv.selected_option_id is not None or cpv.value_json is not None
+        )
 
     @staticmethod
     def get_list_context(*, company: Any) -> dict:
@@ -103,30 +204,51 @@ class PolicyManagementService:
         by_module: dict[str, list] = {}
         for p in policies:
             cpv = values.get(p.id)
+            group_key, group_title, group_desc = (
+                PolicyManagementService._policy_group_meta(p.code)
+            )
             by_module.setdefault(p.module, []).append({
                 "policy": p,
                 "cpv": cpv,
                 "current_display": _format_current(cpv, p.value_type),
-                "is_set": cpv is not None and (
-                    cpv.selected_option_id is not None or cpv.value_json is not None
-                ),
+                "is_set": PolicyManagementService._is_set(cpv),
+                "group_key": group_key,
+                "group_title": group_title,
+                "group_description": group_desc,
             })
-        # Ordered, display-friendly module groups for the policies page (task 13).
-        meta = {
-            "leads": ("Leads & Distribution", "Assignment, SLA and per-lead rules"),
-            "marketing": ("Marketing", "Campaign budgets and approvals"),
-            "notifications": ("Notifications", "Reminders and cleanup jobs"),
-            "integration": ("Integrations", "Webhooks and external mappings"),
-        }
-        order = ["leads", "marketing", "notifications", "integration"]
         modules = []
-        for key in order + [m for m in by_module if m not in order]:
+        for key in (
+            PolicyManagementService.MODULE_ORDER
+            + [m for m in by_module if m not in PolicyManagementService.MODULE_ORDER]
+        ):
             rows = by_module.get(key)
             if not rows:
                 continue
-            title, desc = meta.get(key, (key.title(), ""))
+            grouped_rows: dict[str, dict] = {}
+            for row in rows:
+                group = grouped_rows.setdefault(row["group_key"], {
+                    "key": row["group_key"],
+                    "title": row["group_title"],
+                    "description": row["group_description"],
+                    "rows": [],
+                    "count": 0,
+                    "set_count": 0,
+                })
+                group["rows"].append(row)
+                group["count"] += 1
+                group["set_count"] += 1 if row["is_set"] else 0
+            group_order = {
+                group["key"]: index
+                for index, group in enumerate(PolicyManagementService.POLICY_GROUPS)
+            }
+            groups = sorted(
+                grouped_rows.values(),
+                key=lambda group: group_order.get(group["key"], 999),
+            )
+            title, desc = PolicyManagementService.MODULE_META.get(key, (key.title(), ""))
             modules.append({
                 "key": key, "title": title, "description": desc, "rows": rows,
+                "groups": groups,
                 "count": len(rows),
                 "set_count": sum(1 for r in rows if r["is_set"]),
             })
@@ -134,6 +256,17 @@ class PolicyManagementService:
         configured = sum(m["set_count"] for m in modules)
         return {"by_module": by_module, "modules": modules,
                 "total_policies": total, "configured_policies": configured}
+
+    @staticmethod
+    def get_value_summary(*, policy: PolicyDefinition,
+                          cpv: CompanyPolicyValue | None) -> dict:
+        is_set = PolicyManagementService._is_set(cpv)
+        return {
+            "policy_id": str(policy.id),
+            "current_display": _format_current(cpv, policy.value_type),
+            "is_set": is_set,
+            "status_label": "Configured" if is_set else "Not configured",
+        }
 
     @staticmethod
     def get_edit_context(*, policy_id: Any, company: Any) -> dict:
@@ -215,9 +348,10 @@ class PolicyManagementService:
             option = policy.options.filter(code=code).first() if code else None
 
         elif vtype == ValueType.DURATION:
+            d = int(post_data.get("days", 0) or 0)
             h = int(post_data.get("hours", 0) or 0)
             m = int(post_data.get("minutes", 0) or 0)
-            value_json = {"hours": h, "minutes": m}
+            value_json = {"days": d, "hours": h, "minutes": m}
 
         elif vtype == ValueType.INTEGER:
             value_json = int(post_data.get("integer_value", 0) or 0)
@@ -236,8 +370,9 @@ class PolicyManagementService:
             from .composite import parse_post
             value_json = parse_post(policy.code, post_data)
 
-        PolicyManagementService.set_value(
+        cpv = PolicyManagementService.set_value(
             company=company, code=policy.code,
             option=option, value_json=value_json,
             updated_by=updated_by, request_meta=request_meta,
         )
+        return PolicyManagementService.get_value_summary(policy=policy, cpv=cpv)

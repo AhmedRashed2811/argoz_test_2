@@ -251,6 +251,12 @@ class Command(BaseCommand):
              "Daily Task Reminder Email", "notifications", ValueType.COMPOSITE, []),
             (PolicyCode.WEEKEND_SLA_FREEZE,
              "Weekend SLA Freeze", "leads", ValueType.COMPOSITE, []),
+            # Task 1a: per-salesman stage capacity caps (On/Off, default Off).
+            (PolicyCode.SALES_STAGE_CAPACITY,
+             "Per-Salesman Stage Capacity", "leads", ValueType.COMPOSITE, []),
+            # Task 1b: salesman sees their inactive leads (default On).
+            (PolicyCode.SALES_VIEW_INACTIVE,
+             "Salesman Sees Inactive Leads", "leads", ValueType.BOOLEAN, []),
         ]
         # Per-stage SLA durations.
         for stage in (StageCode.FRESH, StageCode.INTERESTED, StageCode.FOLLOW_UP,
@@ -289,6 +295,8 @@ class Command(BaseCommand):
         self._set_value(company, PolicyCode.CAMPAIGN_RESTRICT_EDITING, True)
         self._set_value(company, PolicyCode.REQUEST_CAMPAIGN_APPROVAL, True)
         self._select(company, PolicyCode.NOT_REACHED_REMINDER_MODE, "AUTOMATIC")
+        # Task 1b default: salesmen see their inactive leads unless turned off.
+        self._set_value(company, PolicyCode.SALES_VIEW_INACTIVE, True)
         self.stdout.write(f"  policies: {len(defs)}")
 
     def _select(self, company, code, option_code):
@@ -340,11 +348,14 @@ class Command(BaseCommand):
             # — Notifications —
             ("notifications", "view_own", "Notifications", "notifications:list", 40, None),
             # — Administration —
-            ("admin", "users", "Users", "accounts:user_list", 50, None),
-            ("admin", "teams", "Sales Teams", "accounts:team_list", 51, None),
+            # People & access group (task 12): header-only parent grouping Users,
+            # Sales Teams and Roles & Permissions under one collapsible section.
+            ("admin", "people", "People & Access", "", 49, None),
+            ("admin", "users", "Users", "accounts:user_list", 50, "admin.people"),
+            ("admin", "teams", "Sales Teams", "accounts:team_list", 51, "admin.people"),
             ("admin", "brokers", "Brokers", "accounts:broker_list", 52, None),
             ("authorization", "roles", "Roles & Permissions",
-             "authorization:role_list", 53, None),
+             "authorization:role_list", 53, "admin.people"),
             ("policies", "company", "Policies", "policies:list", 54, None),
             ("audit", "view_all", "Audit Log", "audit:list", 55, None),
             ("integrations", "webhooks", "Webhooks", "integrations:webhook_list", 56, None),

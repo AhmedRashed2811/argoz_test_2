@@ -674,10 +674,24 @@ function renderBulkResult(d) {
 }
 
 function downloadRejected() {
-  // Original columns untouched, plus a trailing 'error' column explaining why.
-  const header = [..._bulkCols, 'error'];
-  const data = _bulkRejected.map(r => header.map(c => r[c] != null ? r[c] : ''));
-  _downloadCsv('rejected_leads.csv', _csv([header, ...data]));
+  // Server builds an .xlsx with the rejected value cells filled light red so
+  // the importer can spot bad rows at a glance (task 9).
+  fetch(CFG.urls.rejectedExport, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CFG.csrf },
+    body: JSON.stringify({ rows: _bulkRejected, columns: _bulkCols }),
+  }).then(r => { if (!r.ok) throw new Error('Export failed'); return r.blob(); })
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'rejected_leads.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+    })
+    .catch(() => {
+      // Fallback to the plain CSV if the styled export is unavailable.
+      const header = [..._bulkCols, 'error'];
+      const data = _bulkRejected.map(r => header.map(c => r[c] != null ? r[c] : ''));
+      _downloadCsv('rejected_leads.csv', _csv([header, ...data]));
+    });
 }
 
 function reactivateDuplicates() {

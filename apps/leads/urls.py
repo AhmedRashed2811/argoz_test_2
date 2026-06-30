@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/create/", api.api_create, name="api_create"),
     path("api/bulk-import/", api.api_bulk_import, name="api_bulk_import"),
     path("api/bulk-reactivate/", api.api_bulk_reactivate, name="api_bulk_reactivate"),
+    path("api/rejected-export/", api.api_rejected_export, name="api_rejected_export"),
     path("api/sources/", api.api_sources, name="api_sources"),
     path("api/languages/", api.api_languages, name="api_languages"),
     path("api/duplicate-check/", api.api_duplicate_check, name="api_duplicate_check"),

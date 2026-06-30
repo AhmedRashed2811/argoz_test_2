@@ -23,14 +23,21 @@ def nav_menu(request):
         if page.module == "notifications":
             continue
         access_code = f"{page.code}.access"
-        if user.is_superuser or access_code in codes or _page_allowed(page, codes):
-            # Resolve allowed children
-            allowed_children = []
-            for child in page.children.filter(is_menu_item=True, is_active=True).order_by("menu_order", "name"):
-                child_access = f"{child.code}.access"
-                if user.is_superuser or child_access in codes or _page_allowed(child, codes):
-                    allowed_children.append(child)
-            page.allowed_children = allowed_children
+        # Resolve allowed children
+        allowed_children = []
+        for child in page.children.filter(is_menu_item=True, is_active=True).order_by("menu_order", "name"):
+            child_access = f"{child.code}.access"
+            if user.is_superuser or child_access in codes or _page_allowed(child, codes):
+                allowed_children.append(child)
+        page.allowed_children = allowed_children
+        page_allowed = (
+            user.is_superuser or access_code in codes or _page_allowed(page, codes)
+        )
+        # A header-only group page (no url_name, no own permission) still shows
+        # whenever the user may reach at least one of its children (task 12).
+        if not page.url_name and allowed_children:
+            page_allowed = True
+        if page_allowed:
             items.append(page)
 
     # Brokers get a dedicated read-only "Leads" link to the All-Leads page,

@@ -53,7 +53,7 @@
         <span class="value">
           {% if policy.value_type == "DURATION" %}
             {% with v=cpv.value_json %}
-              {% if v.hours %}{{ v.hours }}h {% endif %}{% if v.minutes %}{{ v.minutes }}m{% endif %}
+              {% if v.days %}{{ v.days }}d {% endif %}{% if v.hours %}{{ v.hours }}h {% endif %}{% if v.minutes %}{{ v.minutes }}m{% endif %}
             {% endwith %}
           {% elif policy.value_type == "BOOLEAN" %}
             {% if cpv.value_json %}Yes{% else %}No{% endif %}
@@ -72,7 +72,7 @@
       </div>
     {% endif %}
 
-    <form method="post" id="policy-form">
+    <form method="post" id="policy-form" data-no-idempotency>
       {% csrf_token %}
 
       {# ── OPTION ── #}
@@ -102,6 +102,14 @@
       {% elif policy.value_type == "DURATION" %}
         <div class="field-label">Set duration</div>
         <div class="duration-row">
+          <div class="duration-field">
+            <label for="id_days">Days</label>
+            <div class="duration-input-wrap">
+              <input type="number" name="days" id="id_days" min="0" max="3650"
+                     value="{{ cpv.value_json.days|default:'0' }}">
+              <span class="duration-unit">days</span>
+            </div>
+          </div>
           <div class="duration-field">
             <label for="id_hours">Hours</label>
             <div class="duration-input-wrap">

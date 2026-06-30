@@ -1,89 +1,137 @@
 {% extends "base.html" %}
 {% load static crm_permissions %}
 
-{% block title %}Policies · Argoz CRM{% endblock %}
+{% block title %}Policies - Argoz CRM{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'policies/policy_edit.css' %}">
 <link rel="stylesheet" href="{% static 'policies/policy_list.css' %}">
 {% endblock %}
 
 {% block content %}
 <main class="page-body">
-
-  <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-left">
-      <div class="page-icon">
+      <div class="page-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       </div>
       <div class="page-title">
         <h1>Company Policies</h1>
-        <p>Configure company-wide rules for distribution SLA, round robin parameters, and marketing budgets</p>
+        <p>Grouped company rules for lead routing, SLA timing, marketing, notifications and integrations.</p>
       </div>
     </div>
     <div class="search-wrapper">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" class="search-input" id="policy-search" placeholder="Search policies…" oninput="filterPolicies()" autocomplete="off">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="search-input" id="policy-search" placeholder="Search policies" autocomplete="off">
     </div>
   </div>
 
-  <!-- Quick stats + module jump-nav (task 13) -->
-  <div class="policy-toolbar">
-    <div class="policy-stats">
-      <span class="stat-chip"><strong>{{ configured_policies }}</strong> configured</span>
-      <span class="stat-chip muted"><strong>{{ total_policies }}</strong> total</span>
-    </div>
-    <div class="module-nav">
-      {% for m in modules %}
-        <a href="#mod-{{ m.key }}" class="module-nav-chip">{{ m.title }}
-          <span class="chip-count">{{ m.set_count }}/{{ m.count }}</span></a>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Policies Content -->
-  {% for m in modules %}
-    <div class="module-section" id="mod-{{ m.key }}" data-module="{{ m.key }}">
-      <div class="module-heading">
-        <span class="module-label">{{ m.title }}</span>
-        {% if m.description %}<span class="module-desc">{{ m.description }}</span>{% endif %}
-        <div class="module-divider"></div>
-        <span class="module-count">{{ m.set_count }}/{{ m.count }}</span>
+  <div class="policy-shell">
+    <aside class="policy-sidebar">
+      <div class="policy-stats">
+        <span class="stat-chip"><strong id="configured-count">{{ configured_policies }}</strong> configured</span>
+        <span class="stat-chip muted"><strong>{{ total_policies }}</strong> total</span>
       </div>
-
-      <div class="policy-grid">
-        {% for row in m.rows %}
-          <div class="policy-card {% if row.is_set %}is-set{% else %}not-set{% endif %}"
-               data-search="{{ row.policy.name|lower }} {{ row.policy.code|lower }}">
-            <div class="policy-info">
-              <div class="policy-name">
-                {{ row.policy.name }}
-                <span class="type-badge">{{ row.policy.value_type }}</span>
-              </div>
-              <div class="policy-code">{{ row.policy.code }}</div>
-              {% if row.is_set %}
-                <span class="policy-value value-set">{{ row.current_display }}</span>
-              {% else %}
-                <span class="policy-value value-unset">Not configured</span>
-              {% endif %}
-            </div>
-            {% if request.user|can:'policies.company.manage' %}
-              <a href="{% url 'policies:edit' row.policy.id %}" class="edit-btn">Configure</a>
-            {% endif %}
+      <nav class="module-nav" aria-label="Policy groups">
+        {% for m in modules %}
+          <a href="#mod-{{ m.key }}" class="module-nav-link" data-target="mod-{{ m.key }}">
+            <span>{{ m.title }}</span>
+            <span class="chip-count" data-module-count="{{ m.key }}">{{ m.set_count }}/{{ m.count }}</span>
+          </a>
+          <div class="group-nav">
+            {% for g in m.groups %}
+              <a href="#grp-{{ m.key }}-{{ g.key }}" class="group-nav-link" data-target="grp-{{ m.key }}-{{ g.key }}">{{ g.title }}</a>
+            {% endfor %}
           </div>
         {% endfor %}
-      </div>
-    </div>
-  {% empty %}
-    <div class="empty-state">
-      <h3>No Policies Found</h3>
-      <p>Database table is empty. Please run seeds to populate policy definitions.</p>
-    </div>
-  {% endfor %}
+      </nav>
+    </aside>
 
+    <section class="policy-directory" aria-live="polite">
+      {% for m in modules %}
+        <section class="module-section" id="mod-{{ m.key }}" data-module="{{ m.key }}">
+          <div class="module-heading">
+            <div>
+              <span class="module-label">{{ m.title }}</span>
+              {% if m.description %}<p class="module-desc">{{ m.description }}</p>{% endif %}
+            </div>
+            <span class="module-count" data-module-total="{{ m.key }}">{{ m.set_count }}/{{ m.count }}</span>
+          </div>
+
+          {% for g in m.groups %}
+            <section class="policy-group" id="grp-{{ m.key }}-{{ g.key }}" data-group="{{ g.key }}">
+              <button type="button" class="group-toggle" aria-expanded="true">
+                <span class="toggle-icon">v</span>
+                <span class="group-title-wrap">
+                  <span class="group-title">{{ g.title }}</span>
+                  <span class="group-desc">{{ g.description }}</span>
+                </span>
+                <span class="group-count">{{ g.set_count }}/{{ g.count }}</span>
+              </button>
+              <div class="policy-grid">
+                {% for row in g.rows %}
+                  <article class="policy-card {% if row.is_set %}is-set{% else %}not-set{% endif %}"
+                           data-policy-id="{{ row.policy.id }}"
+                           data-module="{{ m.key }}"
+                           data-search="{{ row.policy.name|lower }} {{ row.policy.code|lower }} {{ g.title|lower }} {{ m.title|lower }}">
+                    <div class="policy-info">
+                      <div class="policy-name">
+                        {{ row.policy.name }}
+                        <span class="type-badge">{{ row.policy.value_type }}</span>
+                      </div>
+                      <div class="policy-code">{{ row.policy.code }}</div>
+                      {% if row.is_set %}
+                        <span class="policy-value value-set">{{ row.current_display }}</span>
+                      {% else %}
+                        <span class="policy-value value-unset">Not configured</span>
+                      {% endif %}
+                    </div>
+                    {% if request.user|can:'policies.company.manage' %}
+                      <a href="{% url 'policies:edit' row.policy.id %}"
+                         class="edit-btn js-policy-edit"
+                         data-policy-id="{{ row.policy.id }}"
+                         data-policy-type="{{ row.policy.value_type }}"
+                         data-api-url="{% url 'policies:api_edit' row.policy.id %}">Configure</a>
+                    {% endif %}
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+          {% endfor %}
+        </section>
+      {% empty %}
+        <div class="empty-state">
+          <h3>No Policies Found</h3>
+          <p>Database table is empty. Please run seeds to populate policy definitions.</p>
+        </div>
+      {% endfor %}
+      <div class="empty-state search-empty" id="policy-empty-search">
+        <h3>No matching policies</h3>
+        <p>Try another policy name, code or group.</p>
+      </div>
+    </section>
+  </div>
 </main>
+
+<div class="policy-drawer-backdrop" id="policyDrawerBackdrop" hidden></div>
+<aside class="policy-drawer" id="policyDrawer" aria-hidden="true" aria-label="Configure policy">
+  <div class="drawer-bar">
+    <div>
+      <span class="drawer-kicker">Policy settings</span>
+      <h2 id="drawerTitle">Configure policy</h2>
+    </div>
+    <button type="button" class="drawer-close js-drawer-close" id="policyDrawerClose" aria-label="Close">x</button>
+  </div>
+  <div class="drawer-body" id="policyDrawerBody">
+    <div class="drawer-placeholder">Select a policy to configure it here.</div>
+  </div>
+  <button type="button" class="drawer-mobile-close js-drawer-close">Close</button>
+</aside>
+
+<div class="toast-container" id="toastContainer"></div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'policies/policy_edit.js' %}"></script>
 <script src="{% static 'policies/policy_list.js' %}"></script>
 {% endblock %}

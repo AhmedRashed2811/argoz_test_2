@@ -77,10 +77,12 @@ class FinanceApprovalService:
             .prefetch_related(
                 "selected_types", "approval_history__actor", "other_costs",
                 "events__celebrities", "events__giveaways", "events__catering",
+                "events__printouts",
                 "tv_ads__channels", "street_ads__type_lines__ad_type",
                 "street_ads__type_lines__locations",
                 "social_ads__platform_lines__platform",
-                "exhibitions",
+                "exhibitions__celebrities", "exhibitions__giveaways",
+                "exhibitions__catering", "exhibitions__printouts",
             )
             .order_by("-created_at")
         )
@@ -98,6 +100,25 @@ class FinanceApprovalService:
         }
 
     @staticmethod
+    def approved_budget(c) -> float:
+        """Budget finance has actually approved (task 4 column). Full total when
+        Approved; total minus the rejected line amounts when Semi-Approved; 0 when
+        Pending or Not Approved (nothing approved yet)."""
+        if c.approval_status == ApprovalStatus.APPROVED:
+            return float(c.total_budget)
+        if c.approval_status == ApprovalStatus.SEMI_APPROVED:
+            rejected = set(c.rejected_budgets or [])
+            if not rejected:
+                return float(c.total_budget)
+            amount_by_key = {}
+            for section in FinanceApprovalService._breakdown(c):
+                for item in section["items"]:
+                    amount_by_key[item["key"]] = item["amount"]
+            rejected_total = sum(amount_by_key.get(k, 0) for k in rejected)
+            return float(c.total_budget) - rejected_total
+        return 0.0
+
+    @staticmethod
     def _serialize(c, projects):
         return {
             "id": str(c.id),
@@ -108,6 +129,8 @@ class FinanceApprovalService:
             "submittedDate": c.created_at.date().isoformat(),
             "approval": _STATUS_TO_JS.get(c.approval_status, "pending"),
             "budget": float(c.total_budget),
+            "approvedBudget": FinanceApprovalService.approved_budget(c),
+            "rejectedBudgets": c.rejected_budgets or [],
             "target": (f"Project — {projects[c.target_id]}"
                        if c.target_type == "PROJECT" and c.target_id in projects else "—"),
             "dateRange": f"{c.start_date:%d %b %Y} – {c.end_date:%d %b %Y}",
@@ -136,6 +159,9 @@ class FinanceApprovalService:
             for ct_idx, ct in enumerate(ev.catering.all()):
                 ev_items.append({"label": f"↳ Catering: {ct.name}", "amount": float(ct.budget), "key": f"events.{ev_idx}.catering.{ct_idx}"})
                 ev_total += float(ct.budget)
+            for po_idx, po in enumerate(ev.printouts.all()):
+                ev_items.append({"label": f"↳ Print Out: {po.name}", "amount": float(po.budget), "key": f"events.{ev_idx}.printouts.{po_idx}"})
+                ev_total += float(po.budget)
         section("Events", ev_items, ev_total)
 
         tv_items, tv_total = [], 0
@@ -172,6 +198,18 @@ class FinanceApprovalService:
         for ex_idx, ex in enumerate(c.exhibitions.all()):
             ex_items.append({"label": ex.name or "Exhibition", "amount": float(ex.budget), "key": f"exhibitions.{ex_idx}.main"})
             ex_total += float(ex.budget)
+            for cel_idx, cel in enumerate(ex.celebrities.all()):
+                ex_items.append({"label": f"↳ Celebrity: {cel.name}", "amount": float(cel.budget), "key": f"exhibitions.{ex_idx}.celebrities.{cel_idx}"})
+                ex_total += float(cel.budget)
+            for gv_idx, gv in enumerate(ex.giveaways.all()):
+                ex_items.append({"label": f"↳ Giveaway: {gv.name}", "amount": float(gv.budget), "key": f"exhibitions.{ex_idx}.giveaways.{gv_idx}"})
+                ex_total += float(gv.budget)
+            for ct_idx, ct in enumerate(ex.catering.all()):
+                ex_items.append({"label": f"↳ Catering: {ct.name}", "amount": float(ct.budget), "key": f"exhibitions.{ex_idx}.catering.{ct_idx}"})
+                ex_total += float(ct.budget)
+            for po_idx, po in enumerate(ex.printouts.all()):
+                ex_items.append({"label": f"↳ Print Out: {po.name}", "amount": float(po.budget), "key": f"exhibitions.{ex_idx}.printouts.{po_idx}"})
+                ex_total += float(po.budget)
         section("Exhibition", ex_items, ex_total)
 
         oc_items, oc_total = [], 0

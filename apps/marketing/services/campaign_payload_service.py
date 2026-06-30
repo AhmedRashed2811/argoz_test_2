@@ -23,7 +23,12 @@ from ..models import (
     EventCatering,
     EventCelebrity,
     EventGiveaway,
+    EventPrintOut,
     EventRecord,
+    ExhibitionCatering,
+    ExhibitionCelebrity,
+    ExhibitionGiveaway,
+    ExhibitionPrintOut,
     ExhibitionRecord,
     OtherCost,
     Project,
@@ -266,6 +271,11 @@ class CampaignPayloadService:
                                     ["name", "budget"], rejected, f"events.{ev_idx}.catering.{{item_idx}}",
                                     "Approved catering item '{name}' was modified or deleted."
                                 )
+                                _validate_sub_list(
+                                    db_ev.get("printouts") or [], p_ev.get("printouts") or [],
+                                    ["name", "budget"], rejected, f"events.{ev_idx}.printouts.{{item_idx}}",
+                                    "Approved print out '{name}' was modified or deleted."
+                                )
                                 break
                         if not found:
                             raise ValidationError(f"Approved Event '{db_ev.get('name')}' main details were modified or deleted.")
@@ -434,6 +444,16 @@ class CampaignPayloadService:
                                _num_eq(db_ex.get("budget"), p_ex.get("budget")):
                                 matched_ex_indices.add(p_idx)
                                 found = True
+                                for _sub, _noun in (("celebrities", "celebrity"),
+                                                    ("giveaways", "giveaway"),
+                                                    ("catering", "catering item"),
+                                                    ("printouts", "print out")):
+                                    _validate_sub_list(
+                                        db_ex.get(_sub) or [], p_ex.get(_sub) or [],
+                                        ["name", "budget"], rejected,
+                                        f"exhibitions.{ex_idx}.{_sub}.{{item_idx}}",
+                                        "Approved " + _noun + " '{name}' was modified or deleted.",
+                                    )
                                 break
                         if not found:
                             raise ValidationError(f"Approved Exhibition '{db_ex.get('name')}' was modified or deleted.")
@@ -471,6 +491,11 @@ class CampaignPayloadService:
             campaign.selected_types.create(type_code=code)
         CampaignPayloadService._rebuild_children(campaign, actor, payload)
         CampaignBudgetService.recalculate(campaign=campaign, actor=actor)
+        # Task 5: editing any field of an already-decided campaign (everything
+        # except leads count / real attendance, which never reach this editor)
+        # sends it back to Pending for fresh finance approval (audit + notify).
+        CampaignApprovalService.reset_to_pending_on_edit(
+            campaign=campaign, actor=actor, request_meta=request_meta)
         return campaign
 
     @staticmethod
@@ -562,6 +587,9 @@ class CampaignPayloadService:
             for ct in ev.get("catering", []):
                 if ct.get("name"):
                     EventCatering.objects.create(event=record, name=ct["name"], budget=_d(ct.get("budget")))
+            for po in ev.get("printouts", []):
+                if po.get("name"):
+                    EventPrintOut.objects.create(event=record, name=po["name"], budget=_d(po.get("budget")))
 
         for tv in _section("tvMulti", "tv"):
             record = TVAdRecord.objects.create(
@@ -603,12 +631,24 @@ class CampaignPayloadService:
             _save_assets(campaign, "street_image", record.id, st.get("images"), actor, existing_by_url, claimed)
 
         for ex in _section("exhibitionMulti", "exhibition"):
-            ExhibitionRecord.objects.create(
+            record = ExhibitionRecord.objects.create(
                 campaign=campaign, name=(ex.get("name") or "").strip(),
                 place=(ex.get("place") or "").strip(),
                 start_date=_date(ex.get("start")), end_date=_date(ex.get("end")),
                 budget=_d(ex.get("budget")),
             )
+            for cel in ex.get("celebrities", []):
+                if cel.get("name"):
+                    ExhibitionCelebrity.objects.create(exhibition=record, name=cel["name"], budget=_d(cel.get("budget")))
+            for gv in ex.get("giveaways", []):
+                if gv.get("name"):
+                    ExhibitionGiveaway.objects.create(exhibition=record, name=gv["name"], budget=_d(gv.get("budget")))
+            for ct in ex.get("catering", []):
+                if ct.get("name"):
+                    ExhibitionCatering.objects.create(exhibition=record, name=ct["name"], budget=_d(ct.get("budget")))
+            for po in ex.get("printouts", []):
+                if po.get("name"):
+                    ExhibitionPrintOut.objects.create(exhibition=record, name=po["name"], budget=_d(po.get("budget")))
 
         for sm in _section("socialMulti", "social"):
             record = SocialMediaAdRecord.objects.create(
@@ -665,10 +705,13 @@ class CampaignPayloadService:
             "social": sum(s.lead_count for s in campaign.social_ads.all()),
             "exhibition": sum(x.lead_count for x in campaign.exhibitions.all()),
         }
+        from apps.finance.services import FinanceApprovalService
         return {
             "id": str(campaign.id),
             "name": campaign.name,
             "description": campaign.description,
+            "totalBudget": float(campaign.total_budget),
+            "approvedBudget": FinanceApprovalService.approved_budget(campaign),
             "startDate": campaign.start_date.isoformat() if campaign.start_date else "",
             "endDate": campaign.end_date.isoformat() if campaign.end_date else "",
             "campaignTypes": types,
@@ -711,6 +754,7 @@ class CampaignPayloadService:
             "celebrities": [{"name": c.name, "budget": float(c.budget)} for c in e.celebrities.all()],
             "giveaways": [{"name": g.name, "budget": float(g.budget)} for g in e.giveaways.all()],
             "catering": [{"name": c.name, "budget": float(c.budget)} for c in e.catering.all()],
+            "printouts": [{"name": p.name, "budget": float(p.budget)} for p in e.printouts.all()],
             "leads": int(e.lead_count),
         }
 
@@ -769,5 +813,9 @@ class CampaignPayloadService:
             "start": x.start_date.isoformat() if x.start_date else "",
             "end": x.end_date.isoformat() if x.end_date else "",
             "budget": float(x.budget),
+            "celebrities": [{"name": c.name, "budget": float(c.budget)} for c in x.celebrities.all()],
+            "giveaways": [{"name": g.name, "budget": float(g.budget)} for g in x.giveaways.all()],
+            "catering": [{"name": c.name, "budget": float(c.budget)} for c in x.catering.all()],
+            "printouts": [{"name": p.name, "budget": float(p.budget)} for p in x.printouts.all()],
             "leads": int(x.lead_count),
         }

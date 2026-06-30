@@ -30,6 +30,10 @@ class PolicyCode:
     NOTIFICATION_AUTO_CLEANUP = "notification.auto_cleanup"       # 16c
     DAILY_TASK_EMAIL = "notification.daily_task_email"            # 16d
     WEEKEND_SLA_FREEZE = "lead.weekend_sla_freeze"               # 16e
+    # Per-salesman caps on how many leads may sit in each stage at once (task 1a).
+    SALES_STAGE_CAPACITY = "lead.sales_stage_capacity"           # composite On/Off
+    # Whether a salesman sees their inactive leads on the sales page (task 1b).
+    SALES_VIEW_INACTIVE = "lead.sales_view_inactive"             # boolean, default On
 
 
 class ValueType:

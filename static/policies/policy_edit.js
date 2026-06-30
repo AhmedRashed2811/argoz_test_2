@@ -28,10 +28,18 @@ function selectBool(val) {
   }
 }
 
-function initPage() {
+window.initPage = function initPage() {
   const form = document.getElementById('policy-form');
   const submitBtn = document.getElementById('submitBtn');
-  if (!form || !submitBtn) return;
+  if (!form || !submitBtn || form.dataset.policyBound === 'true') return;
+  form.dataset.policyBound = 'true';
+
+  function resetSubmitButton() {
+    submitBtn.classList.remove('loading');
+    submitBtn.disabled = false;
+    const label = submitBtn.querySelector('.btn-label');
+    if (label) label.textContent = 'Save Policy';
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -53,10 +61,16 @@ function initPage() {
         return;
       }
     } else if (valType === 'DURATION') {
+      const dInput = document.getElementById('id_days');
       const hInput = document.getElementById('id_hours');
       const mInput = document.getElementById('id_minutes');
+      payload.days = parseInt(dInput ? dInput.value : 0, 10);
       payload.hours = parseInt(hInput ? hInput.value : 0, 10);
       payload.minutes = parseInt(mInput ? mInput.value : 0, 10);
+      if (isNaN(payload.days) || payload.days < 0) {
+        showToast('error', 'Validation Error', 'Days must be a non-negative number.');
+        return;
+      }
       if (isNaN(payload.hours) || payload.hours < 0) {
         showToast('error', 'Validation Error', 'Hours must be a non-negative number.');
         return;
@@ -123,13 +137,17 @@ function initPage() {
       });
 
       const data = await res.json();
-      submitBtn.classList.remove('loading');
+      resetSubmitButton();
 
       if (res.ok && data.ok) {
         showToast('success', 'Policy Configured', 'Policy value saved successfully.');
-        setTimeout(() => {
-          window.location.href = window.DIRECTORY_URL;
-        }, 1500);
+        if (window.POLICY_EMBEDDED) {
+          document.dispatchEvent(new CustomEvent('policy:saved', { detail: data }));
+        } else {
+          setTimeout(() => {
+            window.location.href = window.DIRECTORY_URL;
+          }, 1500);
+        }
       } else {
         if (errBanner && errList) {
           errBanner.style.display = 'block';
@@ -141,11 +159,11 @@ function initPage() {
       }
     } catch (err) {
       console.error('Submit API failed', err);
-      submitBtn.classList.remove('loading');
+      resetSubmitButton();
       showToast('error', 'Error', 'Failed to communicate with server.');
     }
   });
-}
+};
 
 function showToast(type, title, msg) {
   const container = document.getElementById('toastContainer');
@@ -161,7 +179,7 @@ function showToast(type, title, msg) {
   setTimeout(() => el.remove(), 4000);
 }
 
-function initComposite() {
+window.initComposite = function initComposite() {
   const toggle = document.getElementById('composite-enabled');
   const fields = document.getElementById('composite-fields');
   if (!toggle || !fields) return;
@@ -171,7 +189,7 @@ function initComposite() {
   document.querySelectorAll('.weekday-chip input').forEach(cb => {
     cb.addEventListener('change', () => cb.closest('.weekday-chip').classList.toggle('selected', cb.checked));
   });
-}
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   initPage();

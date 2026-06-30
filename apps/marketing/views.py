@@ -62,10 +62,13 @@ def campaign_list(request):
 def campaign_api_list(request):
     campaigns = campaigns_for_user(request.user, request.company).prefetch_related(
         "events__celebrities", "events__giveaways", "events__catering",
+        "events__printouts",
         "tv_ads__channels", "tv_ads__slots",
         "street_ads__type_lines__ad_type", "street_ads__type_lines__locations",
         "social_ads__platform_lines__platform", "social_ads__linked_event",
-        "exhibitions", "other_costs", "assets",
+        "exhibitions__celebrities", "exhibitions__giveaways",
+        "exhibitions__catering", "exhibitions__printouts",
+        "other_costs", "assets",
     )
     return JsonResponse([CampaignPayloadService.serialize(c) for c in campaigns], safe=False)
 

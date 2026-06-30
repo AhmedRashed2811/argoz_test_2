@@ -14,11 +14,12 @@ from ..models import Lead, LeadStageDefinition, SLAInstance
 
 
 def _duration_to_timedelta(value, default_minutes: int = 60) -> timedelta:
-    """Policy duration may be {'minutes': n} / {'hours': n} / int minutes."""
+    """Policy duration may be {'days': n}/{'hours': n}/{'minutes': n} / int minutes."""
     if isinstance(value, dict):
+        d = int(value.get("days") or 0)
         h = int(value.get("hours") or 0)
         m = int(value.get("minutes") or 0)
-        return timedelta(hours=h, minutes=m)
+        return timedelta(days=d, hours=h, minutes=m)
     if isinstance(value, (int, float)):
         return timedelta(minutes=int(value))
     return timedelta(minutes=default_minutes)

@@ -170,6 +170,17 @@ class EventCatering(BaseModel):
     notes = models.TextField(blank=True)
 
 
+class EventPrintOut(BaseModel):
+    """Print-out line for an event (task 2) — mirrors celebrities/giveaways."""
+
+    event = models.ForeignKey(
+        EventRecord, on_delete=models.CASCADE, related_name="printouts"
+    )
+    name = models.CharField(max_length=200)
+    budget = models.DecimalField(default=0, **MONEY)
+    notes = models.TextField(blank=True)
+
+
 # --- TV Ads ---
 class TVAdRecord(BaseModel):
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="tv_ads")
@@ -252,6 +263,43 @@ class ExhibitionRecord(BaseModel):
     budget = models.DecimalField(default=0, **MONEY)
     place = models.CharField(max_length=200, blank=True)
     lead_count = models.PositiveIntegerField(default=0)  # ROI denormalization (§10.5)
+
+
+# Exhibition sub-sections (task 3) — same shape as the event ones.
+class ExhibitionCelebrity(BaseModel):
+    exhibition = models.ForeignKey(
+        ExhibitionRecord, on_delete=models.CASCADE, related_name="celebrities"
+    )
+    name = models.CharField(max_length=200)
+    budget = models.DecimalField(default=0, **MONEY)
+    notes = models.TextField(blank=True)
+
+
+class ExhibitionGiveaway(BaseModel):
+    exhibition = models.ForeignKey(
+        ExhibitionRecord, on_delete=models.CASCADE, related_name="giveaways"
+    )
+    name = models.CharField(max_length=200)
+    budget = models.DecimalField(default=0, **MONEY)
+    notes = models.TextField(blank=True)
+
+
+class ExhibitionCatering(BaseModel):
+    exhibition = models.ForeignKey(
+        ExhibitionRecord, on_delete=models.CASCADE, related_name="catering"
+    )
+    name = models.CharField(max_length=200)
+    budget = models.DecimalField(default=0, **MONEY)
+    notes = models.TextField(blank=True)
+
+
+class ExhibitionPrintOut(BaseModel):
+    exhibition = models.ForeignKey(
+        ExhibitionRecord, on_delete=models.CASCADE, related_name="printouts"
+    )
+    name = models.CharField(max_length=200)
+    budget = models.DecimalField(default=0, **MONEY)
+    notes = models.TextField(blank=True)
 
 
 # --- Social Media ---

@@ -377,6 +377,32 @@ def api_bulk_reactivate(request):
     return JsonResponse({"ok": True, "reactivated": count})
 
 
+@login_required
+@crm_permission_required("leads.lead.bulk_create")
+@require_POST
+def api_rejected_export(request):
+    """Return the rejected import rows as an .xlsx with the value cells filled
+    light red (task 9). The rows come back from the import summary, so no
+    re-validation happens here — this is a pure formatting/export endpoint."""
+    from django.http import HttpResponse
+
+    try:
+        data = json.loads(request.body.decode() or "{}")
+    except ValueError:
+        return _err("Malformed request.")
+    rows = data.get("rows") or []
+    columns = data.get("columns") or []
+    if not rows:
+        return _err("Nothing to export.")
+    content = BulkLeadImportService.build_rejected_xlsx(rows=rows, columns=columns)
+    resp = HttpResponse(
+        content,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = 'attachment; filename="rejected_leads.xlsx"'
+    return resp
+
+
 # ── Leads analysis report page (leads_analysis.html) ──────────────────────────
 
 @login_required
@@ -419,9 +445,16 @@ def _combine(date_str, time_str, *, default_time="09:00"):
 def api_leads(request):
     """Leads the user may see (scoped by view permission), shaped for the table."""
     from apps.reports.selectors import leads_for_user
+    from apps.policies.constants import PolicyCode
+    from apps.policies.services import PolicyResolver
+    from .constants import ActiveStatus
 
-    leads_list = list(leads_for_user(request.user, request.company))
-    return JsonResponse({"leads": LeadSerializationService.rows(leads_list)})
+    qs = leads_for_user(request.user, request.company)
+    # Task 1b: when the company turns off "salesman sees inactive leads" (On by
+    # default), the sales management page shows only the salesman's active leads.
+    if not PolicyResolver.value(request.company, PolicyCode.SALES_VIEW_INACTIVE, default=True):
+        qs = qs.filter(active_status=ActiveStatus.ACTIVE)
+    return JsonResponse({"leads": LeadSerializationService.rows(list(qs))})
 
 
 @login_required

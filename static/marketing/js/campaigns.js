@@ -54,13 +54,23 @@ function calcEvSubBudget(ev) {
   (ev.celebrities||[]).forEach(x=>{ s+=Number(x.budget||0); });
   (ev.giveaways||[]).forEach(x=>{ s+=Number(x.budget||0); });
   (ev.catering||[]).forEach(x=>{ s+=Number(x.budget||0); });
+  (ev.printouts||[]).forEach(x=>{ s+=Number(x.budget||0); });
+  return s;
+}
+// Exhibition extras roll up the same way (task 3).
+function calcExSubBudget(ex) {
+  let s=Number(ex.budget||0);
+  (ex.celebrities||[]).forEach(x=>{ s+=Number(x.budget||0); });
+  (ex.giveaways||[]).forEach(x=>{ s+=Number(x.budget||0); });
+  (ex.catering||[]).forEach(x=>{ s+=Number(x.budget||0); });
+  (ex.printouts||[]).forEach(x=>{ s+=Number(x.budget||0); });
   return s;
 }
 function calcBudget(c) {
   let t=0;
   (c.campaignTypes||[]).forEach(ct => {
     if (ct==='events') return;
-    if (ct==='exhibition') { (c.exhibitionMulti||[]).forEach(ex=>{ t+=Number(ex.budget||0); }); return; }
+    if (ct==='exhibition') { (c.exhibitionMulti||[]).forEach(ex=>{ t+=calcExSubBudget(ex); }); return; }
     // social: sum per-platform budgets from multi ads
     if (ct==='social') {
       (c.socialMulti||[]).forEach(sm => {
@@ -173,7 +183,7 @@ function renderTable() {
   document.getElementById('kpiLeads').textContent=campaignLeadsFromData.toLocaleString('en-US');
   document.getElementById('searchHint').textContent=searchQuery.trim()||activeNameFilters.size?`${list.length} result${list.length!==1?'s':''} found`:`${campaigns.length} campaign${campaigns.length!==1?'s':''}`;
   renderPagination(list.length);
-  if (!list.length) { tbody.innerHTML=`<tr class="no-results-row"><td colspan="9"><div class="no-results-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>No campaigns found</span></div></td></tr>`; return; }
+  if (!list.length) { tbody.innerHTML=`<tr class="no-results-row"><td colspan="10"><div class="no-results-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>No campaigns found</span></div></td></tr>`; return; }
   const pageData=list.slice((currentPage-1)*PAGE_SIZE,currentPage*PAGE_SIZE);
   const statusLabels={active:'Active',ended:'Ended',upcoming:'Upcoming'};
   const statusColors={active:'#27ae60',ended:'#7a7570',upcoming:'#2980b9'};
@@ -193,6 +203,7 @@ function renderTable() {
       <td style="font-size:.84rem">${fmtDate(c.startDate)}</td>
       <td style="font-size:.84rem">${fmtDate(c.endDate)}</td>
       <td><span class="budget-val"> ${calcBudget(c).toLocaleString('en-US')}</span></td>
+      <td><span class="budget-val"> ${Number(c.approvedBudget||0).toLocaleString('en-US')}</span></td>
       <td><span class="leads-badge">${leadsVal}</span></td>
       <td><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;background:${statusColors[status]}1a;color:${statusColors[status]}">${statusLabels[status]}</span></td>
       <td class="approval-cell"><span class="approval-badge ${apprClass}" onclick="openApprovalModal(${origIndex})" title="Click to view approval status"><span class="dot"></span>${apprLabel}</span></td>
@@ -527,7 +538,10 @@ function addCrEvent(prefill, ctx) {
     <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_giveaways','Giveaway',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Giveaway</button>
     <div class="sub-section-label">🍽️ Catering <span style="font-size:.7rem;font-weight:400;text-transform:none;color:var(--clr-gray)">(food & beverage arrangements)</span></div>
     <div class="cr-ev-catering-list" id="${id}_catering"></div>
-    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_catering','Catering Item',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Catering Item</button>`;
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_catering','Catering Item',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Catering Item</button>
+    <div class="sub-section-label">🖨️ Print Out <span style="font-size:.7rem;font-weight:400;text-transform:none;color:var(--clr-gray)">(flyers, banners, brochures, etc.)</span></div>
+    <div class="cr-ev-printouts-list" id="${id}_printouts"></div>
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_printouts','Print Out',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Print Out</button>`;
   document.getElementById(listId).appendChild(el);
   seedExistingMedia(id+'_logo_prev', prefill?.logo);
   seedExistingMedia(id+'_imgs_prev', prefill?.images);
@@ -535,6 +549,7 @@ function addCrEvent(prefill, ctx) {
   (prefill?.celebrities||[]).forEach(cel=>addCrEvPerson(id+'_celebs','Celebrity',cel,isEdit?'edit':'create'));
   (prefill?.giveaways||[]).forEach(gv=>addCrEvPerson(id+'_giveaways','Giveaway',gv,isEdit?'edit':'create'));
   (prefill?.catering||[]).forEach(ct=>addCrEvPerson(id+'_catering','Catering Item',ct,isEdit?'edit':'create'));
+  (prefill?.printouts||[]).forEach(po=>addCrEvPerson(id+'_printouts','Print Out',po,isEdit?'edit':'create'));
   recalcTotal(isEdit?'edit':'create');
   refreshSocialEventLinks(isEdit?'edit_':'');
 }
@@ -907,8 +922,24 @@ function addCrExhibition(prefill, ctx) {
     <div class="form-row">
       <div><label class="form-label">Budget</label><input type="text" class="form-input cr-ex-budget" min="0" placeholder="e.g. 20,000" oninput="recalcTotal('${isEdit?'edit':'create'}')" value="${fmtInt(prefill?.budget)}"></div>
       <div></div>
-    </div>`;
+    </div>
+    <div class="sub-section-label">⭐ Celebrities</div>
+    <div class="cr-ex-celebs-list" id="${id}_celebs"></div>
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_celebs','Celebrity',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Celebrity</button>
+    <div class="sub-section-label">🎁 Giveaways <span style="font-size:.7rem;font-weight:400;text-transform:none;color:var(--clr-gray)">(prizes, branded items, etc.)</span></div>
+    <div class="cr-ex-giveaways-list" id="${id}_giveaways"></div>
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_giveaways','Giveaway',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Giveaway</button>
+    <div class="sub-section-label">🍽️ Catering <span style="font-size:.7rem;font-weight:400;text-transform:none;color:var(--clr-gray)">(food & beverage arrangements)</span></div>
+    <div class="cr-ex-catering-list" id="${id}_catering"></div>
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_catering','Catering Item',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Catering Item</button>
+    <div class="sub-section-label">🖨️ Print Out <span style="font-size:.7rem;font-weight:400;text-transform:none;color:var(--clr-gray)">(flyers, banners, brochures, etc.)</span></div>
+    <div class="cr-ex-printouts-list" id="${id}_printouts"></div>
+    <button type="button" class="btn-add-sub" onclick="addCrEvPerson('${id}_printouts','Print Out',null,'${isEdit?'edit':'create'}')"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Print Out</button>`;
   document.getElementById(listId).appendChild(el);
+  (prefill?.celebrities||[]).forEach(cel=>addCrEvPerson(id+'_celebs','Celebrity',cel,isEdit?'edit':'create'));
+  (prefill?.giveaways||[]).forEach(gv=>addCrEvPerson(id+'_giveaways','Giveaway',gv,isEdit?'edit':'create'));
+  (prefill?.catering||[]).forEach(ct=>addCrEvPerson(id+'_catering','Catering Item',ct,isEdit?'edit':'create'));
+  (prefill?.printouts||[]).forEach(po=>addCrEvPerson(id+'_printouts','Print Out',po,isEdit?'edit':'create'));
   recalcTotal(isEdit?'edit':'create');
 }
 
@@ -982,8 +1013,12 @@ function recalcTotal(ctx) {
   });
   // Social — sum platform budgets
   document.querySelectorAll(`#${pfx}cr_social_list .cr-sm-plat-budget`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Social Media']=(breakdown['Social Media']||0)+val; });
-  // Exhibition
-  document.querySelectorAll(`#${pfx}cr_exhibition_list .cr-ex-budget`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Exhibition']=(breakdown['Exhibition']||0)+val; });
+  // Exhibition: main budget + celebrities + giveaways + catering + printouts
+  document.querySelectorAll(`#${pfx}cr_exhibition_list .multi-item-card`).forEach(card=>{
+    let exTotal=Number(card.querySelector('.cr-ex-budget')?.value.replace(/,/g, '')||0);
+    card.querySelectorAll('.cr-person-budget').forEach(el=>{ exTotal+=Number(el.value.replace(/,/g, '')||0); });
+    total+=exTotal; breakdown['Exhibition']=(breakdown['Exhibition']||0)+exTotal;
+  });
   // Other costs
   const ocListId=(pfx==='edit_'?'edit_':'')+'otherCostsList';
   document.querySelectorAll(`#${ocListId} .cr-oc-value`).forEach(el=>{ const val=Number(el.value.replace(/,/g, '')||0); total+=val; breakdown['Other Costs']=(breakdown['Other Costs']||0)+val; });
@@ -1020,7 +1055,8 @@ function collectCrEvents(pfx) {
       images:_storedImages[id+'_imgs_prev']||[],
       celebrities:collectPersonList(id+'_celebs'),
       giveaways:collectPersonList(id+'_giveaways'),
-      catering:collectPersonList(id+'_catering')
+      catering:collectPersonList(id+'_catering'),
+      printouts:collectPersonList(id+'_printouts')
     };
   });
 }
@@ -1069,12 +1105,25 @@ function collectCrSocialAds(pfx) {
 }
 
 function collectCrExhibitions(pfx) {
+  // Sub-items live in .cr-ex-*-list within the card; collect by class so we don't
+  // depend on element ids (task 3 — same shape as events).
+  function persons(card, listClass) {
+    const list=card.querySelector('.'+listClass);
+    return Array.from(list?.querySelectorAll('.person-item')||[]).map(row=>({
+      name:row.querySelector('.cr-person-name')?.value.trim()||'',
+      budget:Number(row.querySelector('.cr-person-budget')?.value.replace(/,/g, '')||0)
+    }));
+  }
   return Array.from(document.getElementById(pfx+'cr_exhibition_list').querySelectorAll('.multi-item-card')).map(card=>({
     name:card.querySelector('.cr-ex-name')?.value.trim()||'',
     place:card.querySelector('.cr-ex-place')?.value.trim()||'',
     start:card.querySelector('.cr-ex-start')?.value||'',
     end:card.querySelector('.cr-ex-end')?.value||'',
-    budget:Number(card.querySelector('.cr-ex-budget')?.value.replace(/,/g, '')||0)
+    budget:Number(card.querySelector('.cr-ex-budget')?.value.replace(/,/g, '')||0),
+    celebrities:persons(card,'cr-ex-celebs-list'),
+    giveaways:persons(card,'cr-ex-giveaways-list'),
+    catering:persons(card,'cr-ex-catering-list'),
+    printouts:persons(card,'cr-ex-printouts-list')
   }));
 }
 
@@ -1615,6 +1664,7 @@ function openView(index) {
       ${viewPersonRows(ev.celebrities,'⭐','Celebrities')}
       ${viewPersonRows(ev.giveaways,'🎁','Giveaways')}
       ${viewPersonRows(ev.catering,'🍽️','Catering')}
+      ${viewPersonRows(ev.printouts,'🖨️','Print Out')}
       ${viewImgBlock('🖼️ Event Logo',(ev.logo||[]))}
       ${viewImgBlock('📸 Event Photos',(ev.images||[]))}
     </div>`;
@@ -1668,7 +1718,12 @@ function openView(index) {
         <div><div class="view-kv-label">💰 Budget</div><div class="view-kv-val accent"> ${fmtBudget(ex.budget)}</div></div>
         <div><div class="view-kv-label">📅 Period</div><div class="view-kv-val">${fmtDate(ex.start)} – ${fmtDate(ex.end)}</div></div>
         <div><div class="view-kv-label">📈 Lead Count</div><div class="view-kv-val">${ex.leads||0}</div></div>
+        ${calcExSubBudget(ex)!==Number(ex.budget||0)?`<div style="grid-column:1/-1"><div class="view-kv-label">🏷️ Total Exhibition Cost (incl. extras)</div><div class="view-kv-val" style="color:var(--clr-orange-dk);font-weight:700;font-size:1rem"> ${fmtBudget(calcExSubBudget(ex))}</div></div>`:''}
       </div>
+      ${viewPersonRows(ex.celebrities,'⭐','Celebrities')}
+      ${viewPersonRows(ex.giveaways,'🎁','Giveaways')}
+      ${viewPersonRows(ex.catering,'🍽️','Catering')}
+      ${viewPersonRows(ex.printouts,'🖨️','Print Out')}
     </div>`;
   });
   // Other costs

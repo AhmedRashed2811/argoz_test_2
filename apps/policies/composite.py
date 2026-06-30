@@ -34,6 +34,18 @@ COMPOSITE_SCHEMA: dict[str, dict] = {
             {"key": "max_freezes", "label": "Max freezes per lead", "type": "int", "default": 1},
         ],
     },
+    PolicyCode.SALES_STAGE_CAPACITY: {
+        "toggle_label": "Cap how many leads a sales/sales-head may hold in each "
+                        "stage at the same time",
+        "note": "When a sales/sales-head tries to move a lead into a stage where "
+                "they are already at the cap, the change is blocked. 0 means no "
+                "cap for that stage. Sales operations are never restricted.",
+        "fields": [
+            {"key": "max_meeting", "label": "Max leads in Meeting stage", "type": "int", "default": 10},
+            {"key": "max_followup", "label": "Max leads in Follow-up stage", "type": "int", "default": 5},
+            {"key": "max_freeze", "label": "Max leads in Frozen stage", "type": "int", "default": 2},
+        ],
+    },
     PolicyCode.SALES_ACTION_MAX_DURATION: {
         "toggle_label": "Cap how far ahead a sales/sales-head may schedule a "
                         "meeting or follow-up, and the maximum freeze length",

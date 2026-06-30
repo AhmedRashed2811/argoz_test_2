@@ -66,6 +66,45 @@ class CampaignApprovalService:
         return campaign
 
     @staticmethod
+    def reset_to_pending_on_edit(*, campaign, actor=None, request_meta=None) -> bool:
+        """Task 5: any content edit to a campaign finance already decided sends it
+        back to Pending for re-approval. Leads count and real attendance never
+        flow through the campaign editor, so any edit that reaches here qualifies.
+        Emits the audit entry, approval-history row and a finance notification."""
+        if not CampaignApprovalService.approval_required(campaign.company):
+            return False
+        decided = (ApprovalStatus.APPROVED, ApprovalStatus.SEMI_APPROVED,
+                   ApprovalStatus.NOT_APPROVED)
+        from_status = campaign.approval_status
+        if from_status not in decided:
+            return False
+        campaign.approval_status = ApprovalStatus.PENDING
+        campaign.approval_reason = ""
+        campaign.rejected_budgets = []
+        campaign.save(update_fields=["approval_status", "approval_reason",
+                                     "rejected_budgets", "updated_at"])
+        CampaignApprovalHistory.objects.create(
+            campaign=campaign, from_status=from_status,
+            to_status=ApprovalStatus.PENDING,
+            reason="Reset to Pending — campaign edited after a finance decision.",
+            actor=actor,
+        )
+        AuditService.log(
+            action=AuditAction.UPDATE, instance=campaign, actor=actor,
+            company=campaign.company, module="marketing", request_meta=request_meta,
+            before={"approval_status": from_status},
+            after={"approval_status": ApprovalStatus.PENDING},
+            reason="Edited after a finance decision; re-approval required.",
+        )
+        NotificationService.create_for_users(
+            company=campaign.company, recipients=_finance_managers(campaign.company),
+            exclude_user=actor, code=NotificationCode.CAMPAIGN_SUBMITTED_FINANCE,
+            title=f"Campaign edited — re-approval needed: {campaign.name}",
+            related_type="Campaign", related_id=campaign.pk,
+        )
+        return True
+
+    @staticmethod
     @transaction.atomic
     def set_status(*, campaign_id, status: str, actor=None, reason: str = "",
                    rejected_budgets=None, request_meta=None) -> Campaign:

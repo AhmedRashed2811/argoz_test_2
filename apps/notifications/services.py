@@ -177,6 +177,23 @@ class NotificationService:
         notification.delete()
 
     @staticmethod
+    def clear_for_lead_breach(*, recipient, lead) -> int:
+        """On SLA breach, remove the breaching salesman's lead-assigned, follow-up,
+        meeting and freeze notifications for that lead (task 10b). Call before the
+        lead is reassigned so the new owner's fresh notifications are untouched."""
+        if recipient is None or lead is None:
+            return 0
+        codes = [
+            NotificationCode.LEAD_ASSIGNED, NotificationCode.FOLLOWUP_DUE,
+            NotificationCode.MEETING_DUE, NotificationCode.FROZEN_LEAD_RETURN,
+        ]
+        deleted, _ = Notification.objects.filter(
+            recipient=recipient, related_type="Lead", related_id=str(lead.pk),
+            notification_type__code__in=codes,
+        ).delete()
+        return deleted
+
+    @staticmethod
     def mark_all_read(*, recipient) -> int:
         return Notification.objects.filter(
             recipient=recipient, is_read=False

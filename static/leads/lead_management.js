@@ -22,7 +22,8 @@ let searchQuery='', currentPage=1, totalPages=1;
 let PAGE_SIZE=100;
 let stageEditId=null, _selectedStage=null;
 let historyLeadId=null, historyTab='all';
-let sortField=null, sortAscMap={};
+// Default sort: SLA remaining ascending (nearest expiry first) — task 7.
+let sortField='sortSlaBtn', sortAscMap={sortSlaBtn:true};
 let globalFilter='all';
 let openFilterKey=null;
 let filterDateOpen=false;
@@ -708,6 +709,9 @@ document.getElementById('filterUpdatedBtn')?.addEventListener('click',e=>{ e.sto
    SORT
 ═══════════════════════════════════════════════════ */
 const SORT_BTNS={
+  // Nearest expiry first (ascending remaining time). Inactive / no-SLA sink to
+  // the bottom; expired leads (negative remaining) float to the very top.
+  sortSlaBtn:     l=>{ if(l.active===false) return Infinity; const ms=getSlaMs(l); return ms==null?Infinity:ms; },
   sortNameBtn:    l=>(l.name||'').toLowerCase(),
   sortStageBtn:   l=>STAGE_ORDER.indexOf(l.stage||'Fresh'),
   sortSourceBtn:  l=>(l.source||'').toLowerCase(),
@@ -824,6 +828,7 @@ function renderTable(){
     const hasPopover = !!l.broker || !!l.campaign;
     const sourceHtml = `<span class="source-tag"${hasPopover ? ` onclick="openSrcPopover('${l.id}',event)" title="View details"` : ' style="cursor:default"'}><svg viewBox="0 0 24 24">${SRC_ICONS[srcIconKey]||SRC_ICONS['Other']}</svg>${escHtml(srcLabel)}</span>`;
     return `<tr class="${inactive?'lead-inactive':''}">
+      <td>${inactive?'<span style="color:var(--clr-gray);font-size:.78rem">—</span>':sla.html}</td>
       <td style="text-align:left">
         <div style="font-weight:500">${escHtml(l.name)}</div>
       </td>
@@ -832,7 +837,6 @@ function renderTable(){
       </td>
       <td>${sourceHtml}</td>
       <td><span class="stage-badge ${stageClass}">${escHtml(l.stage||'Fresh')}</span></td>
-      <td>${inactive?'<span style="color:var(--clr-gray);font-size:.78rem">—</span>':sla.html}</td>
       <td>${statusHtml}</td>
       <td style="font-size:.78rem;color:var(--clr-text-sub)">${fmtDate(l.createdAt)}</td>
       <td style="font-size:.78rem;color:var(--clr-text-sub)">${fmtDate(l.updatedAt||l.createdAt)}</td>
@@ -909,7 +913,7 @@ setInterval(()=>{
   rows.forEach((row,i)=>{
     const l=pageData[i]; if(!l||l.active===false)return;
     const cells=row.querySelectorAll('td');
-    if(cells[4]) cells[4].innerHTML=fmtSla(getSlaMs(l)).html;
+    if(cells[0]) cells[0].innerHTML=fmtSla(getSlaMs(l)).html;
     if(getSlaMs(l) !== null && getSlaMs(l) <= 0) {
       const stageBtn = row.querySelector('.action-btn.stage-btn');
       if (stageBtn) {

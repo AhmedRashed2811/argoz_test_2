@@ -54,7 +54,7 @@
   const headers = () => ({ 'Content-Type': 'application/json', 'X-CSRFToken': CFG.csrf || '' });
   let NOTIFS = [];
   let unreadCount = 0;
-  let activeCat = 'all';
+  let activeCat = 'leads';
 
   function fmtDate(iso) {
     if (!iso) return '';
@@ -97,32 +97,32 @@
     return cls;
   }
 
+  // True when the notification is dated today or tomorrow. Meeting/follow-up
+  // reminders fire at their scheduled time, so created_at is the due moment.
+  function _isTodayOrTomorrow(iso) {
+    if (!iso) return false;
+    const d = new Date(iso); if (isNaN(d)) return false;
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    return day.getTime() === today.getTime() || day.getTime() === tomorrow.getTime();
+  }
+
+  // Categories:
+  //   leads      → "lead assigned" + manual-distribution-required
+  //   reminders  → SLA expiry warnings
+  //   meetings   → today's & tomorrow's meetings
+  //   followups  → today's & tomorrow's follow-ups and freezes
+  //   campaigns  → all marketing/campaign + budget notifications
   function matchCategory(item, cat) {
     const code = (item.code || '').toUpperCase();
-    const isLeadCat = code.startsWith('LEAD_') || code.startsWith('SLA_') || code.startsWith('FROZEN_') || code.startsWith('BROKER_') ||
-        code === 'FOLLOWUP_DUE' || code === 'MEETING_DUE' || code === 'STAGE_CHANGED' || code === 'WALKIN_WAITING' || code === 'MANUAL_DISTRIBUTION_REQUIRED';
-    
-    if (cat === 'all') return true;
+    if (cat === 'leads')     return code === 'LEAD_ASSIGNED' || code === 'MANUAL_DISTRIBUTION_REQUIRED';
+    if (cat === 'reminders') return code === 'SLA_WARNING';
+    if (cat === 'meetings')  return code === 'MEETING_DUE' && _isTodayOrTomorrow(item.created_at);
+    if (cat === 'followups') return (code === 'FOLLOWUP_DUE' || code === 'FROZEN_LEAD_RETURN')
+                                    && _isTodayOrTomorrow(item.created_at);
     if (cat === 'campaigns') return code.startsWith('CAMPAIGN_') || code === 'BUDGET_CHANGED';
-    if (cat === 'system') return !isLeadCat && !code.startsWith('CAMPAIGN_') && code !== 'BUDGET_CHANGED';
-    
-    // Leads category: contains all lead-related notifications
-    if (cat === 'leads') return isLeadCat;
-    
-    // Tasks: reminders and lead assigned
-    const isReminder = code === 'FOLLOWUP_DUE' || code === 'MEETING_DUE' || code === 'SLA_WARNING' || code === 'FROZEN_LEAD_RETURN';
-    const isAssigned = code === 'LEAD_ASSIGNED' || code === 'LEAD_REASSIGNED_SLA';
-    if (cat === 'tasks') return isReminder || isAssigned;
-    
-    // Reminders: only reminders
-    if (cat === 'reminders') return isReminder;
-    
-    // Meetings: only meetings
-    if (cat === 'meetings') return code.includes('MEETING');
-    
-    // Followups: only followups
-    if (cat === 'followups') return code.includes('FOLLOWUP');
-    
     return false;
   }
 
@@ -156,20 +156,21 @@
       ? unreadCount + ' pending notification' + (unreadCount > 1 ? 's' : '')
       : 'All caught up';
 
-    // Hide campaigns filter button if there are no notifications for it
-    const hasCampaigns = NOTIFS.some(item => matchCategory(item, 'campaigns'));
-    const campaignsTab = catContainer ? catContainer.querySelector('[data-cat="campaigns"]') : null;
-    if (campaignsTab) {
-      if (hasCampaigns) {
-        campaignsTab.style.display = '';
-      } else {
-        campaignsTab.style.display = 'none';
-        if (activeCat === 'campaigns') {
-          activeCat = 'all';
-          catContainer.querySelectorAll('.notif-cat-tab').forEach(t => t.classList.remove('active'));
-          const allTab = catContainer.querySelector('[data-cat="all"]');
-          if (allTab) allTab.classList.add('active');
-        }
+    // Hide category buttons that currently have no notifications; if the active
+    // tab becomes empty, fall back to the first visible one.
+    if (catContainer) {
+      let firstVisible = null;
+      catContainer.querySelectorAll('.notif-cat-tab').forEach(tab => {
+        const cat = tab.dataset.cat;
+        const has = NOTIFS.some(item => matchCategory(item, cat));
+        tab.style.display = has ? '' : 'none';
+        if (has && !firstVisible) firstVisible = cat;
+      });
+      const activeHasData = NOTIFS.some(item => matchCategory(item, activeCat));
+      if (!activeHasData && firstVisible) {
+        activeCat = firstVisible;
+        catContainer.querySelectorAll('.notif-cat-tab').forEach(t =>
+          t.classList.toggle('active', t.dataset.cat === activeCat));
       }
     }
 

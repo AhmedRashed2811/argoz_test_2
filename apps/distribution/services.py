@@ -334,10 +334,11 @@ class SLAExpiryService:
             handled_by_task_id=task_id, action_taken=method,
         )
         # SLA expiry is recorded in SLABreachEvent (Lead history); no audit write.
-        NotificationService.create_for_users(
-            company=lead.company, recipients=[lead.assigned_salesman],
-            code=NotificationCode.SLA_BREACHED, title="Lead SLA breached",
-            related_type="Lead", related_id=lead.pk,
+        # Task 10b: no more "SLA breached" notification. Instead clear the (now
+        # ex-)owner's lead-assigned, follow-up, meeting and freeze notifications
+        # for this lead — done before reassignment so the new owner's stay intact.
+        NotificationService.clear_for_lead_breach(
+            recipient=lead.assigned_salesman, lead=lead,
         )
 
         if method == SLAExpiryMethod.ROUND_ROBIN:

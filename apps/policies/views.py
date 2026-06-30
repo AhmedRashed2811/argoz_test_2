@@ -42,13 +42,13 @@ def policy_api_edit(request, policy_id):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     try:
-        PolicyManagementService.set_value_from_post(
+        result = PolicyManagementService.set_value_from_post(
             company=request.company,
             policy=policy,
             post_data=data,
             updated_by=request.user,
             request_meta=request.request_meta,
         )
-        return JsonResponse({"ok": True})
+        return JsonResponse({"ok": True, **result})
     except (ValueError, TypeError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)

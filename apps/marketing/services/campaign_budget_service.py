@@ -14,7 +14,12 @@ from ..models import (
     EventCatering,
     EventCelebrity,
     EventGiveaway,
+    EventPrintOut,
     EventRecord,
+    ExhibitionCatering,
+    ExhibitionCelebrity,
+    ExhibitionGiveaway,
+    ExhibitionPrintOut,
     ExhibitionRecord,
     OtherCost,
     SocialMediaAdRecord,
@@ -55,6 +60,7 @@ class CampaignBudgetService:
             Prefetch("celebrities", queryset=EventCelebrity.objects.only("budget")),
             Prefetch("giveaways", queryset=EventGiveaway.objects.only("budget")),
             Prefetch("catering", queryset=EventCatering.objects.only("budget")),
+            Prefetch("printouts", queryset=EventPrintOut.objects.only("budget")),
         )
         events = ZERO
         for event in events_qs:
@@ -62,6 +68,7 @@ class CampaignBudgetService:
             events += _sum_field(event.celebrities.all())
             events += _sum_field(event.giveaways.all())
             events += _sum_field(event.catering.all())
+            events += _sum_field(event.printouts.all())
         breakdown["events"] = float(events)
         total += events
 
@@ -97,11 +104,20 @@ class CampaignBudgetService:
         breakdown["street_ads"] = float(street)
         total += street
 
-        exhibition = (
-            ExhibitionRecord.objects.filter(campaign=campaign)
-            .aggregate(s=Sum("budget"))
-            .get("s") or ZERO
+        # Exhibition: main + celebrities + giveaways + catering + printouts (task 3).
+        exhibition_qs = ExhibitionRecord.objects.filter(campaign=campaign).prefetch_related(
+            Prefetch("celebrities", queryset=ExhibitionCelebrity.objects.only("budget")),
+            Prefetch("giveaways", queryset=ExhibitionGiveaway.objects.only("budget")),
+            Prefetch("catering", queryset=ExhibitionCatering.objects.only("budget")),
+            Prefetch("printouts", queryset=ExhibitionPrintOut.objects.only("budget")),
         )
+        exhibition = ZERO
+        for ex in exhibition_qs:
+            exhibition += ex.budget or ZERO
+            exhibition += _sum_field(ex.celebrities.all())
+            exhibition += _sum_field(ex.giveaways.all())
+            exhibition += _sum_field(ex.catering.all())
+            exhibition += _sum_field(ex.printouts.all())
         breakdown["exhibition"] = float(exhibition)
         total += exhibition
 

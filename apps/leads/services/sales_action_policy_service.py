@@ -68,6 +68,41 @@ def enforce_action_limit(*, lead, salesman, actor, action: str) -> None:
             f"Policy limit reached: you may only do {cap} {noun} for this lead.")
 
 
+_STAGE_CAPACITY_KEY = {
+    StageCode.MEETING: "max_meeting",
+    StageCode.FOLLOW_UP: "max_followup",
+    StageCode.FROZEN: "max_freeze",
+}
+
+
+def enforce_stage_capacity(*, lead, salesman, actor, to_stage_code: str) -> None:
+    """Block moving a lead into Meeting/Follow-up/Frozen when the salesman is
+    already at the configured cap of leads in that stage (task 1a). Off by
+    default and a no-op for non-restricted actors / unconfigured caps."""
+    key = _STAGE_CAPACITY_KEY.get(to_stage_code)
+    if key is None or not _is_restricted(actor) or salesman is None:
+        return
+    cfg = _composite(lead.company, PolicyCode.SALES_STAGE_CAPACITY)
+    if not cfg:
+        return
+    cap = int(cfg.get(key, 0) or 0)
+    if not cap:
+        return
+    from ..constants import ActiveStatus
+
+    current = (
+        type(lead).objects.filter(
+            company=lead.company, assigned_salesman=salesman,
+            current_stage__code=to_stage_code, active_status=ActiveStatus.ACTIVE,
+        ).exclude(id=lead.id).count()
+    )
+    if current >= cap:
+        noun = to_stage_code.replace("_", " ").title()
+        raise ValidationError(
+            f"Policy limit reached: you may hold at most {cap} lead(s) in the "
+            f"{noun} stage. Resolve an existing one first.")
+
+
 def enforce_max_duration(*, company, actor, action: str, scheduled_at=None,
                          days: int | None = None) -> None:
     """Block scheduling further ahead than the configured cap. For meetings/

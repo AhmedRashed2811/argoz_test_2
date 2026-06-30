@@ -26,6 +26,13 @@ class LeadStageService:
         ).get(id=lead_id)
         to_stage = LeadStageDefinition.objects.get(code=to_stage_code)
         from_stage = lead.current_stage
+        # Per-stage capacity cap for sales/sales-head (task 1a). Skip when the lead
+        # is already in that stage (no new occupancy added).
+        if from_stage is None or from_stage.code != to_stage_code:
+            from .sales_action_policy_service import enforce_stage_capacity
+            enforce_stage_capacity(
+                lead=lead, salesman=lead.assigned_salesman, actor=actor,
+                to_stage_code=to_stage_code)
         sla_before = lead.sla_deadline
 
         lead.current_stage = to_stage
