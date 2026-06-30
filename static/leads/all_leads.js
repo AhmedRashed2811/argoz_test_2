@@ -856,5 +856,12 @@ document.getElementById('btnExport').addEventListener('click',()=>{
 /* ═══════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════ */
+// Prefill the search box from ?search= (e.g. arriving from the Calendar page).
+const _searchParam = new URLSearchParams(window.location.search).get('search');
+if (_searchParam) {
+  searchQuery = _searchParam.trim();
+  const _si = document.getElementById('searchInput');
+  if (_si) _si.value = searchQuery;
+}
 loadLeadsFromServer().then(()=>{ setGlobalFilter('all'); renderTable(); });
 setInterval(()=>{ loadLeadsFromServer().then(renderTable); }, 60000);

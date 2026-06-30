@@ -72,6 +72,14 @@ def all_leads(request):
 
 
 @login_required
+@crm_permission_required("leads.calendar.access")
+def calendar(request):
+    """Sales calendar: follow-ups, meetings, SLA deadlines and freeze returns.
+    Thin shell — events load via api.api_calendar (scoped own/team/all)."""
+    return render(request, "leads/calendar.html", {})
+
+
+@login_required
 @crm_permission_required("review_sales_performance_report")
 def sales_performance(request):
     """Sales performance report. Thin shell: every figure loads via the AJAX

@@ -86,6 +86,79 @@ def expired_sla_instances(now, company=None, limit=100):
     return qs.order_by("deadline_at")[:limit]
 
 
+def _cal_event(kind, dt, lead, salesman=None, extra=None):
+    """Shape one calendar event. `date`/`time` are in server-local time so the
+    client groups into day cells without timezone drift."""
+    local = timezone.localtime(dt)
+    return {
+        "type": kind,
+        "start": dt.isoformat(),
+        "date": local.strftime("%Y-%m-%d"),
+        "time": local.strftime("%H:%M"),
+        "lead_id": str(lead.id),
+        "lead_name": lead.name,
+        "lead_phone": lead.phone,
+        "stage": lead.current_stage.name if lead.current_stage else "",
+        "salesman": (salesman.get_full_name() or salesman.email) if salesman else "",
+        "extra": extra or {},
+    }
+
+
+def calendar_events(user, company, start, end):
+    """Scoped, forward-looking calendar events between [max(start, now), end):
+    upcoming follow-ups, meetings, active SLA deadlines and freeze returns for
+    the user's own/team/all active leads. Excludes inactive leads, expired or
+    breached SLAs, and anything in the past. Scope reuses leads_for_user."""
+    from apps.reports.selectors import leads_for_user
+
+    lead_ids = list(
+        leads_for_user(user, company)
+        .filter(active_status=ActiveStatus.ACTIVE)
+        .values_list("id", flat=True)
+    )
+    events: list[dict] = []
+    if not lead_ids:
+        return events
+
+    # Never surface past events — clamp the window's lower bound to now.
+    lower = max(start, timezone.now())
+
+    for f in FollowUp.objects.filter(
+        lead_id__in=lead_ids, status="SCHEDULED",
+        scheduled_at__gte=lower, scheduled_at__lt=end,
+    ).select_related("lead", "lead__current_stage", "assigned_salesman"):
+        events.append(_cal_event("followup", f.scheduled_at, f.lead,
+                                  salesman=f.assigned_salesman,
+                                  extra={"notes": f.notes}))
+
+    for m in Meeting.objects.filter(
+        lead_id__in=lead_ids, status="SCHEDULED",
+        scheduled_start__gte=lower, scheduled_start__lt=end,
+    ).select_related("lead", "lead__current_stage", "assigned_salesman"):
+        events.append(_cal_event("meeting", m.scheduled_start, m.lead,
+                                 salesman=m.assigned_salesman,
+                                 extra={"location": m.location}))
+
+    # Active SLAs only with a future deadline — breached/expired are excluded.
+    for s in SLAInstance.objects.filter(
+        lead_id__in=lead_ids, status=SLAStatus.ACTIVE,
+        deadline_at__gte=lower, deadline_at__lt=end,
+    ).select_related("lead", "lead__current_stage", "stage", "assigned_salesman"):
+        events.append(_cal_event("sla", s.deadline_at, s.lead,
+                                 salesman=s.assigned_salesman,
+                                 extra={"stage": s.stage.name if s.stage else ""}))
+
+    for r in Reminder.objects.filter(
+        lead_id__in=lead_ids, reminder_type="FROZEN_RETURN",
+        due_at__gte=lower, due_at__lt=end,
+    ).select_related("lead", "lead__current_stage", "user"):
+        events.append(_cal_event("freeze", r.due_at, r.lead,
+                                 salesman=r.user, extra={"status": r.status}))
+
+    events.sort(key=lambda e: e["start"])
+    return events
+
+
 def existing_client(company, phone):
     """The Client row for a phone in this company, salesman eager-loaded."""
     from .models import Client

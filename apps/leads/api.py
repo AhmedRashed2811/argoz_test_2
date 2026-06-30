@@ -93,6 +93,32 @@ def api_sources(request):
 
 
 @login_required
+@crm_permission_required("leads.calendar.access")
+@require_GET
+def api_calendar(request):
+    """Scoped calendar events for the visible month grid (padded one week each
+    side so leading/trailing days render correctly). Read-only selector call."""
+    from datetime import timedelta
+
+    from .selectors import calendar_events
+
+    now = timezone.localtime()
+    try:
+        year = int(request.GET.get("year", now.year))
+        month = int(request.GET.get("month", now.month))
+        first = datetime(year, month, 1)
+    except (TypeError, ValueError):
+        return _err("Invalid year/month")
+    nxt = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+    start = timezone.make_aware(first) - timedelta(days=7)
+    end = timezone.make_aware(nxt) + timedelta(days=7)
+    return JsonResponse({
+        "ok": True,
+        "events": calendar_events(request.user, request.company, start, end),
+    })
+
+
+@login_required
 @require_GET
 def api_languages(request):
     return JsonResponse({"languages": [
