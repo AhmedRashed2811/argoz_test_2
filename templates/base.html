@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
   <link rel="stylesheet" href="{% static 'base/layout.css' %}">
+  <link rel="stylesheet" href="{% static 'chat/chat.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -32,6 +33,15 @@
       </a>
     </div>
     <div class="header-right">
+      <button class="chat-btn" id="chatBtn" aria-label="Messages">
+        <div class="chat-btn-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 5.5C4 4.67 4.67 4 5.5 4H18.5C19.33 4 20 4.67 20 5.5V15C20 15.83 19.33 16.5 18.5 16.5H9L5 20V16.5H5.5C4.67 16.5 4 15.83 4 15V5.5Z" fill="rgba(224,123,32,0.12)" stroke="#e07b20" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9" cy="10.2" r="1" fill="#e07b20"/><circle cx="12" cy="10.2" r="1" fill="#e07b20"/><circle cx="15" cy="10.2" r="1" fill="#e07b20"/>
+          </svg>
+        </div>
+        <span class="chat-badge hidden" id="chatBadge">0</span>
+      </button>
       <button class="notif-btn" id="notifBtn" aria-label="Notifications">
         <div class="notif-btn-icon">
           <svg viewBox="0 0 24 24" fill="none">
@@ -99,6 +109,70 @@
     </div>
     <div class="notif-body" id="notifBody"></div>
     <div class="notif-panel-foot"><span class="notif-foot-text">Notifications clear as you act on them</span></div>
+  </div>
+
+  <div class="chat-panel-backdrop" id="chatBackdrop"></div>
+  <div class="chat-panel" id="chatPanel" data-view="list">
+    <!-- ── List view ── -->
+    <div class="chat-list-view">
+      <div class="chat-panel-head">
+        <div class="chat-head-left">
+          <div class="chat-head-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H18.5C19.33 4 20 4.67 20 5.5V15C20 15.83 19.33 16.5 18.5 16.5H9L5 20V16.5H5.5C4.67 16.5 4 15.83 4 15V5.5Z" stroke="#e07b20" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div><div class="chat-panel-title">Messages</div><div class="chat-panel-sub" id="chatPanelSub">Loading…</div></div>
+        </div>
+        <div class="chat-panel-actions">
+          <button class="chat-new-btn" id="chatNewBtn" title="New chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="chat-panel-close" data-chat-close><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="chat-search-bar">
+        <svg viewBox="0 0 24 24" class="chat-search-icon" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="chatSearch" placeholder="Search conversations...">
+      </div>
+      <div class="chat-body" id="chatListBody"></div>
+    </div>
+
+    <!-- ── New-chat user picker ── -->
+    <div class="chat-users-view">
+      <div class="chat-panel-head chat-thread-head">
+        <button class="chat-back-btn" data-chat-back><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="chat-thread-title"><div class="chat-panel-title">New conversation</div><div class="chat-panel-sub">Pick someone to chat with</div></div>
+        <button class="chat-panel-close" data-chat-close><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="chat-search-bar">
+        <svg viewBox="0 0 24 24" class="chat-search-icon" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="chatUserSearch" placeholder="Search people...">
+      </div>
+      <div class="chat-body" id="chatUsersBody"></div>
+    </div>
+
+    <!-- ── Thread view ── -->
+    <div class="chat-thread-view">
+      <div class="chat-panel-head chat-thread-head">
+        <button class="chat-back-btn" data-chat-back><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="chat-thread-peer">
+          <div class="chat-avatar" id="chatThreadAvatar"></div>
+          <div class="chat-thread-title"><div class="chat-panel-title" id="chatThreadName"></div><div class="chat-panel-sub" id="chatThreadStatus"></div></div>
+        </div>
+        <button class="chat-panel-close" data-chat-close><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-attach-tray hidden" id="chatAttachTray"></div>
+      <form class="chat-composer" id="chatComposer">
+        <input type="file" id="chatFileInput" multiple hidden>
+        <button type="button" class="chat-attach-btn" id="chatAttachBtn" title="Attach files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <textarea id="chatInput" rows="1" placeholder="Write a message..." autocomplete="off"></textarea>
+        <button type="submit" class="chat-send-btn" title="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </div>
   </div>
 
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -182,10 +256,21 @@
     sseUrl: "{% url 'notifications:sse' %}",
     logoutUrl: "{% url 'accounts:logout' %}",
     csrf: "{{ csrf_token }}",
-    canReviewFinance: {% if request.user|can:'finance.campaign.review' %}true{% else %}false{% endif %}
+    canReviewFinance: {% if request.user|can:'finance.campaign.review' %}true{% else %}false{% endif %},
+    chat: {
+      listUrl: "{% url 'chat:list' %}",
+      usersUrl: "{% url 'chat:users' %}",
+      openUrl: "{% url 'chat:open' %}",
+      uploadUrl: "{% url 'chat:upload' %}",
+      historyTmpl: "{% url 'chat:history' '00000000-0000-0000-0000-000000000000' %}",
+      readTmpl: "{% url 'chat:mark_read' '00000000-0000-0000-0000-000000000000' %}",
+      wsPath: "/ws/chat/",
+      meId: "{{ user.id }}"
+    }
   };
 </script>
 <script src="{% static 'base/layout.js' %}"></script>
+<script src="{% static 'chat/chat.js' %}"></script>
 {% endif %}
 {% block extra_js %}{% endblock %}
 </body>

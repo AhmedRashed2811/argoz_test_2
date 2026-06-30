@@ -17,6 +17,7 @@ urlpatterns = [
     path("policies/", include("apps.policies.urls")),
     path("audit/", include("apps.audit.urls")),
     path("notifications/", include("apps.notifications.urls")),
+    path("chat/", include("apps.chat.urls")),
     path("integrations/", include("apps.integrations.urls")),
 ]
 

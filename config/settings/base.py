@@ -41,6 +41,7 @@ LOCAL_APPS = [
     "apps.marketing",
     "apps.finance",
     "apps.notifications",
+    "apps.chat",
     "apps.integrations",
     "apps.reports",
 ]

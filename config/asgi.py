@@ -11,13 +11,14 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
 django_asgi_app = get_asgi_application()
 
 # Imported after Django setup so app models/consumers are loadable.
-from apps.notifications.routing import websocket_urlpatterns  # noqa: E402
+from apps.notifications.routing import websocket_urlpatterns as notif_ws  # noqa: E402
+from apps.chat.routing import websocket_urlpatterns as chat_ws  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
+            AuthMiddlewareStack(URLRouter(notif_ws + chat_ws))
         ),
     }
 )

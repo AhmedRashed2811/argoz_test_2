@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 myproject/__pycache__/
 media/campaign_assets/
+media/chat/
 media/masterplans/
 media/market-project-images/
 media/market-masterplans/
