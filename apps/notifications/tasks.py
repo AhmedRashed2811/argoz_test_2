@@ -2,8 +2,12 @@
 channel layer; no business logic here."""
 from __future__ import annotations
 
+import logging
+
 from celery import shared_task
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task
@@ -130,14 +134,20 @@ def cleanup_old_notifications():
             continue
         company = cpv.company
         cutoff = now - timedelta(days=days)
-        print(f"[Celery notification cleanup] Checking company: {company.name} (ID: {company.id}). Cutoff: {cutoff}")
+        logger.info(
+            "Notification cleanup checking company=%s company_id=%s cutoff=%s",
+            company.name, company.id, cutoff,
+        )
         deleted, _ = Notification.objects.filter(
             company=company, created_at__lt=cutoff
         ).delete()
         if deleted > 0:
-            print(f"[Celery notification cleanup] Deleted {deleted} notifications for company {company.name} older than cutoff {cutoff}")
+            logger.info(
+                "Notification cleanup deleted count=%s company=%s cutoff=%s",
+                deleted, company.name, cutoff,
+            )
         removed += deleted
-    print(f"[Celery notification cleanup] Completed. Total removed notifications: {removed}")
+    logger.info("Notification cleanup completed removed=%s", removed)
     return removed
 
 

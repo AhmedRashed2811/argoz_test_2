@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -22,7 +23,49 @@ def _dedupe_hash(payload: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+@dataclass
+class WebhookReceiveWorkflow:
+    audit_service: object = AuditService
+    event_model: object = WebhookEvent
+
+    @transaction.atomic
+    def receive(self, *, endpoint: WebhookEndpoint, payload: dict,
+                external_event_id: str = "") -> WebhookEvent:
+        """Persist + dedupe the event and return existing duplicates."""
+        dedupe = _dedupe_hash(payload)
+        existing = self.event_model.objects.filter(
+            endpoint=endpoint
+        ).filter(
+            models_dedupe_or_event(external_event_id, dedupe)
+        ).first()
+        if existing is not None:
+            return existing
+
+        try:
+            with transaction.atomic():
+                event = self.event_model.objects.create(
+                    endpoint=endpoint, payload=payload,
+                    external_event_id=external_event_id or "", dedupe_hash=dedupe,
+                )
+        except IntegrityError:
+            existing = self.event_model.objects.filter(
+                endpoint=endpoint
+            ).filter(
+                models_dedupe_or_event(external_event_id, dedupe)
+            ).first()
+            return existing
+        endpoint.last_used_at = timezone.now()
+        endpoint.save(update_fields=["last_used_at", "updated_at"])
+        self.audit_service.log(
+            action=AuditAction.WEBHOOK_EVENT, instance=event, company=endpoint.company,
+            module="integrations", after={"status": "RECEIVED"}, source="webhook",
+        )
+        return event
+
+
 class WebhookReceiverService:
+    receive_workflow_class = WebhookReceiveWorkflow
+
     @staticmethod
     def authenticate(*, endpoint_uuid, token) -> WebhookEndpoint:
         endpoint = WebhookEndpoint.objects.filter(
@@ -38,27 +81,9 @@ class WebhookReceiverService:
                 external_event_id: str = "") -> WebhookEvent:
         """Persist + dedupe the event (docs §13.2). Returns the existing event
         when a duplicate is detected so callers stay idempotent."""
-        dedupe = _dedupe_hash(payload)
-        try:
-            with transaction.atomic():
-                event = WebhookEvent.objects.create(
-                    endpoint=endpoint, payload=payload,
-                    external_event_id=external_event_id or "", dedupe_hash=dedupe,
-                )
-        except IntegrityError:
-            existing = WebhookEvent.objects.filter(
-                endpoint=endpoint
-            ).filter(
-                models_dedupe_or_event(external_event_id, dedupe)
-            ).first()
-            return existing
-        endpoint.last_used_at = timezone.now()
-        endpoint.save(update_fields=["last_used_at", "updated_at"])
-        AuditService.log(
-            action=AuditAction.WEBHOOK_EVENT, instance=event, company=endpoint.company,
-            module="integrations", after={"status": "RECEIVED"}, source="webhook",
+        return WebhookReceiverService.receive_workflow_class().receive(
+            endpoint=endpoint, payload=payload, external_event_id=external_event_id,
         )
-        return event
 
 
 class MappingService:

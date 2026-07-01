@@ -6,6 +6,9 @@ rules, duplicate handling, SLA, audit, attribution and distribution stay in one
 place. Thin views call SourceRouterService.create_lead(...)."""
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
+
 from django.db import transaction
 
 from apps.accounts.models import Broker, Team, User
@@ -34,23 +37,48 @@ _MANUAL_ASSIGN_CODES = (
     "leads.distribution.team_manual",
 )
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SourceRouterWorkflow:
+    permission_resolver: object = EffectivePermissionResolver
+    service_facade: object | None = None
+
+    @transaction.atomic
+    def create_lead(self, *, company, actor, source_code, data, request_meta=None):
+        """Route a lead through the source-specific handler selected by code."""
+        logger.debug(
+            "Routing lead creation source=%s actor=%s data=%s",
+            source_code, actor, data,
+        )
+        if source_code not in SourceCode.ALL:
+            raise ValidationError("Unknown lead source.")
+        perm = f"leads.lead.create_from_{source_code.lower()}"
+        if not self.permission_resolver.has(actor, perm):
+            raise PermissionDenied(f"Not allowed to create {source_code} leads.")
+
+        facade = self.service_facade or SourceRouterService
+        handler = getattr(facade, f"_{source_code.lower()}")
+        return handler(company=company, actor=actor, data=data,
+                       request_meta=request_meta)
+
 
 class SourceRouterService:
+    workflow_class = SourceRouterWorkflow
+
+    @classmethod
+    def build_workflow(cls) -> SourceRouterWorkflow:
+        return cls.workflow_class(service_facade=cls)
+
     @staticmethod
     @transaction.atomic
     def create_lead(*, company, actor, source_code, data, request_meta=None):
         """data is a plain dict of cleaned form values. Returns the created Lead."""
-        print(f"\n[SourceRouterService] create_lead: source={source_code}, actor={actor}, data={data}")
-        if source_code not in SourceCode.ALL:
-            raise ValidationError("Unknown lead source.")
-        # §4.2b: a user may only create from sources they are permitted to.
-        perm = f"leads.lead.create_from_{source_code.lower()}"
-        if not EffectivePermissionResolver.has(actor, perm):
-            raise PermissionDenied(f"Not allowed to create {source_code} leads.")
-
-        handler = getattr(SourceRouterService, f"_{source_code.lower()}")
-        return handler(company=company, actor=actor, data=data,
-                       request_meta=request_meta)
+        return SourceRouterService.build_workflow().create_lead(
+            company=company, actor=actor, source_code=source_code,
+            data=data, request_meta=request_meta,
+        )
 
     # ---- shared helpers ---------------------------------------------------
     @staticmethod
@@ -155,7 +183,7 @@ class SourceRouterService:
     # ---- per-source handlers ---------------------------------------------
     @staticmethod
     def _self_generated(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing self_generated lead: actor={actor}")
+        logger.debug("Routing self-generated lead actor=%s", actor)
         base = SourceRouterService._base_kwargs(
             company, actor, SourceCode.SELF_GENERATED, data, request_meta
         )
@@ -199,7 +227,10 @@ class SourceRouterService:
 
     @staticmethod
     def _campaign(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing campaign lead: actor={actor}, campaign_id={data.get('campaign_id')}, dist={data.get('dist')}, assign_id={data.get('assign_id')}")
+        logger.debug(
+            "Routing campaign lead actor=%s campaign_id=%s dist=%s assign_id=%s",
+            actor, data.get("campaign_id"), data.get("dist"), data.get("assign_id"),
+        )
         from apps.marketing.models import Campaign
 
         campaign = Campaign.objects.filter(
@@ -222,7 +253,11 @@ class SourceRouterService:
 
     @staticmethod
     def _broker(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing broker lead: actor={actor}, broker_id={data.get('broker_id')}, broker_policy={data.get('broker_policy')}, salesman_id={data.get('salesman_id')}")
+        logger.debug(
+            "Routing broker lead actor=%s broker_id=%s broker_policy=%s salesman_id=%s",
+            actor, data.get("broker_id"), data.get("broker_policy"),
+            data.get("salesman_id"),
+        )
         base = SourceRouterService._base_kwargs(
             company, actor, SourceCode.BROKER, data, request_meta
         )
@@ -250,7 +285,10 @@ class SourceRouterService:
     def _walk_in(*, company, actor, data, request_meta):
         """Interactive reception (leads spec §4.2d). The receptionist's pick drives
         assignment; the company policy governs which rotation cursor advances."""
-        print(f"[SourceRouterService] Routing walk_in lead: actor={actor}, channel={data.get('channel')}, salesman_id={data.get('salesman_id')}")
+        logger.debug(
+            "Routing walk-in lead actor=%s channel=%s salesman_id=%s",
+            actor, data.get("channel"), data.get("salesman_id"),
+        )
         from apps.distribution.services import ManualDistributionEscalation
         from apps.leads.models import WalkInQueueEntry
         from apps.leads.services.walkin_service import (
@@ -290,7 +328,10 @@ class SourceRouterService:
 
     @staticmethod
     def _call_center(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing call_center lead: actor={actor}, cc_agent_id={data.get('cc_agent_id')}, dist={data.get('dist')}, salesman_id={data.get('salesman_id')}")
+        logger.debug(
+            "Routing call-center lead actor=%s cc_agent_id=%s dist=%s salesman_id=%s",
+            actor, data.get("cc_agent_id"), data.get("dist"), data.get("salesman_id"),
+        )
         base = SourceRouterService._base_kwargs(
             company, actor, SourceCode.CALL_CENTER, data, request_meta
         )
@@ -314,7 +355,10 @@ class SourceRouterService:
 
     @staticmethod
     def _exhibition(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing exhibition lead: actor={actor}, salesman_id={data.get('salesman_id')}")
+        logger.debug(
+            "Routing exhibition lead actor=%s salesman_id=%s",
+            actor, data.get("salesman_id"),
+        )
         base = SourceRouterService._base_kwargs(
             company, actor, SourceCode.EXHIBITION, data, request_meta
         )
@@ -331,7 +375,10 @@ class SourceRouterService:
 
     @staticmethod
     def _referral(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing referral lead: actor={actor}, dist={data.get('dist')}, salesman_id={data.get('salesman_id')}")
+        logger.debug(
+            "Routing referral lead actor=%s dist=%s salesman_id=%s",
+            actor, data.get("dist"), data.get("salesman_id"),
+        )
         base = SourceRouterService._base_kwargs(
             company, actor, SourceCode.REFERRAL, data, request_meta
         )
@@ -346,7 +393,10 @@ class SourceRouterService:
 
     @staticmethod
     def _existing_client(*, company, actor, data, request_meta):
-        print(f"[SourceRouterService] Routing existing_client lead: actor={actor}, phone={data.get('phone')}")
+        logger.debug(
+            "Routing existing-client lead actor=%s phone=%s",
+            actor, data.get("phone"),
+        )
         # ExistingClientService applies the preserve/redistribute policy and
         # LeadCreationService escalates active in-SLA duplicates to manual (§4.2f).
         return ExistingClientService.create_from_client(

@@ -51,7 +51,6 @@ def demo():
     assert _split_tenant("/t/acme/ws/chat/") == ("acme", "/ws/chat/")
     assert _split_tenant("/ws/chat/") == (None, "/ws/chat/")
     assert _split_tenant("/t//ws/chat/") == (None, "/ws/chat/")
-    print("ok")
 
 
 if __name__ == "__main__":

@@ -591,6 +591,30 @@
       border-color: var(--clr-orange);
       font-weight: 600;
     }
+    .notif-cat-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      margin-left: 5px;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      line-height: 1;
+      background: rgba(224, 123, 32, 0.12);
+      color: var(--clr-orange-dk);
+      transition: all var(--transition);
+    }
+    .notif-cat-tab.active .notif-cat-badge {
+      background: #ffffff;
+      color: var(--clr-orange);
+    }
+    .notif-cat-tab:hover .notif-cat-badge {
+      background: var(--clr-orange);
+      color: #ffffff;
+    }
 
     /* ── Notification Search Bar ── */
     .notif-search-bar {

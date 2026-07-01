@@ -2,6 +2,7 @@
 and register by stable code; existing workflows never change."""
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,10 +24,10 @@ class DistributionContext:
     params: dict = field(default_factory=dict)
 
 
-class AssignmentStrategyInterface:
+class AssignmentStrategyInterface(ABC):
     code: str = ""
 
+    @abstractmethod
     def select_candidate(self, *, company, lead, eligible_pool, context):
         """Return an AssignmentDecision. eligible_pool is the language/scope-
         filtered list of candidate TeamMember rows (docs §8.4)."""
-        raise NotImplementedError

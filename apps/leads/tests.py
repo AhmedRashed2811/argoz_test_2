@@ -201,3 +201,42 @@ class CRMTechnicalAlignmentTests(TestCase):
             company=self.company, notification_type__code=NotificationCode.MANUAL_DISTRIBUTION_REQUIRED
         ).first()
         self.assertIsNotNone(notif)
+
+    def test_sla_warning_reminder_on_reassignment(self):
+        # Seed user languages so they are eligible for self.arabic
+        from apps.accounts.models import UserLanguage
+        UserLanguage.objects.create(user=self.sales1, language=self.arabic, is_primary=True)
+        UserLanguage.objects.create(user=self.sales2, language=self.arabic, is_primary=True)
+
+        # Create a lead assigned to sales1
+        lead = LeadCreationService.create(
+            company=self.company,
+            source_code=SourceCode.CALL_CENTER,
+            name="Reminder SLA Lead",
+            phone="98765432",
+            origin=Origin.DIRECT,
+            language=self.arabic,
+            assigned_salesman=self.sales1,
+            campaign=None,
+            auto_distribute=False,
+        )
+        sla_inst1 = SLAInstance.objects.get(lead=lead, status=SLAStatus.ACTIVE)
+        
+        # Fire warning reminder for sales1
+        from apps.leads.tasks import send_sla_reminder
+        res1 = send_sla_reminder(str(sla_inst1.id))
+        self.assertTrue(res1)
+        self.assertTrue(Reminder.objects.filter(lead=lead, user=self.sales1, reminder_type="SLA_WARNING").exists())
+
+        # Breach the SLA to trigger distribution to sales2
+        SLAExpiryService.process_instance(sla_inst1, task_id="test_task_reassign")
+        lead.refresh_from_db()
+        self.assertEqual(lead.assigned_salesman, self.sales2)
+
+        # Get the new SLA instance
+        sla_inst2 = SLAInstance.objects.get(lead=lead, status=SLAStatus.ACTIVE)
+
+        # Fire warning reminder for sales2
+        res2 = send_sla_reminder(str(sla_inst2.id))
+        self.assertTrue(res2)
+        self.assertTrue(Reminder.objects.filter(lead=lead, user=self.sales2, reminder_type="SLA_WARNING").exists())

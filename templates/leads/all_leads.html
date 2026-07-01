@@ -356,10 +356,6 @@
         <div class="stage-opt" onclick="selectStage('Not Interested',this)" style="grid-column:1/-1">❌ Not Interested</div>
       </div>
       <div class="stage-section" id="stageFeedbackSection">
-        <div class="form-group">
-          <label class="form-label" id="feedbackLabel">Feedback / Notes</label>
-          <textarea class="form-textarea" id="stageFeedback" placeholder="What happened on this call?"></textarea>
-        </div>
         <div class="form-group" id="reasonGroup">
           <label class="form-label">Reason for Not Interested <span style="color:#c0392b">*</span></label>
           <select class="form-select" id="stageReason">
@@ -371,6 +367,10 @@
             <option>Wrong contact</option>
             <option>Other</option>
           </select>
+        </div>
+        <div class="form-group" id="feedbackGroup">
+          <label class="form-label" id="feedbackLabel">Feedback / Notes</label>
+          <textarea class="form-textarea" id="stageFeedback" placeholder="What happened on this call?"></textarea>
         </div>
         <div id="nextActionSection">
           <label class="form-label">Next Action</label>

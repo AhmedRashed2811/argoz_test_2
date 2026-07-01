@@ -3,6 +3,9 @@ the policy-selected strategy + scope mode and assigns through one shared,
 locked, audited routine. Manual paths and retry/team escalation reuse it."""
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -23,6 +26,8 @@ from . import registry  # noqa: F401  (registers built-in strategies on import)
 from .models import DistributionCandidateSnapshot, DistributionRun
 from .registry import StrategyRegistry
 from .selectors import eligible_pool
+
+logger = logging.getLogger(__name__)
 
 
 def _assign(*, lead: Lead, team, salesman, method: str, strategy_code: str = "",
@@ -95,53 +100,65 @@ class ManualAssignmentService:
         return lead
 
 
-class DistributionEngine:
-    @staticmethod
+@dataclass
+class DistributionWorkflow:
+    policy_resolver: object = PolicyResolver
+    strategy_registry: object = StrategyRegistry
+    assignment_service: object = ManualAssignmentService
+    pool_selector: object = eligible_pool
+
+    @property
+    def escalation_service(self):
+        return ManualDistributionEscalation
+
     @transaction.atomic
-    def distribute(*, lead, actor=None, request_meta=None, team=None, strategy_code=None) -> Lead:
+    def distribute(self, *, lead, actor=None, request_meta=None, team=None, strategy_code=None) -> Lead:
         company = lead.company
-        method = strategy_code or PolicyResolver.strategy_code(
+        method = strategy_code or self.policy_resolver.strategy_code(
             company, PolicyCode.DEFAULT_AUTO_DISTRIBUTION_METHOD, default="ROUND_ROBIN"
         )
-        scope_mode = PolicyResolver.option_code(
+        scope_mode = self.policy_resolver.option_code(
             company, PolicyCode.DISTRIBUTION_SCOPE_MODE,
             default=ScopeMode.ALL_SALESMEN,
         )
 
-        print(f"\n==================================================")
-        print(f"[DISTRIBUTION START] Lead: {lead.id} | Name: '{lead.name}' | Company: {company.id}")
-        print(f"   Origin: {lead.origin} | Language: {lead.language} | Stage: {getattr(lead.current_stage, 'code', None)}")
-        print(f"   Current Assigned Salesman: {lead.assigned_salesman} (ID: {lead.assigned_salesman_id})")
-        print(f"   Requested Team Filter: {team} | Strategy Code Override: {strategy_code}")
-        print(f"   Resolved Strategy: {method} | Scope Mode: {scope_mode}")
-        print(f"==================================================")
+        logger.debug(
+            "Distribution started lead=%s name=%s company=%s origin=%s language=%s "
+            "stage=%s assigned_salesman=%s requested_team=%s strategy=%s scope=%s",
+            lead.id, lead.name, company.id, lead.origin, lead.language,
+            getattr(lead.current_stage, "code", None), lead.assigned_salesman_id,
+            team, method, scope_mode,
+        )
 
         run = DistributionRun.objects.create(
             company=company, lead=lead, method_code=method, scope_mode=scope_mode,
             language=lead.language, actor=actor,
         )
-        pool = eligible_pool(
+        pool = self.pool_selector(
             company=company, language=lead.language, scope_mode=scope_mode, team=team
         )
-        print(f"[POOL ELIGIBLE] Initial Pool Size: {len(pool)}")
-        print(f"   Candidates: {[(m.user.email, m.team.name) for m in pool]}")
+        logger.debug(
+            "Distribution eligible pool size=%s candidates=%s",
+            len(pool), [(m.user.email, m.team.name) for m in pool],
+        )
 
         if lead.assigned_salesman_id:
             pool = [m for m in pool if m.user_id != lead.assigned_salesman_id] or pool
-            print(f"[POOL FILTERED] Current salesman excluded. Final Pool Size: {len(pool)}")
-            print(f"   Final Candidates: {[(m.user.email, m.team.name) for m in pool]}")
+            logger.debug(
+                "Distribution pool filtered size=%s candidates=%s",
+                len(pool), [(m.user.email, m.team.name) for m in pool],
+            )
 
         if not pool:
-            print(f"[DISTRIBUTION FAILED] Pool is empty! Escalate to manual.")
-            print(f"==================================================\n")
+            logger.info("Distribution escalated to manual: empty eligible pool lead=%s", lead.id)
             run.status = "NO_CANDIDATE"
             run.error = "Empty eligible pool after language/scope filter"
             run.finished_at = timezone.now()
             run.save(update_fields=["status", "error", "finished_at"])
-            ManualDistributionEscalation.notify(company=company, lead=lead, actor=actor)
+            self.escalation_service.notify(company=company, lead=lead, actor=actor)
             return lead
 
-        strategy = StrategyRegistry.get(method)
+        strategy = self.strategy_registry.get(method)
         from .interfaces import DistributionContext
 
         decision = strategy.select_candidate(
@@ -149,37 +166,40 @@ class DistributionEngine:
             context=DistributionContext(company=company, scope_mode=scope_mode,
                                         language=lead.language, actor=actor),
         )
-        print(f"[STRATEGY SELECTION] Strategy '{method}' evaluated.")
-        print(f"   Decision - Salesman: {decision.salesman} (ID: {getattr(decision.salesman, 'id', None)}) | Team: {decision.team}")
-        print(f"   Reason: '{decision.reason}'")
+        logger.debug(
+            "Distribution strategy evaluated strategy=%s salesman=%s team=%s reason=%s",
+            method, getattr(decision.salesman, "id", None), decision.team,
+            decision.reason,
+        )
 
-        DistributionEngine._record_candidates(run, pool, decision)
+        self._record_candidates(run, pool, decision)
 
         if decision.salesman is None and decision.team is None:
-            print(f"[DISTRIBUTION FAILED] Strategy returned no candidate! Escalate to manual.")
-            print(f"==================================================\n")
+            logger.info("Distribution escalated to manual: strategy returned no candidate lead=%s", lead.id)
             run.status = "NO_CANDIDATE"
             run.finished_at = timezone.now()
             run.save(update_fields=["status", "finished_at"])
-            ManualDistributionEscalation.notify(company=company, lead=lead, actor=actor)
+            self.escalation_service.notify(company=company, lead=lead, actor=actor)
             return lead
 
         # Scope mode 2: engine picks team, Sales Head decides salesman (§8.4).
         if scope_mode == ScopeMode.TEAM_HEAD_DECIDES:
-            print(f"[ASSIGNMENT] Scope Mode: TEAM_HEAD_DECIDES -> Assigning to team: {decision.team}")
-            lead = ManualAssignmentService.assign_to_team(
+            logger.debug("Distribution assigning team for head decision team=%s", decision.team)
+            lead = self.assignment_service.assign_to_team(
                 lead_id=lead.id, team=decision.team, actor=actor,
                 reason="Auto: team selected, head decides", request_meta=request_meta,
             )
         else:
-            print(f"[ASSIGNMENT] Assigning to salesman: {decision.salesman} | Team: {decision.team}")
+            logger.debug(
+                "Distribution assigning salesman=%s team=%s",
+                decision.salesman, decision.team,
+            )
             lead = _assign(
                 lead=lead, team=decision.team, salesman=decision.salesman,
                 method=AssignmentMethod.AUTO, strategy_code=method, actor=actor,
                 reason=decision.reason, request_meta=request_meta,
             )
-        print(f"[DISTRIBUTION DONE] Lead {lead.id} assignment completed successfully.")
-        print(f"==================================================\n")
+        logger.debug("Distribution completed lead=%s", lead.id)
 
         run.status = "DONE"
         run.selected_team = decision.team
@@ -190,8 +210,7 @@ class DistributionEngine:
         ])
         return lead
 
-    @staticmethod
-    def _record_candidates(run, pool, decision):
+    def _record_candidates(self, run, pool, decision):
         from .selectors import batch_candidate_loads
 
         chosen = getattr(decision.salesman, "pk", None)
@@ -206,6 +225,26 @@ class DistributionEngine:
                 rejection_reason="" if member.user_id == chosen else "Not selected",
             ))
         DistributionCandidateSnapshot.objects.bulk_create(rows)
+
+
+class DistributionEngine:
+    workflow_class = DistributionWorkflow
+
+    @classmethod
+    def build_workflow(cls) -> DistributionWorkflow:
+        return cls.workflow_class()
+
+    @classmethod
+    def distribute(cls, *, lead, actor=None, request_meta=None, team=None,
+                   strategy_code=None) -> Lead:
+        return cls.build_workflow().distribute(
+            lead=lead, actor=actor, request_meta=request_meta,
+            team=team, strategy_code=strategy_code,
+        )
+
+    @classmethod
+    def _record_candidates(cls, run, pool, decision):
+        return cls.build_workflow()._record_candidates(run, pool, decision)
 
 
 class RetryEscalationService:

@@ -3,6 +3,8 @@ policies: Open Floor, Team Turn (head assigns), Full Rotation. The lead is
 always created with source Walk-in and the how-did-you-know prompt captured."""
 from __future__ import annotations
 
+import logging
+
 from django.db import transaction
 
 from apps.policies.constants import PolicyCode
@@ -18,6 +20,8 @@ FULL_ROTATION = "FULL_ROTATION"
 
 ROT_FULL = "WALKIN_FULL_ROTATION"
 ROT_TEAM = "WALKIN_TEAM_TURN"
+
+logger = logging.getLogger(__name__)
 
 
 class WalkInService:
@@ -164,31 +168,42 @@ class WalkInService:
             Team.objects.filter(company=company, is_active=True).order_by("order_index")
         )
         if not teams:
-            print("[WALKIN TEAM TURN] No active teams found.")
+            logger.info("Walk-in team turn has no active teams company=%s", company.id)
             return None
         pointer, created = RotationPointer.objects.select_for_update().get_or_create(
             company=company, pointer_code="WALKIN_TEAM_TURN", scope="GLOBAL",
             defaults={"current_index": 0},
         )
-        print(f"[WALKIN TEAM TURN START] Loaded Pointer ID: {pointer.id} | Current Index in DB: {pointer.current_index} (Created: {created})")
-        print(f"   Active Teams: {[t.name for t in teams]}")
+        logger.debug(
+            "Walk-in team turn pointer=%s index=%s created=%s teams=%s",
+            pointer.id, pointer.current_index, created, [t.name for t in teams],
+        )
 
         for i in range(len(teams)):
             idx = pointer.current_index % len(teams)
             team = teams[idx]
-            print(f"   - Checking team index {idx}: '{team.name}' (Pointer before advance: {pointer.current_index})")
+            logger.debug(
+                "Walk-in checking team index=%s team=%s pointer_before=%s",
+                idx, team.name, pointer.current_index,
+            )
             
             pointer.current_index = (idx + 1) % len(teams)
             pointer.save(update_fields=["current_index", "updated_at"])
-            print(f"     Advanced pointer to: {pointer.current_index} and saved to DB.")
+            logger.debug("Walk-in pointer advanced to=%s", pointer.current_index)
 
             # Check if this team has available salesmen
             pool = eligible_pool(
                 company=company, team=team, scope_mode=ScopeMode.TEAM_THEN_SALESMAN
             )
-            print(f"     Team '{team.name}' eligible pool size: {len(pool)} (Members: {[m.user.email for m in pool]})")
+            logger.debug(
+                "Walk-in team eligible pool team=%s size=%s members=%s",
+                team.name, len(pool), [m.user.email for m in pool],
+            )
             if pool:
-                print(f"[WALKIN TEAM TURN SELECTED] Selected Team: '{team.name}'")
+                logger.debug("Walk-in selected team=%s", team.name)
                 return team
-        print("❌ [WALKIN TEAM TURN FAILED] No teams with available candidates.")
+        logger.info(
+            "Walk-in team turn found no teams with available candidates company=%s",
+            company.id,
+        )
         return None

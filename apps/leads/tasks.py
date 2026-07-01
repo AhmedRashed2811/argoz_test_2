@@ -2,6 +2,8 @@
 services and record a JobExecutionLog; no business logic lives here."""
 from __future__ import annotations
 
+import logging
+
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
@@ -18,6 +20,8 @@ _REMINDER_MAP = {
     "SLA_WARNING":      ("SLA_WARNING",      "SLA expiry warning"),
 }
 
+logger = logging.getLogger(__name__)
+
 
 @shared_task(bind=True)
 def expire_sla_instance(self, sla_instance_id):
@@ -31,23 +35,23 @@ def expire_sla_instance(self, sla_instance_id):
     from apps.leads.constants import SLAStatus
 
     task_id = getattr(self.request, "id", "") or ""
-    print(f"\n⏰ [CELERY SLA EXPIRY START] Task ID: {task_id} | SLA Instance: {sla_instance_id}")
+    logger.info("SLA expiry task started task_id=%s sla_instance=%s", task_id, sla_instance_id)
     sla = (
         SLAInstance.objects.select_related("lead", "lead__company", "lead__assigned_salesman")
         .filter(id=sla_instance_id, status=SLAStatus.ACTIVE)
         .first()
     )
     if sla is None:
-        print(f"⚠️ SLA instance {sla_instance_id} not active (rotated/revoked) — skipping.\n")
+        logger.info("SLA expiry skipped inactive instance=%s", sla_instance_id)
         return False
     try:
         with transaction.atomic():
-            print(f"👉 Processing expired SLA instance {sla.id} for Lead {sla.lead_id}...")
+            logger.debug("Processing expired SLA instance=%s lead=%s", sla.id, sla.lead_id)
             result = bool(SLAExpiryService.process_instance(sla, task_id=task_id))
-            print(f"🏁 [CELERY SLA EXPIRY DONE] SLA {sla.id} processed: {result}\n")
+            logger.info("SLA expiry task finished sla=%s processed=%s", sla.id, result)
             return result
     except Exception as exc:
-        print(f"❌ Error processing SLA instance {sla_instance_id}: {str(exc)}\n")
+        logger.exception("Error processing SLA instance=%s", sla_instance_id)
         JobExecutionLog.objects.create(
             task_name="expire_sla_instance", task_id=task_id,
             status="ERROR", finished_at=timezone.now(), error=str(exc)[:500],
@@ -72,7 +76,9 @@ def send_sla_reminder(self, sla_instance_id):
     if sla is None or not sla.lead.assigned_salesman_id:
         return False
     already = Reminder.objects.filter(
-        lead=sla.lead, user=sla.lead.assigned_salesman, reminder_type="SLA_WARNING",
+        related_type="SLAInstance",
+        related_id=sla.id,
+        reminder_type="SLA_WARNING",
         status__in=("PENDING", "SENT"),
     ).exists()
     if already:
@@ -80,6 +86,7 @@ def send_sla_reminder(self, sla_instance_id):
     ReminderService.create(
         company=sla.lead.company, user=sla.lead.assigned_salesman,
         due_at=timezone.now(), reminder_type="SLA_WARNING", lead=sla.lead,
+        related_type="SLAInstance", related_id=sla.id,
     )
     return True
 
@@ -136,19 +143,19 @@ def send_due_reminders():
     since reminders are delivered on time via their own eta job."""
     from apps.leads.models import Reminder
 
-    print(f"\n⏰ [CELERY REMINDERS TASK START]")
+    logger.info("Due reminders sweep started")
 
     due = Reminder.objects.select_related("lead", "company", "user").filter(
         status="PENDING", due_at__lte=timezone.now()
     )[:500]
     due_list = list(due)
-    print(f"📊 Found {len(due_list)} pending reminders due.")
+    logger.info("Due reminders found count=%s", len(due_list))
 
     count = 0
     for reminder in due_list:
         _deliver_reminder(reminder)
         count += 1
-        print(f"✅ Reminder {reminder.id} status set to SENT.")
+        logger.debug("Reminder sent id=%s", reminder.id)
 
-    print(f"🏁 [CELERY REMINDERS TASK DONE] Total sent: {count}\n")
+    logger.info("Due reminders sweep finished sent=%s", count)
     return count

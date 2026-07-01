@@ -4,6 +4,8 @@ broker-ownership separation, attribution, SLA, audit and distribution stay
 consistent (§13 requires webhook leads to use this same service)."""
 from __future__ import annotations
 
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -22,6 +24,8 @@ from ..models import (
 )
 from .duplicate_service import DuplicateService
 from .sla_service import SLAService
+
+logger = logging.getLogger(__name__)
 
 
 class LeadCreationService:
@@ -51,7 +55,10 @@ class LeadCreationService:
         attribution_event=None,
         **extra,
     ) -> Lead:
-        print(f"\n[LeadCreationService] create called: source={source_code}, name={name}, phone={phone}, salesman={assigned_salesman}, team={assigned_team}, auto={auto_distribute}")
+        logger.debug(
+            "Creating lead source=%s name=%s phone=%s salesman=%s team=%s auto=%s",
+            source_code, name, phone, assigned_salesman, assigned_team, auto_distribute,
+        )
         if not name or not phone:
             raise ValidationError("Lead requires name and phone (docs §8.1).")
 
@@ -133,7 +140,7 @@ class LeadCreationService:
             last_activity_at=timezone.now(),
             metadata=metadata,
         )
-        print(f"[LeadCreationService] Lead object created in DB: id={lead.id}, name={lead.name}")
+        logger.debug("Lead object created id=%s name=%s", lead.id, lead.name)
 
         if broker_owner is not None:
             BrokerLeadOwnershipHistory.objects.create(
@@ -193,7 +200,10 @@ class LeadCreationService:
         elif notify:
             LeadCreationService._escalate_manual(company, lead, actor)
 
-        print(f"[LeadCreationService] Lead creation workflow finished: lead_id={lead.id}, assigned_salesman={lead.assigned_salesman}, assigned_team={lead.assigned_team}\n")
+        logger.debug(
+            "Lead creation workflow finished lead_id=%s assigned_salesman=%s assigned_team=%s",
+            lead.id, lead.assigned_salesman, lead.assigned_team,
+        )
         return lead
 
     @staticmethod

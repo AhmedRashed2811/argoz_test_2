@@ -18,7 +18,7 @@ from .services import NotificationService
 def mark_read(request, notification_id):
     notif = get_object_or_404(Notification, id=notification_id, recipient=request.user)
     NotificationService.mark_read(notification=notif)
-    return redirect("notifications:list")
+    return JsonResponse({"ok": True})
 
 
 # ── AJAX API for the header notification panel (read-only + state toggles) ──

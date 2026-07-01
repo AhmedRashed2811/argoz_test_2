@@ -196,7 +196,7 @@ class NotificationService:
         codes = [
             NotificationCode.LEAD_ASSIGNED, NotificationCode.LEAD_REASSIGNED_SLA,
             NotificationCode.FOLLOWUP_DUE, NotificationCode.MEETING_DUE,
-            NotificationCode.FROZEN_LEAD_RETURN,
+            NotificationCode.FROZEN_LEAD_RETURN, NotificationCode.SLA_WARNING,
         ]
         deleted, _ = Notification.objects.filter(
             recipient=recipient, related_type="Lead", related_id=str(lead.pk),
