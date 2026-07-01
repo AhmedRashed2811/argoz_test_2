@@ -326,7 +326,7 @@ class SLAExpiryService:
         sla_instance.save(update_fields=["status", "breached_at"])
 
         method = resolve_expiry_method(lead.company)
-        if lead.origin == Origin.BROKER and method == SLAExpiryMethod.ROUND_ROBIN:
+        if lead.origin == Origin.BROKER:
             method = SLAExpiryMethod.MANUAL
 
         SLABreachEvent.objects.create(

@@ -25,10 +25,12 @@ class CRMTechnicalAlignmentTests(TestCase):
         self.profile1 = UserProfile.objects.create(user=self.sales1, company=self.company, availability_status="AVAILABLE")
 
         # Assign SYSTEM_ADMINS role to sales1 so they are authorized for manual distribution
-        from apps.authorization.models import RoleGroup
+        from apps.authorization.models import PermissionDefinition, RoleGroup, RolePermission
         from apps.authorization.services import PermissionManagementService
         admin_role = RoleGroup.objects.get(company=self.company, code="SYSTEM_ADMINS")
         PermissionManagementService.assign_role(user=self.sales1, role=admin_role)
+        manual_perm = PermissionDefinition.objects.get(code="leads.distribution.manual_all")
+        RolePermission.objects.get_or_create(role=admin_role, permission=manual_perm)
 
         self.sales2 = User.objects.create_user(email="sales2@example.com", password="password", first_name="Sales", last_name="Two")
         self.profile2 = UserProfile.objects.create(user=self.sales2, company=self.company, availability_status="AVAILABLE")
