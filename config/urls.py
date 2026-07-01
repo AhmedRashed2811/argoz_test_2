@@ -6,8 +6,16 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.leads import api as leads_api
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # External read-only leads API (Bearer / x-api-key). Reached per-tenant via
+    # /t/<slug>/api/leads/... — tenant routing strips the prefix before matching.
+    path("api/leads/", leads_api.api_salesman_leads, name="api_salesman_leads"),
+    path("api/leads/<str:email>", leads_api.api_salesman_leads),
+    # SaaS control plane (operator only, default DB). Not under /t/.
+    path("tenant-admin/", include("apps.tenants.urls")),
     path("", include("apps.reports.urls")),                 # dashboard:index
     path("accounts/", include("apps.accounts.urls")),
     path("leads/", include("apps.leads.urls")),

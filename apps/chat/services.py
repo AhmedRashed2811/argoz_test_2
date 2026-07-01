@@ -174,13 +174,15 @@ class ChatService:
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
 
+        from .consumers import _chat_group
+
         layer = get_channel_layer()
         if layer is None:
             return
         payload = ChatService.serialize_message(message)
         for uid in message.conversation.participants.values_list("id", flat=True):
             async_to_sync(layer.group_send)(
-                f"chat_user_{uid}", {"type": "chat.message", "message": payload}
+                _chat_group(uid), {"type": "chat.message", "message": payload}
             )
 
     @staticmethod

@@ -28,18 +28,14 @@ class ReactivationService:
         lead.save(update_fields=["active_status", "last_activity_at", "updated_at"])
         LeadStageService.change_stage(
             lead_id=lead.id, to_stage_code=to_stage_code, actor=actor,
-            reason="Reactivated", request_meta=request_meta,
+            reason="Reactivated", request_meta=request_meta, notify=False,
         )
         AuditService.log(
             action=AuditAction.UPDATE, instance=lead, actor=actor,
             company=lead.company, module="leads", request_meta=request_meta,
             after={"active_status": ActiveStatus.ACTIVE},
         )
-        NotificationService.create_for_users(
-            company=lead.company, recipients=[lead.assigned_salesman],
-            code=NotificationCode.LEAD_REACTIVATED, title="Lead reactivated",
-            related_type="Lead", related_id=lead.pk,
-        )
+        # De/activation is an admin housekeeping action — no salesman notification.
         return lead
 
     @staticmethod

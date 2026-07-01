@@ -1,0 +1,271 @@
+========================================================================
+ ARGOZ CRM — TECHNICAL HANDOVER / PRODUCTION DEPLOYMENT NOTES
+========================================================================
+For: Production / DevOps Team Lead
+Stack: Django 4.2 · ASGI (Channels) · Celery · Redis · MariaDB
+
+
+------------------------------------------------------------------------
+1. WHAT THIS PROJECT IS (ARCHITECTURE)
+------------------------------------------------------------------------
+Argoz is a multi-tenant SaaS CRM. It is DB-PER-TENANT:
+
+  - ONE control-plane database ("default", MariaDB "argoz"): holds the
+    Tenant registry (apps/tenants) and the super-admin panel only.
+  - ONE separate MariaDB database PER paying company (tenant). Each tenant
+    DB carries the FULL CRM schema (leads, users, notifications, chat...).
+
+  Every tenant is reached at a URL prefix:   /t/<slug>/
+      e.g.  https://app.example.com/t/palmier/leads/
+
+  How a request is routed to the right database:
+    apps/tenants/middleware.py (HTTP) and apps/tenants/asgi.py (WebSocket)
+    read the /t/<slug>/ prefix, look the tenant up in the control-plane DB,
+    then pin a per-request ContextVar to that tenant's DB alias. A Django
+    DB router (apps/tenants/routers.py) sends EVERY ORM query to that alias.
+    No alias set  =>  falls back to the control-plane "default" DB.
+
+  Tenants are provisioned at runtime (apps/tenants/services.py): create the
+  MariaDB database, run migrations into it, seed the first admin + CRM
+  config. Suspending a tenant (is_active=False) blocks its users at the
+  middleware WITHOUT touching their data.
+
+  Apps: core, tenants, companies, accounts, authorization, audit, policies,
+  leads, distribution, marketing, finance, notifications, chat, notebook,
+  integrations, reports. Business logic lives in each app's services.py;
+  views/consumers stay thin.
+
+
+------------------------------------------------------------------------
+2. SECURITY / TENANT ISOLATION LAYER  (READ THIS)
+------------------------------------------------------------------------
+  a) DATA isolation is physical: each tenant is its OWN database. The ORM
+     cannot see another tenant's rows — there is no shared table to leak.
+
+  b) SHARED Redis is the one place tenants meet. Because model primary keys
+     are per-tenant auto-increment (user id 5 exists in EVERY tenant DB),
+     any Redis key/group/channel MUST be namespaced by the tenant, or two
+     tenants collide. This is already enforced via
+     apps/tenants/db.py -> current_scope()  on:
+        - permission cache        (effperm:<tenant>:<uid>)
+        - chat channel groups     (chat_user_<tenant>_<uid>)
+        - notification groups     (notifications_<tenant>_<uid>)
+        - SSE pub/sub channel      (sse_notif:<tenant>:<uid>)
+        - idempotency cache        (crm_idempotency_key_<tenant>:<key>)
+     >> RULE FOR THE TEAM: any NEW cache key / channel group / pub-sub
+        channel must include current_scope(). Do not ship an un-scoped one.
+
+  c) Authorization is code-based, not role-name based (apps/authorization):
+     EffectivePermissionResolver computes each user's effective permission
+     codes (role defaults + ALLOW overrides − DENY), cached per user.
+     Views are guarded with @crm_permission_required("...").
+
+  d) Control plane (/tenant-admin/) is gated by Django is_superuser only
+     (apps/tenants/decorators.py). Only the operator ("super super user")
+     manages tenants. Normal tenant users authenticate against their own
+     tenant DB and cannot reach the control plane.
+
+  e) Frontend NEVER hard-links to "/". All links use Django {% url %} (which
+     re-adds the /t/<slug>/ prefix automatically) and AJAX. Post-login
+     redirect falls back to the tenant mount, never the bare root.
+
+  f) Production hardening is in config/settings/production.py:
+     DEBUG=False, SECURE_PROXY_SSL_HEADER, SESSION/CSRF cookies Secure,
+     CSRF_TRUSTED_ORIGINS from env. Put TLS termination at the proxy.
+
+
+------------------------------------------------------------------------
+3. AUDIT ENGINE
+------------------------------------------------------------------------
+  apps/audit — a single centralized writer. Services call
+  AuditService.log(...) for semantic events; DiffService computes
+  field-level before/after diffs for simple CRUD. No scattered audit
+  writes. Every audit row lives inside the tenant's own DB (so audit is
+  tenant-isolated like everything else). Background jobs also write a
+  JobExecutionLog on failure.
+
+
+------------------------------------------------------------------------
+4. WHY ASGI (NOT WSGI)
+------------------------------------------------------------------------
+  The app serves real-time features that need long-lived / async
+  connections, which WSGI cannot do:
+    - WebSockets via Django Channels (chat + notifications) — see
+      config/asgi.py (ProtocolTypeRouter: http + websocket).
+    - Server-Sent Events (SSE) streaming endpoint (async generator).
+  Therefore the app is served through config.asgi:application (ASGI).
+  config.wsgi still exists but is NOT used in this deployment.
+
+
+------------------------------------------------------------------------
+5. SSE (SERVER-SENT EVENTS)
+------------------------------------------------------------------------
+  Path: /t/<slug>/notifications/stream/  (async view, apps/notifications).
+  The browser opens an EventSource; the server holds it open and pushes new
+  notifications live. Delivery mechanism: Celery task fanout_notification
+  PUBLISHES to Redis pub/sub channel  sse_notif:<tenant>:<uid>; the SSE
+  generator SUBSCRIBES to it and streams each payload. This is used in
+  ADDITION to Channels WebSockets for reliable cross-process delivery.
+
+  Proxy note (nginx/traefik): SSE responses set  X-Accel-Buffering: no  and
+  Cache-Control: no-cache. Disable response buffering and set a long read
+  timeout for the /notifications/stream/ path, or the stream will be cut.
+
+
+------------------------------------------------------------------------
+6. CELERY — WORKERS & TASKS
+------------------------------------------------------------------------
+  Celery app: config/celery.py  (exposed as  config.celery_app), broker +
+  result backend = Redis. Tasks live in each app's tasks.py and only call
+  services.
+
+  TENANT CONTEXT PROPAGATION (important): a task enqueued inside a tenant
+  request is stamped with that tenant's DB alias (before_task_publish); the
+  worker re-enters that tenant DB for the task duration (task_prerun) and
+  clears it after (task_postrun). So per-instance/eta tasks run against the
+  correct tenant DB automatically. Examples:
+    - expire_sla_instance / send_sla_reminder (SLA lifecycle, eta-scheduled)
+    - deliver_reminder (fires at Reminder.due_at)
+    - fanout_notification (push notification to WS + SSE)
+
+
+------------------------------------------------------------------------
+7. CELERY BEAT (PERIODIC SCHEDULER)
+------------------------------------------------------------------------
+  Schedule in config/settings/base.py -> CELERY_BEAT_SCHEDULE:
+    - send_due_reminders            every 60s   (safety-net sweep)
+    - retry_failed_webhooks         every 10min
+    - recalculate_campaign_metrics  hourly
+    - cleanup_old_notifications     daily 02:00
+    - send_daily_task_emails        daily 07:00
+
+  >> KNOWN LIMITATION TO PLAN FOR: beat-scheduled tasks carry NO tenant
+     alias, so they currently run against the control-plane "default" DB and
+     do NOT fan out across every tenant DB. This is NOT a data leak (they
+     touch no tenant data), but those periodic jobs will not act per-tenant
+     until a per-tenant fan-out loop is added. Flag before relying on them
+     in production. eta/per-request tasks (section 6) are unaffected.
+
+  Run exactly ONE beat process cluster-wide (never more than one) to avoid
+  duplicate scheduling.
+
+
+------------------------------------------------------------------------
+8. REDIS (ON DOCKER)
+------------------------------------------------------------------------
+  Redis is used for THREE things: Celery broker/result backend, Django
+  cache (django-redis), and the Channels layer + SSE pub/sub. One Redis
+  instance is fine.
+
+    docker run -d --name argoz-redis \
+      -p 6379:6379 \
+      --restart unless-stopped \
+      redis:7-alpine
+
+  Then in the app environment:  REDIS_URL=redis://127.0.0.1:6379/0
+  (In prod put Redis on a private network, not published to the internet.)
+
+
+------------------------------------------------------------------------
+9. ENVIRONMENT VARIABLES (.env)
+------------------------------------------------------------------------
+  DJANGO_SETTINGS_MODULE=config.settings.production
+  SECRET_KEY=<generate a strong random value>
+  DEBUG=0
+  ALLOWED_HOSTS=app.example.com
+  CSRF_TRUSTED_ORIGINS=https://app.example.com
+  TIME_ZONE=Africa/Cairo
+
+  # Control-plane MariaDB ("argoz"); tenant DBs are created from these creds
+  MYSQL_DATABASE=argoz
+  MYSQL_USER=argoz
+  MYSQL_PASSWORD=<db password>
+  MYSQL_HOST=127.0.0.1
+  MYSQL_PORT=3306
+
+  # Redis
+  REDIS_URL=redis://127.0.0.1:6379/0
+  CELERY_TASK_ALWAYS_EAGER=0        # MUST be 0 in prod (real workers)
+
+  # Email + integrations
+  EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+  EMAIL_HOST=...  EMAIL_PORT=...  EMAIL_HOST_USER=...  EMAIL_HOST_PASSWORD=...
+  DEFAULT_FROM_EMAIL=crm@yourdomain
+  WEBHOOK_BASE_URL=https://app.example.com
+
+
+========================================================================
+10. FIRST-TIME RUN — STEP BY STEP
+========================================================================
+Prereqs: Python 3.11+, MariaDB running, Redis running (section 8).
+
+  # 0. Code + virtualenv + deps
+  python -m venv venv
+  source venv/bin/activate          # Windows:  venv\Scripts\activate
+  pip install -r requirements.txt
+
+  # 1. Configure environment
+  cp .env.example .env              # then edit per section 9
+
+  # 2. Create the control-plane database in MariaDB (once)
+  #    CREATE DATABASE argoz CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+  # 3. Migrate the control plane + collect static
+  python manage.py migrate
+  python manage.py collectstatic --noinput
+
+  # 4. Create the operator (the "super super user" for /tenant-admin/)
+  python manage.py createsuperuser
+
+  # 5. Start Redis (if not already, see section 8)
+  docker start argoz-redis
+
+  ----------------------------------------------------------------
+  DEVELOPMENT (three terminals) — matches the commands you use:
+  ----------------------------------------------------------------
+  # Terminal A — ASGI web server (HTTP + WebSocket + SSE)
+  uvicorn config.asgi:application --reload
+
+  # Terminal B — Celery worker
+  #   (on Windows dev, --pool=solo is required)
+  celery -A config worker -l info --pool=solo
+
+  # Terminal C — Celery beat (exactly one)
+  celery -A config beat -l info
+
+  ----------------------------------------------------------------
+  PRODUCTION (run each as its own supervised service: systemd/supervisor):
+  ----------------------------------------------------------------
+  # Web (ASGI) — gunicorn driving uvicorn workers behind nginx/TLS
+  gunicorn config.asgi:application \
+      -k uvicorn.workers.UvicornWorker \
+      -b 0.0.0.0:8000 --workers 4 --timeout 120
+
+  # Celery worker(s) — Linux prod uses prefork, NOT solo
+  celery -A config worker -l info --concurrency=4
+
+  # Celery beat — ONE instance only, cluster-wide
+  celery -A config beat -l info
+
+  All three services must share the SAME .env (DB + Redis) and have
+  DJANGO_SETTINGS_MODULE=config.settings.production.
+
+  # 6. Provision the first tenant: log in to /tenant-admin/ as the operator
+  #    and create a tenant. It builds that tenant's DB automatically; the
+  #    tenant then lives at  /t/<slug>/ .
+
+
+------------------------------------------------------------------------
+11. OPERATIONAL CHECKLIST
+------------------------------------------------------------------------
+  [ ] Redis NOT exposed publicly; on a private network.
+  [ ] Exactly ONE celery beat process.
+  [ ] Reverse proxy: TLS on; buffering OFF + long read timeout for
+      /notifications/stream/ (SSE) and /ws/ (WebSocket upgrade headers).
+  [ ] DB backups cover the control-plane DB AND every per-tenant DB.
+  [ ] CELERY_TASK_ALWAYS_EAGER=0 in production.
+  [ ] Any new Redis key/group is namespaced with current_scope() (section 2b).
+  [ ] Plan the beat per-tenant fan-out before depending on periodic jobs
+      (section 7).
+
+========================================================================

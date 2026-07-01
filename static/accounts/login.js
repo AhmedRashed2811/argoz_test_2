@@ -109,9 +109,11 @@ if (form) {
         alertBox.style.borderColor = '#b7e4c7';
         alertBox.style.color = '#1e7e45';
         
-        // Find if next param exists
+        // Find if next param exists. Fall back to the tenant mount (/t/<slug>/),
+        // never bare '/', so a direct login never drops to the control-plane root.
         const urlParams = new URLSearchParams(window.location.search);
-        const nextUrl = urlParams.get('next') || '/';
+        const tprefix = (window.location.pathname.match(/^\/t\/[^\/]+/) || [''])[0];
+        const nextUrl = urlParams.get('next') || (tprefix + '/');
         
         setTimeout(() => {
           window.location.href = nextUrl;

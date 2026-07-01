@@ -9,6 +9,14 @@ from .models import Agency, Language, Team, TeamMember, User, UserLanguage, User
 
 class UserService:
     @staticmethod
+    def assert_can_manage_user(actor, target_user) -> None:
+        """Ensures the superuser of the tenant can only be managed by themselves."""
+        from django.core.exceptions import PermissionDenied
+        if target_user and getattr(target_user, "is_superuser", False):
+            if actor is not None and actor != target_user:
+                raise PermissionDenied("Only the superuser themselves can manage this account.")
+
+    @staticmethod
     @transaction.atomic
     def create_user(*, company, email, password=None, default_role=None,
                     first_name="", last_name="", phone="", permission_codes=None,
@@ -66,6 +74,7 @@ class UserService:
     def update_user(*, user, email, password=None, default_role=None,
                     first_name="", last_name="", phone="", permission_codes=None,
                     language_codes=None, created_by=None, request_meta=None, **profile_data):
+        UserService.assert_can_manage_user(created_by, user)
         from apps.audit.services import AuditService, DiffService
         from apps.core.constants import AuditAction
 
@@ -130,6 +139,7 @@ class UserService:
     @staticmethod
     @transaction.atomic
     def delete_user(*, user, actor=None, request_meta=None):
+        UserService.assert_can_manage_user(actor, user)
         user.is_active = False
         user.save()
         profile = user.profile
@@ -149,6 +159,7 @@ class UserService:
     @staticmethod
     @transaction.atomic
     def destroy_user(*, user, actor=None, request_meta=None) -> None:
+        UserService.assert_can_manage_user(actor, user)
         from apps.audit.services import AuditService
         from apps.core.constants import AuditAction
 
@@ -167,6 +178,7 @@ class UserService:
     @staticmethod
     @transaction.atomic
     def activate_user(*, user, actor=None, request_meta=None):
+        UserService.assert_can_manage_user(actor, user)
         user.is_active = True
         user.save()
         profile = user.profile

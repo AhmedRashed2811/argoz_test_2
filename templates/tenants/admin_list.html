@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tenants — SaaS Admin</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.5/sweetalert2.all.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --bg-main: #0b0f19;
+      --bg-surface: #151c2c;
+      --bg-surface-hover: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #f97316;
+      --primary-hover: #ea580c;
+      --border: #273549;
+      --success: #10b981;
+      --error: #ef4444;
+      --success-bg: rgba(16, 185, 129, 0.1);
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2.5rem;
+      background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .logo-dot {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3);
+    }
+
+    .btn-ghost {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-ghost:hover {
+      background-color: var(--bg-surface-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-sm {
+      padding: 0.4rem 0.875rem;
+      font-size: 0.8125rem;
+      border-radius: 6px;
+    }
+
+    .table-container {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 1.1rem 1.25rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: rgba(21, 28, 44, 0.6);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: rgba(255, 255, 255, 0.015);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .pill.on {
+      background-color: var(--success-bg);
+      color: var(--success);
+    }
+
+    .pill.off {
+      background-color: var(--error-bg);
+      color: var(--error);
+    }
+
+    .pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    a.tlink {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+
+    a.tlink:hover {
+      color: var(--primary-hover);
+      text-decoration: underline;
+    }
+
+    .muted {
+      color: var(--text-muted);
+      font-size: 0.8125rem;
+    }
+
+    .email-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.8125rem;
+      color: var(--text-main);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+
+    /* Modal Overlay */
+    .ov {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 10, 18, 0.6);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      transition: all 0.3s ease;
+    }
+
+    .ov.show {
+      display: flex;
+    }
+
+    /* Modal Box */
+    .modal {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 480px;
+      max-width: 92vw;
+      padding: 2rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: modalEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalEnter {
+      from {
+        transform: scale(0.95) translateY(10px);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .modal p.sub {
+      margin: 0 0 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 1rem 0 0.375rem;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      background-color: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      transition: all 0.15s ease;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+    }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="logo-dot">A</span> Argoz — Companies</h1>
+    <button class="btn btn-primary" id="newBtn">+ New company</button>
+  </header>
+
+  <div class="wrap">
+    <p class="muted">Create a company (with its own database), and activate or
+      deactivate access. Deactivating only blocks login — no data is removed.</p>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Slug / URL</th>
+            <th>Database</th>
+            <th>Superuser Email</th>
+            <th>Status</th>
+            <th>Paid until</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create modal -->
+  <div class="ov" id="ov">
+    <form class="modal" id="form">
+      <h2>New company</h2>
+      <p class="sub">Provisions a fresh database and an admin login for the company.</p>
+      <div class="row2">
+        <div><label>Company name</label><input name="name" required placeholder="Acme Realty"></div>
+        <div><label>Slug</label><input name="slug" required placeholder="acme" pattern="[a-z0-9-]+"></div>
+      </div>
+      <label>Admin email</label><input name="admin_email" type="email" required placeholder="owner@acme.com">
+      <label>Admin password</label><input name="admin_password" type="password" required placeholder="••••••••">
+      <div class="row2">
+        <div><label>Paid until (optional)</label><input name="paid_until" type="date"></div>
+        <div><label>Notes (optional)</label><input name="notes" placeholder="Cash, Jan"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Create company</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const LIST_URL = "{% url 'tenants:api_list' %}";
+    const CREATE_URL = "{% url 'tenants:api_create' %}";
+    const TOGGLE_TMPL = "{% url 'tenants:api_toggle' 0 %}";
+    function csrf(){return document.cookie.split('; ').find(c=>c.startsWith('csrftoken='))?.split('=')[1] || '';}
+    async function api(url, body){
+      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf()}, body:JSON.stringify(body||{})});
+      const d = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(d.error || 'Request failed');
+      return d;
+    }
+    function esc(s){const e=document.createElement('div');e.textContent=s??'';return e.innerHTML;}
+
+    async function load(){
+      const {tenants} = await (await fetch(LIST_URL)).json();
+      const tb = document.getElementById('rows');
+      if(!tenants.length){tb.innerHTML='<tr><td colspan="7" class="empty">No companies yet. Click “New company”.</td></tr>';return;}
+      tb.innerHTML = tenants.map(t=>`
+        <tr>
+          <td><strong>${esc(t.name)}</strong><div class="muted">${esc(t.notes)}</div></td>
+          <td><a class="tlink" href="${t.url}" target="_blank">${t.url}</a></td>
+          <td class="muted">${esc(t.db_name)}</td>
+          <td><span class="email-badge">${esc(t.admin_email)}</span></td>
+          <td><span class="pill ${t.is_active?'on':'off'}"><span class="dot"></span>${t.is_active?'Active':'Suspended'}</span></td>
+          <td class="muted">${esc(t.paid_until)||'—'}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-sm" data-toggle="${t.id}" data-active="${t.is_active?0:1}">
+              ${t.is_active?'Deactivate':'Activate'}</button>
+          </td>
+        </tr>`).join('');
+      tb.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>toggle(b.dataset.toggle, b.dataset.active==='1'));
+    }
+
+    async function toggle(id, active){
+      const verb = active?'activate':'deactivate';
+      const ok = await Swal.fire({title:`${verb[0].toUpperCase()+verb.slice(1)} this company?`,
+        text: active?'Users will be able to log in again.':'Users will be blocked. Data is kept.',
+        icon:'question',showCancelButton:true,confirmButtonColor:'#ea580c',confirmButtonText:'Yes'});
+      if(!ok.isConfirmed) return;
+      try{ await api(TOGGLE_TMPL.replace('0',id), {active}); load(); }
+      catch(e){ Swal.fire('Error', e.message, 'error'); }
+    }
+
+    const ov=document.getElementById('ov'), form=document.getElementById('form');
+    document.getElementById('newBtn').onclick=()=>{form.reset();ov.classList.add('show');};
+    document.getElementById('cancelBtn').onclick=()=>ov.classList.remove('show');
+    ov.onclick=e=>{if(e.target===ov)ov.classList.remove('show');};
+    form.onsubmit=async e=>{
+      e.preventDefault();
+      const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Creating…';
+      const body=Object.fromEntries(new FormData(form).entries());
+      try{
+        await api(CREATE_URL, body);
+        ov.classList.remove('show');
+        Swal.fire({icon:'success',title:'Company created',text:'Database provisioned and admin login ready.',confirmButtonColor:'#ea580c'});
+        load();
+      }catch(err){ Swal.fire('Could not create', err.message, 'error'); }
+      finally{ btn.disabled=false; btn.textContent='Create company'; }
+    };
+    load();
+  </script>
+</body>
+</html>

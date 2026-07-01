@@ -57,10 +57,16 @@ def notification_api_mark_all_read(request):
 async def notification_sse(request):
     from asgiref.sync import sync_to_async
     from django.contrib.auth import get_user
+    from apps.tenants.db import get_current_db
     user = await sync_to_async(get_user)(request)
     if not user.is_authenticated:
         return HttpResponseForbidden()
-    response = StreamingHttpResponse(NotificationService.sse_stream(user), content_type="text/event-stream")
+    # Capture the tenant alias now; the routing middleware clears it before the
+    # stream below starts iterating.
+    response = StreamingHttpResponse(
+        NotificationService.sse_stream(user, get_current_db()),
+        content_type="text/event-stream",
+    )
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response

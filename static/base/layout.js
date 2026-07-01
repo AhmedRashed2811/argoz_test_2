@@ -4,6 +4,9 @@
 (function () {
   const CFG = window.LAYOUT_CFG || {};
   const $ = (id) => document.getElementById(id);
+  // Tenant mount (/t/<slug>) for hand-built links; {% url %}-generated CFG urls
+  // already carry it, but the notification action urls below are literals.
+  const TPREFIX = (location.pathname.match(/^\/t\/[^\/]+/) || [''])[0];
 
   /* ── User dropdown ── */
   const userBtn = $('userBtn'), dropdown = $('dropdown');
@@ -208,14 +211,14 @@
       if (item.code !== 'SLA_BREACHED') {
         if (item.code === 'MANUAL_DISTRIBUTION_REQUIRED') {
           actionUrl = item.lead_phone
-            ? `/leads/manual-distribution/?search=${encodeURIComponent(item.lead_phone)}`
-            : '/leads/manual-distribution/';
+            ? `${TPREFIX}/leads/manual-distribution/?search=${encodeURIComponent(item.lead_phone)}`
+            : `${TPREFIX}/leads/manual-distribution/`;
         } else if (item.related_type === 'Lead') {
-          actionUrl = `/leads/?search=${item.related_id}`;
+          actionUrl = `${TPREFIX}/leads/?search=${item.related_id}`;
         } else if (item.related_type === 'Campaign') {
           actionUrl = (CFG.canReviewFinance)
-            ? `/finance/approvals/?search=${item.related_id}`
-            : `/marketing/?search=${item.related_id}`;
+            ? `${TPREFIX}/finance/approvals/?search=${item.related_id}`
+            : `${TPREFIX}/marketing/?search=${item.related_id}`;
         }
       }
       const actionBtn = actionUrl

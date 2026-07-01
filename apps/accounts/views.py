@@ -60,6 +60,11 @@ def user_api_list(request):
 @require_POST
 def user_api_deactivate(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    from django.core.exceptions import PermissionDenied
+    try:
+        UserService.assert_can_manage_user(request.user, target_user)
+    except PermissionDenied as e:
+        return JsonResponse({"error": str(e)}, status=403)
     if target_user == request.user:
         return JsonResponse(
             {"error": "You cannot deactivate your own account."}, status=400
@@ -76,6 +81,11 @@ def user_api_deactivate(request, user_id):
 @require_POST
 def user_api_activate(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    from django.core.exceptions import PermissionDenied
+    try:
+        UserService.assert_can_manage_user(request.user, target_user)
+    except PermissionDenied as e:
+        return JsonResponse({"error": str(e)}, status=403)
     UserService.activate_user(
         user=target_user, actor=request.user,
         request_meta=getattr(request, "request_meta", None),
@@ -88,6 +98,11 @@ def user_api_activate(request, user_id):
 @require_POST
 def user_api_delete(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    from django.core.exceptions import PermissionDenied
+    try:
+        UserService.assert_can_manage_user(request.user, target_user)
+    except PermissionDenied as e:
+        return JsonResponse({"error": str(e)}, status=403)
     if target_user == request.user:
         return JsonResponse(
             {"error": "You cannot delete your own account."}, status=400
@@ -139,6 +154,11 @@ def user_api_create(request):
 def user_api_edit(request, user_id):
     import json
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    from django.core.exceptions import PermissionDenied
+    try:
+        UserService.assert_can_manage_user(request.user, target_user)
+    except PermissionDenied as e:
+        return JsonResponse({"error": str(e)}, status=403)
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -193,6 +213,7 @@ def user_create(request):
 @crm_permission_required("admin.users.update")
 def user_edit(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    UserService.assert_can_manage_user(request.user, target_user)
     profile = target_user.profile
     initial_data = {
         "email": target_user.email,
@@ -237,6 +258,7 @@ def user_edit(request, user_id):
 @crm_permission_required("admin.users.delete")
 def user_delete(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    UserService.assert_can_manage_user(request.user, target_user)
     if target_user == request.user:
         messages.error(request, "You cannot delete/deactivate your own account.")
     else:
@@ -249,6 +271,7 @@ def user_delete(request, user_id):
 @crm_permission_required("admin.users.update")
 def user_activate(request, user_id):
     target_user = get_object_or_404(User, id=user_id, profile__company=request.company)
+    UserService.assert_can_manage_user(request.user, target_user)
     UserService.activate_user(user=target_user, actor=request.user, request_meta=request.request_meta)
     messages.success(request, f"User {target_user.email} activated successfully.")
     return redirect("accounts:user_list")

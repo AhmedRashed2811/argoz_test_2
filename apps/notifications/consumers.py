@@ -6,6 +6,18 @@ import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from apps.tenants.db import current_scope
+
+
+def notif_group(user_id) -> str:
+    # Tenant-scoped: shared Redis channel layer + per-tenant repeating user ids
+    # (see chat.consumers._chat_group).
+    return f"notifications_{current_scope()}_{user_id}"
+
+
+def sse_channel(user_id) -> str:
+    return f"sse_notif:{current_scope()}:{user_id}"
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -13,7 +25,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         if user is None or not user.is_authenticated:
             await self.close()
             return
-        self.group = f"notifications_{user.id}"
+        self.group = notif_group(user.id)
         await self.channel_layer.group_add(self.group, self.channel_name)
         await self.accept()
 

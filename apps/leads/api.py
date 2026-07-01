@@ -24,6 +24,7 @@ from .services import (
     BulkLeadImportService,
     DuplicateService,
     FollowUpService,
+    LeadApiService,
     LeadSerializationService,
     LeadStageService,
     ManualDistributionService,
@@ -774,3 +775,33 @@ def api_manual_dist_assign(request):
     except PermissionDenied as exc:
         return _err(exc, status=403)
     return JsonResponse({"ok": True})
+
+
+@require_GET
+def api_salesman_leads(request, email=None):
+    """External read-only API: list a salesman's leads (Bearer / x-api-key auth).
+
+    GET /t/<slug>/api/leads/<email>  or  /t/<slug>/api/leads/?email=<email>
+    request.company is resolved from the tenant DB by middleware; auth and the
+    query live in LeadApiService (view stays thin)."""
+    email = email or request.GET.get("email", "")
+    try:
+        LeadApiService.authenticate(request, getattr(request, "company", None))
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=401)
+    if not email:
+        return JsonResponse(
+            {"success": False, "error": "email is required."}, status=400)
+
+    rows, page = LeadApiService.leads_for_salesman(
+        request.company, email, request.GET.get("page"))
+
+    next_page_url = None
+    if page.has_next():
+        params = request.GET.copy()
+        params["page"] = page.next_page_number()
+        next_page_url = request.build_absolute_uri(
+            f"{request.path}?{params.urlencode()}")
+
+    return JsonResponse(
+        {"success": True, "leads": rows, "next_page_url": next_page_url})

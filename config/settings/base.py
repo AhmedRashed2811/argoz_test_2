@@ -31,6 +31,7 @@ THIRD_PARTY_APPS = [
 # Order matters: core/companies first (base models, resolver), then domains.
 LOCAL_APPS = [
     "apps.core",
+    "apps.tenants",
     "apps.companies",
     "apps.accounts",
     "apps.authorization",
@@ -52,6 +53,9 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Per-DB tenant routing must run before sessions/auth so those lookups hit
+    # the tenant's database (SaaS DB-per-tenant, /t/<slug>/).
+    "apps.tenants.middleware.TenantRoutingMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -110,6 +114,10 @@ DATABASES = {
 
 AUTH_USER_MODEL = "accounts.User"
 
+# DB-per-tenant routing: queries go to the request's tenant DB, falling back to
+# `default` (the control plane) when no tenant is active. See apps.tenants.
+DATABASE_ROUTERS = ["apps.tenants.routers.TenantRouter"]
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -148,12 +156,9 @@ CELERY_TIMEZONE = TIME_ZONE
 from celery.schedules import crontab  # noqa: E402
 
 CELERY_BEAT_SCHEDULE = {
-    # SLA expiry itself is eta-scheduled per instance (apps.leads.tasks.
-    # expire_sla_instance); only near-expiry warnings still need polling.
-    "schedule_sla_warnings": {
-        "task": "apps.leads.tasks.schedule_sla_warnings",
-        "schedule": 60.0,
-    },
+    # SLA expiry and its warning reminder are both eta-scheduled per instance
+    # (apps.leads.tasks.expire_sla_instance / send_sla_reminder) at the moment
+    # the SLA opens — no more minute-by-minute polling for either.
     "send_due_reminders": {
         "task": "apps.leads.tasks.send_due_reminders",
         "schedule": 60.0,

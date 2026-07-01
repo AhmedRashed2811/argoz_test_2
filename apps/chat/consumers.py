@@ -10,6 +10,15 @@ import json
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from apps.tenants.db import current_scope
+
+
+def _chat_group(user_id) -> str:
+    # Tenant-scoped: the channel layer is one shared Redis, and user ids repeat
+    # across tenant DBs — an un-scoped group name would fan a message out to the
+    # same-id user in every other tenant.
+    return f"chat_user_{current_scope()}_{user_id}"
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -18,7 +27,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
         self.user = user
-        self.group = f"chat_user_{user.id}"
+        self.group = _chat_group(user.id)
         await self.channel_layer.group_add(self.group, self.channel_name)
         await self.accept()
 
@@ -48,7 +57,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         payload, recipient_ids = result
         for uid in recipient_ids:
             await self.channel_layer.group_send(
-                f"chat_user_{uid}",
+                _chat_group(uid),
                 {"type": "chat.message", "message": payload},
             )
 
@@ -61,7 +70,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
         for uid in recipient_ids:
             await self.channel_layer.group_send(
-                f"chat_user_{uid}",
+                _chat_group(uid),
                 {
                     "type": "chat.read",
                     "conversation_id": str(convo_id),

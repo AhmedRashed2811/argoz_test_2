@@ -20,7 +20,8 @@ class LeadStageService:
     @staticmethod
     @transaction.atomic
     def change_stage(*, lead_id, to_stage_code: str, actor=None, reason: str = "",
-                     request_meta=None, frozen_days: int = 0, scheduled_time=None) -> Lead:
+                     request_meta=None, frozen_days: int = 0, scheduled_time=None,
+                     notify: bool = True) -> Lead:
         lead = Lead.objects.select_for_update().select_related(
             "company", "assigned_salesman", "current_stage"
         ).get(id=lead_id)
@@ -84,7 +85,7 @@ class LeadStageService:
             before={"stage": getattr(from_stage, "code", None)},
             after={"stage": to_stage_code}, reason=reason,
         )
-        if to_stage_code not in (StageCode.FOLLOW_UP, StageCode.MEETING, StageCode.NOT_REACHED, StageCode.INTERESTED, StageCode.NOT_INTERESTED, StageCode.FROZEN):
+        if notify and to_stage_code not in (StageCode.FOLLOW_UP, StageCode.MEETING, StageCode.NOT_REACHED, StageCode.INTERESTED, StageCode.NOT_INTERESTED, StageCode.FROZEN):
             NotificationService.create(
                 company=lead.company, recipient=lead.assigned_salesman,
                 code=NotificationCode.STAGE_CHANGED, title=f"Lead moved to {to_stage.name}",

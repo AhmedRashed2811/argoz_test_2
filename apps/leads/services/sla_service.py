@@ -90,47 +90,19 @@ class SLAService:
         return _apply_weekend_freeze(company, now, now + delta)
 
     @staticmethod
-    def schedule_warnings(now) -> int:
-        """Create SLA_WARNING Reminders for active SLAs within the warning window.
-        Per-company threshold from policy 'lead.sla_warning_threshold' (default 30 min)."""
-        from datetime import timedelta
-        from apps.policies.services import PolicyResolver
-        from ..models import Reminder
-        from .reminder_service import ReminderService
-
-        MAX_LOOKAHEAD = timedelta(hours=1)
-        near_expiry = (
-            SLAInstance.objects
-            .select_related("lead", "lead__company", "lead__assigned_salesman", "stage")
-            .filter(status=SLAStatus.ACTIVE, deadline_at__gt=now, deadline_at__lte=now + MAX_LOOKAHEAD)
-        )
-        count = 0
-        for sla in near_expiry:
-            if not sla.lead.assigned_salesman_id:
-                continue
-            if sla.stage.code == StageCode.FRESH:
-                threshold_val = PolicyResolver.value(
-                    sla.lead.company, PolicyCode.FRESH_REMINDER_SCHEDULE, default={"minutes": 2}
-                )
-            else:
-                threshold_val = PolicyResolver.value(
-                    sla.lead.company, "lead.sla_warning_threshold", default={"minutes": 30}
-                )
-            threshold = _duration_to_timedelta(threshold_val, default_minutes=30)
-            if sla.deadline_at - threshold > now:
-                continue  # too early
-            already = Reminder.objects.filter(
-                lead=sla.lead, user=sla.lead.assigned_salesman, reminder_type="SLA_WARNING",
-                status__in=("PENDING", "SENT"),
-            ).exists()
-            if already:
-                continue
-            ReminderService.create(
-                company=sla.lead.company, user=sla.lead.assigned_salesman,
-                due_at=now, reminder_type="SLA_WARNING", lead=sla.lead,
+    def warning_threshold(company, stage_code: str) -> timedelta:
+        """How long before deadline_at the SLA_WARNING reminder should fire.
+        Per-company policy: 'lead.fresh_reminder_schedule' for Fresh, else
+        'lead.sla_warning_threshold'."""
+        if stage_code == StageCode.FRESH:
+            threshold_val = PolicyResolver.value(
+                company, PolicyCode.FRESH_REMINDER_SCHEDULE, default={"minutes": 2}
             )
-            count += 1
-        return count
+        else:
+            threshold_val = PolicyResolver.value(
+                company, "lead.sla_warning_threshold", default={"minutes": 30}
+            )
+        return _duration_to_timedelta(threshold_val, default_minutes=30)
 
     @staticmethod
     def _revoke_expiry(task_id: str) -> None:
@@ -144,27 +116,40 @@ class SLAService:
         """Close any active SLA, open a fresh one (idempotent rotation helper).
         Revokes the outgoing SLA's eta expiry job and schedules a new one at the
         new deadline (docs §12.2)."""
-        from apps.leads.tasks import expire_sla_instance
+        from apps.leads.tasks import expire_sla_instance, send_sla_reminder
 
-        # Revoke any pending eta expiry job(s) before closing the old SLA(s).
+        # Revoke any pending eta expiry/reminder job(s) before closing the old SLA(s).
         for old_task_id in SLAInstance.objects.filter(
             lead=lead, status=SLAStatus.ACTIVE
         ).exclude(expiry_task_id="").values_list("expiry_task_id", flat=True):
+            SLAService._revoke_expiry(old_task_id)
+        for old_task_id in SLAInstance.objects.filter(
+            lead=lead, status=SLAStatus.ACTIVE
+        ).exclude(reminder_task_id="").values_list("reminder_task_id", flat=True):
             SLAService._revoke_expiry(old_task_id)
         SLAInstance.objects.filter(lead=lead, status=SLAStatus.ACTIVE).update(
             status=SLAStatus.COMPLETED
         )
         if deadline is None:
             return None
+        owner = salesman or lead.assigned_salesman
         instance = SLAInstance.objects.create(
             lead=lead,
             stage=stage,
-            assigned_salesman=salesman or lead.assigned_salesman,
+            assigned_salesman=owner,
             start_at=timezone.now(),
             deadline_at=deadline,
             status=SLAStatus.ACTIVE,
         )
-        # Schedule expiry exactly at the deadline. Defer enqueue to after commit
+        # Reminder fires at deadline_at minus the company's warning threshold,
+        # replacing the old minute-by-minute poll (docs §12.2).
+        reminder_eta = None
+        if owner is not None:
+            threshold = SLAService.warning_threshold(lead.company, stage.code)
+            candidate = deadline - threshold
+            reminder_eta = candidate if candidate > timezone.now() else timezone.now()
+
+        # Schedule expiry/reminder exactly on time. Defer enqueue to after commit
         # so the worker can never pick up the instance before it's visible.
         from django.db import transaction
 
@@ -172,7 +157,13 @@ class SLAService:
             result = expire_sla_instance.apply_async(
                 args=[str(instance.id)], eta=instance.deadline_at
             )
-            SLAInstance.objects.filter(id=instance.id).update(expiry_task_id=result.id)
+            update_fields = {"expiry_task_id": result.id}
+            if reminder_eta is not None:
+                reminder_result = send_sla_reminder.apply_async(
+                    args=[str(instance.id)], eta=reminder_eta
+                )
+                update_fields["reminder_task_id"] = reminder_result.id
+            SLAInstance.objects.filter(id=instance.id).update(**update_fields)
 
         transaction.on_commit(_schedule)
         return instance

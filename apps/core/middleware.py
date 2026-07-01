@@ -42,7 +42,11 @@ class IdempotencyMiddleware:
         if not key:
             return self.get_response(request)
 
-        cache_key = CACHE_PREFIX + key
+        # Scope by tenant: the key is client-supplied, so two tenants could send
+        # the same value and replay each other's cached response.
+        from apps.tenants.db import current_scope
+
+        cache_key = f"{CACHE_PREFIX}{current_scope()}:{key}"
         cached = cache.get(cache_key)
         if cached is not None:
             return self._rebuild(cached)

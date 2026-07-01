@@ -11,6 +11,8 @@ let sortField = null;
 let sortAscMap = {};
 let searchQuery = '';
 let editingIndex = null;
+let cPasswordTypedByUser = false;
+let edPasswordTypedByUser = false;
 
 // Filter states
 let activeNameFilters   = new Set();
@@ -520,6 +522,7 @@ function resetCreateForm() {
   ['c_name','c_email','c_password','c_agency_id','c_phone','c_location','c_commission','c_startDate','c_endDate','c_notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  cPasswordTypedByUser = false;
 }
 function openCreate() {
   resetCreateForm();
@@ -603,6 +606,7 @@ document.getElementById('createSave').addEventListener('click', async () => {
    ═══════════════════════════════════ */
 function openEdit(index) {
   editingIndex = index;
+  edPasswordTypedByUser = false;
   const b = brokers[index];
   document.getElementById('editModalSub').textContent = b.agency ? `${b.agency}` : 'Independent Broker';
   document.getElementById('editModalBody').innerHTML = `
@@ -1045,6 +1049,8 @@ function unlockGuardedField(el) {
   // so clear shortly after unlocking.
   setTimeout(() => {
     if (el.id === 'searchInput' && searchWasTypedByUser) return;
+    if (el.id === 'c_password' && cPasswordTypedByUser) return;
+    if (el.id === 'ed_password' && edPasswordTypedByUser) return;
     el.value = '';
     el.defaultValue = '';
 
@@ -1070,8 +1076,24 @@ document.addEventListener('mousedown', e => {
 });
 
 document.addEventListener('input', e => {
-  if (e.target && e.target.id === 'searchInput') {
-    searchWasTypedByUser = true;
+  if (e.target) {
+    if (e.target.id === 'searchInput') {
+      searchWasTypedByUser = true;
+    } else if (e.target.id === 'c_password') {
+      cPasswordTypedByUser = true;
+    } else if (e.target.id === 'ed_password') {
+      edPasswordTypedByUser = true;
+    }
+  }
+});
+
+document.addEventListener('change', e => {
+  if (e.target) {
+    if (e.target.id === 'c_password') {
+      cPasswordTypedByUser = true;
+    } else if (e.target.id === 'ed_password') {
+      edPasswordTypedByUser = true;
+    }
   }
 });
 
@@ -1088,6 +1110,8 @@ document.addEventListener('click', () => {
     ['c_password', 'ed_password'].forEach(id => {
       const el = document.getElementById(id);
       if (el && el.value && document.activeElement !== el) {
+        if (id === 'c_password' && cPasswordTypedByUser) return;
+        if (id === 'ed_password' && edPasswordTypedByUser) return;
         clearFieldById(id);
       }
     });

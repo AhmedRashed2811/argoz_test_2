@@ -73,13 +73,20 @@ class NotificationService:
         )
 
     @staticmethod
-    async def sse_stream(user):
+    async def sse_stream(user, db_alias=None):
         """Async generator that yields SSE-formatted lines for *user*.
 
         Uses Redis pub/sub directly (bypasses channels_redis) so messages
         published by fanout_notification in the Celery worker are received
         immediately without cross-process channel-layer timing issues.
+
+        db_alias re-pins the tenant DB: the routing middleware clears the alias
+        once the view returns the StreamingHttpResponse, but this generator runs
+        afterwards, so payload lookups would otherwise hit the control-plane DB.
         """
+        if db_alias:
+            from apps.tenants.db import set_current_db
+            set_current_db(db_alias)
         import asyncio
         import json
         import redis.asyncio as aioredis
@@ -133,9 +140,12 @@ class NotificationService:
                 "is_read": n.is_read,
             }
 
+        from .consumers import sse_channel
+
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         pubsub = r.pubsub()
-        channel = f"sse_notif:{user.id}"
+        # set_current_db(db_alias) above scopes this to the right tenant.
+        channel = sse_channel(user.id)
         await pubsub.subscribe(channel)
 
         queue: asyncio.Queue = asyncio.Queue()
@@ -184,8 +194,9 @@ class NotificationService:
         if recipient is None or lead is None:
             return 0
         codes = [
-            NotificationCode.LEAD_ASSIGNED, NotificationCode.FOLLOWUP_DUE,
-            NotificationCode.MEETING_DUE, NotificationCode.FROZEN_LEAD_RETURN,
+            NotificationCode.LEAD_ASSIGNED, NotificationCode.LEAD_REASSIGNED_SLA,
+            NotificationCode.FOLLOWUP_DUE, NotificationCode.MEETING_DUE,
+            NotificationCode.FROZEN_LEAD_RETURN,
         ]
         deleted, _ = Notification.objects.filter(
             recipient=recipient, related_type="Lead", related_id=str(lead.pk),

@@ -29,7 +29,12 @@ class EffectivePermissionResolver:
 
     @staticmethod
     def _cache_key(user_id) -> str:
-        return f"{_CACHE_PREFIX}{user_id}"
+        # Namespaced by tenant: user ids are per-tenant auto-increment, so an
+        # un-scoped key would serve tenant A's permission set to tenant B's
+        # same-id user (authorization bleed across the shared Redis cache).
+        from apps.tenants.db import current_scope
+
+        return f"{_CACHE_PREFIX}{current_scope()}:{user_id}"
 
     @classmethod
     def get_codes(cls, user) -> set[str]:

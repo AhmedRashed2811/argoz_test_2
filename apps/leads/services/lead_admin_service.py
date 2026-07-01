@@ -10,8 +10,6 @@ from django.utils import timezone
 
 from apps.audit.services import AuditService
 from apps.core.constants import AuditAction
-from apps.notifications.constants import NotificationCode
-from apps.notifications.services import NotificationService
 
 from ..constants import ActiveStatus, SLAStatus
 from ..models import Lead, LeadNote
@@ -119,9 +117,5 @@ class LeadAdminService:
             company=lead.company, module="leads", request_meta=request_meta,
             after={"active_status": ActiveStatus.INACTIVE}, reason=reason,
         )
-        NotificationService.create(
-            company=lead.company, recipient=lead.assigned_salesman,
-            code=NotificationCode.LEAD_REACTIVATED, title="Lead deactivated",
-            related_type="Lead", related_id=lead.pk,
-        )
+        # De/activation is an admin housekeeping action — no salesman notification.
         return lead

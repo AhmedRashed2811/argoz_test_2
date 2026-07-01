@@ -3,6 +3,7 @@ from .bulk_import_service import BulkLeadImportService
 from .duplicate_service import DuplicateService
 from .existing_client_service import ExistingClientService
 from .lead_admin_service import LeadAdminService
+from .lead_api_service import LeadApiService
 from .followup_service import FollowUpService
 from .lead_creation_service import LeadCreationService
 from .lead_serialization_service import LeadSerializationService
@@ -21,6 +22,7 @@ __all__ = [
     "ExistingClientService",
     "FollowUpService",
     "LeadAdminService",
+    "LeadApiService",
     "LeadCreationService",
     "LeadSerializationService",
     "LeadStageService",

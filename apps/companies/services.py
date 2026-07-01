@@ -5,9 +5,15 @@ from __future__ import annotations
 
 from django.core.cache import cache
 
+from apps.tenants.db import get_current_db
+
 from .models import Company
 
-_CACHE_KEY = "current_company:default"
+
+def _cache_key() -> str:
+    # Per-tenant key: the active DB alias scopes the cached company so one
+    # tenant's resolution never leaks into another's (DB-per-tenant SaaS).
+    return f"current_company:{get_current_db() or 'default'}"
 
 
 class CurrentCompanyResolver:
@@ -15,21 +21,22 @@ class CurrentCompanyResolver:
 
     @staticmethod
     def resolve(request=None) -> Company | None:
-        # Future: branch on subdomain / request.user membership / subscription.
+        # Each tenant DB holds exactly one Company; this returns it.
         return CurrentCompanyResolver.default_company()
 
     @staticmethod
     def default_company() -> Company | None:
-        company_id = cache.get(_CACHE_KEY)
+        key = _cache_key()
+        company_id = cache.get(key)
         if company_id:
             company = Company.objects.filter(id=company_id, is_active=True).first()
             if company:
                 return company
         company = Company.objects.filter(is_active=True).order_by("created_at").first()
         if company:
-            cache.set(_CACHE_KEY, str(company.id), timeout=300)
+            cache.set(key, str(company.id), timeout=300)
         return company
 
     @staticmethod
     def invalidate() -> None:
-        cache.delete(_CACHE_KEY)
+        cache.delete(_cache_key())

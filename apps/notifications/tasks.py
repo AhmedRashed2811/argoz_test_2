@@ -48,17 +48,19 @@ def fanout_notification(notification_id: str):
         "created_at": notif.created_at.isoformat(),
     }
 
+    from .consumers import notif_group, sse_channel
+
     # WebSocket delivery via Django Channels layer.
     layer = get_channel_layer()
     if layer is not None:
         async_to_sync(layer.group_send)(
-            f"notifications_{notif.recipient_id}",
+            notif_group(notif.recipient_id),
             {"type": "notify", "payload": payload},
         )
 
     # SSE delivery via direct Redis pub/sub (more reliable cross-process).
     r = sync_redis.from_url(settings.REDIS_URL)
-    r.publish(f"sse_notif:{notif.recipient_id}", str(notif.id))
+    r.publish(sse_channel(notif.recipient_id), str(notif.id))
     r.close()
     NotificationDelivery.objects.filter(
         notification=notif, channel=Channel.WEBSOCKET

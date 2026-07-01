@@ -98,6 +98,14 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         company = self._company()
+        self.seed_config(company)
+        self.stdout.write(self.style.SUCCESS("CRM seed complete."))
+
+    def seed_config(self, company: Company) -> None:
+        """Every configurable record a company needs to run — stages, sources,
+        policies, role groups, pages, permissions, role defaults — EXCEPT the
+        company row itself. Tenant provisioning calls this against a freshly
+        created Company in a brand-new tenant database."""
         self._stages()
         self._sources()
         self._how_did_you_know()
@@ -110,7 +118,6 @@ class Command(BaseCommand):
         self._pages()
         self._permissions()
         self._role_defaults(company)
-        self.stdout.write(self.style.SUCCESS("CRM seed complete."))
 
     def _company(self) -> Company:
         company, created = Company.objects.get_or_create(
@@ -518,21 +525,14 @@ class Command(BaseCommand):
         )
         # Source-level create permission codes (leads spec §4.2b role defaults).
         all_source_creates = [f"leads.lead.create_from_{s.lower()}" for s in SourceCode.ALL]
+        admin_audit_auth_codes = list(
+            PermissionDefinition.objects.filter(
+                module__in=["admin", "audit", "authorization"]
+            ).values_list("code", flat=True)
+        )
         bundles = {
-            "SYSTEM_ADMINS": all_codes,
-            "DIRECTORS": ["leads.dashboard.access",
-                          "leads.lead.create", "leads.lead.view_all", "leads.lead.edit_all",
-                          "leads.lead.deactivate", "leads.stage.change_own",
-                          "leads.distribution.manual_all",
-                          "review_marketing_report",
-                          "review_sales_performance_report",
-                          "review_leads_analysis",
-                          # Oversight of System Admins: only Directors may edit the
-                          # System Admins role / a System Admin's permissions (§4.4).
-                          "authorization.roles.manage",
-                          "authorization.permissions.manage",
-                          "admin.users.access", *all_source_creates,
-                          "admin.brokers.access", "admin.brokers.create"],
+            "SYSTEM_ADMINS": admin_audit_auth_codes,
+            "DIRECTORS": all_codes,
             "SALES": ["leads.dashboard.access", "leads.calendar.access",
                       "leads.lead.create", "leads.lead.create_self_generated",
                       "leads.lead.create_from_self_generated", "leads.lead.view_own",

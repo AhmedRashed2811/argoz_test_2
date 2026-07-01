@@ -55,25 +55,86 @@ def expire_sla_instance(self, sla_instance_id):
         raise
 
 
-@shared_task
-def schedule_sla_warnings():
-    """Beat every ~minute: create SLA_WARNING reminders for near-expiry SLAs
-    (docs §12.2). Expiry itself is now eta-scheduled per instance, not polled."""
-    from apps.leads.services.sla_service import SLAService
+@shared_task(bind=True)
+def send_sla_reminder(self, sla_instance_id):
+    """Fired by an eta scheduled at (deadline - warning threshold) when the SLA
+    is opened (docs §12.2): create the SLA_WARNING reminder for this one
+    instance. No-op if the SLA already rotated away from this instance."""
+    from apps.leads.models import Reminder, SLAInstance
+    from apps.leads.constants import SLAStatus
+    from apps.leads.services.reminder_service import ReminderService
 
-    print(f"\n⏰ [CELERY SLA WARNINGS START]")
-    warned = SLAService.schedule_warnings(timezone.now())
-    print(f"🏁 [CELERY SLA WARNINGS DONE] Scheduled {warned} SLA warnings.\n")
-    return warned
+    sla = (
+        SLAInstance.objects.select_related("lead", "lead__company", "lead__assigned_salesman")
+        .filter(id=sla_instance_id, status=SLAStatus.ACTIVE)
+        .first()
+    )
+    if sla is None or not sla.lead.assigned_salesman_id:
+        return False
+    already = Reminder.objects.filter(
+        lead=sla.lead, user=sla.lead.assigned_salesman, reminder_type="SLA_WARNING",
+        status__in=("PENDING", "SENT"),
+    ).exists()
+    if already:
+        return False
+    ReminderService.create(
+        company=sla.lead.company, user=sla.lead.assigned_salesman,
+        due_at=timezone.now(), reminder_type="SLA_WARNING", lead=sla.lead,
+    )
+    return True
+
+
+def _deliver_reminder(reminder) -> None:
+    """Send one PENDING reminder as a notification and mark it SENT. Shared by
+    the eta-scheduled deliver_reminder task and the send_due_reminders safety
+    net sweep."""
+    from apps.notifications.constants import NotificationCode
+    from apps.notifications.services import NotificationService
+
+    if reminder.user_id:
+        code_attr, title = _REMINDER_MAP.get(
+            reminder.reminder_type,
+            ("FOLLOWUP_DUE", f"Reminder: {reminder.reminder_type}"),
+        )
+        NotificationService.create(
+            company=reminder.company,
+            recipient=reminder.user,
+            code=getattr(NotificationCode, code_attr),
+            title=title,
+            body=str(reminder.lead) if reminder.lead else "",
+            related_type="Lead",
+            related_id=reminder.lead_id or "",
+            channels=[reminder.channel] if reminder.channel else None,
+        )
+    reminder.status = "SENT"
+    reminder.sent_at = timezone.now()
+    reminder.save(update_fields=["status", "sent_at"])
+
+
+@shared_task
+def deliver_reminder(reminder_id):
+    """Fired by an eta scheduled at Reminder.due_at when the reminder is
+    created (docs §12.1): deliver this one reminder on time instead of
+    waiting for the next polling sweep. No-op if already delivered."""
+    from apps.leads.models import Reminder
+
+    reminder = (
+        Reminder.objects.select_related("lead", "company", "user")
+        .filter(id=reminder_id, status="PENDING")
+        .first()
+    )
+    if reminder is None:
+        return False
+    _deliver_reminder(reminder)
+    return True
 
 
 @shared_task
 def send_due_reminders():
-    """Beat ~every minute: deliver due reminders as in-app (and email when the
-    reminder channel is EMAIL) notifications (docs §12.1)."""
+    """Beat ~every minute: safety-net sweep in case an eta-scheduled
+    deliver_reminder job was lost (e.g. broker restart). Normally a no-op
+    since reminders are delivered on time via their own eta job."""
     from apps.leads.models import Reminder
-    from apps.notifications.constants import NotificationCode
-    from apps.notifications.services import NotificationService
 
     print(f"\n⏰ [CELERY REMINDERS TASK START]")
 
@@ -85,25 +146,7 @@ def send_due_reminders():
 
     count = 0
     for reminder in due_list:
-        if reminder.user_id:
-            code_attr, title = _REMINDER_MAP.get(
-                reminder.reminder_type,
-                ("FOLLOWUP_DUE", f"Reminder: {reminder.reminder_type}"),
-            )
-            print(f"👉 Sending reminder {reminder.id} of type {reminder.reminder_type} to user {reminder.user_id}...")
-            NotificationService.create(
-                company=reminder.company,
-                recipient=reminder.user,
-                code=getattr(NotificationCode, code_attr),
-                title=title,
-                body=str(reminder.lead) if reminder.lead else "",
-                related_type="Lead",
-                related_id=reminder.lead_id or "",
-                channels=[reminder.channel] if reminder.channel else None,
-            )
-        reminder.status = "SENT"
-        reminder.sent_at = timezone.now()
-        reminder.save(update_fields=["status", "sent_at"])
+        _deliver_reminder(reminder)
         count += 1
         print(f"✅ Reminder {reminder.id} status set to SENT.")
 

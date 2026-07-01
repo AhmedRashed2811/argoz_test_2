@@ -323,7 +323,7 @@
       uploadUrl: "{% url 'chat:upload' %}",
       historyTmpl: "{% url 'chat:history' '00000000-0000-0000-0000-000000000000' %}",
       readTmpl: "{% url 'chat:mark_read' '00000000-0000-0000-0000-000000000000' %}",
-      wsPath: "/ws/chat/",
+      wsPath: (location.pathname.match(/^\/t\/[^\/]+/) || [""])[0] + "/ws/chat/",
       meId: "{{ user.id }}"
     },
     notebook: {

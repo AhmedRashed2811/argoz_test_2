@@ -1,8 +1,15 @@
 """Company tenant root + branches (docs §11, §2.3). Single active company now;
 SaaS tenant root later. Holds subscription placeholders, no billing UI yet."""
+import secrets
+
 from django.db import models
 
 from apps.core.models import BaseModel
+
+
+def generate_api_key() -> str:
+    """Bearer/x-api-key token for the external leads API. URL-safe, ~43 chars."""
+    return secrets.token_urlsafe(32)
 
 
 class SubscriptionStatus:
@@ -28,6 +35,11 @@ class Company(BaseModel):
     )
     plan_code = models.CharField(max_length=50, blank=True)
     timezone = models.CharField(max_length=64, default="UTC")
+    # Auth token for the external read-only leads API (Bearer / x-api-key).
+    api_key = models.CharField(
+        max_length=64, unique=True, default=generate_api_key,
+        help_text="Token external systems send to read this company's leads.",
+    )
 
     class Meta:
         verbose_name_plural = "companies"

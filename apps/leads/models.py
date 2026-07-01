@@ -217,6 +217,9 @@ class SLAInstance(BaseModel):
     # Celery task id of the eta-scheduled expiry job, so it can be revoked when
     # the SLA is rotated or its deadline changes (docs §12.2).
     expiry_task_id = models.CharField(max_length=255, blank=True, default="")
+    # Celery task id of the eta-scheduled reminder job (fires before deadline_at,
+    # per company policy), revoked/rescheduled alongside expiry_task_id.
+    reminder_task_id = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         indexes = [
@@ -252,6 +255,12 @@ class FollowUp(BaseModel):
     )
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["assigned_salesman", "status", "scheduled_at"]),
+            models.Index(fields=["lead", "status", "scheduled_at"]),
+        ]
+
 
 class Meeting(BaseModel):
     """Created by MeetingService only (docs §9.3)."""
@@ -268,6 +277,12 @@ class Meeting(BaseModel):
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["assigned_salesman", "status", "scheduled_start"]),
+            models.Index(fields=["lead", "status", "scheduled_start"]),
+        ]
 
 
 class Reminder(BaseModel, CompanyOwnedModel):
@@ -288,7 +303,10 @@ class Reminder(BaseModel, CompanyOwnedModel):
     channel = models.CharField(max_length=20, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=["status", "due_at"])]
+        indexes = [
+            models.Index(fields=["status", "due_at"]),
+            models.Index(fields=["lead", "reminder_type", "status"]),
+        ]
 
 
 class LeadNote(BaseModel):
